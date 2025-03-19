@@ -93,9 +93,10 @@ namespace CachedEfCore.Cache.Helper
             string key,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var cacheKey = GenCacheKey(key, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
 
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
+            var cacheKey = GenCacheKey(entityType.FullName!, key, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -178,16 +179,18 @@ namespace CachedEfCore.Cache.Helper
             string key,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var cacheKey = GenCacheKey(key, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = GenCacheKey(entityType.FullName!, key, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static string GenCacheKey(string query, string getFromDb)
+        private static string GenCacheKey(string entityFullName, string query, string getFromDb)
         {
-            return $"{getFromDb}.{query}";
+            return $"{entityFullName}.{getFromDb}.{query}";
         }
     }
 }

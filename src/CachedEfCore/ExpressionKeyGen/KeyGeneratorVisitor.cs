@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -59,9 +58,8 @@ namespace CachedEfCore.ExpressionKeyGen
             typeof(string),
         };
 
-        private readonly Lock _lock = new Lock();
-
-        private bool _isPrintable = true;
+        [ThreadStatic]
+        private static bool _isPrintable;
 
         public KeyGeneratorVisitor(IEnumerable<Type> printableTypes)
         {
@@ -75,7 +73,7 @@ namespace CachedEfCore.ExpressionKeyGen
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResetState()
+        private static void ResetState()
         {
             _isPrintable = true;
         }
@@ -147,30 +145,18 @@ namespace CachedEfCore.ExpressionKeyGen
             return result;
         }
 
-        [return: NotNullIfNotNull(nameof(node))]
-        public override Expression? Visit(Expression? node)
-        {
-            lock (_lock)
-            {
-                return base.Visit(node);
-            }
-        }
-
         private KeyGeneratorResult<Expression> VisitWithState(Expression node)
         {
-            lock (_lock)
+            ResetState();
+            var expression = base.Visit(node);
+
+            var result = new KeyGeneratorResult<Expression>
             {
-                ResetState();
-                var expression = base.Visit(node);
+                Expression = expression,
+                IsPrintable = _isPrintable,
+            };
 
-                var result = new KeyGeneratorResult<Expression>
-                {
-                    Expression = expression,
-                    IsPrintable = _isPrintable,
-                };
-
-                return result;
-            }
+            return result;
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
