@@ -49,8 +49,48 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
                });
 
             yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                DELETE FROM
+                "{GetTableName(typeof(LazyLoadEntity))}";
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                DELETE FROM
+                [{GetTableName(typeof(LazyLoadEntity))}];
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
                $"""
                 DELETE FROM {GetTableName(typeof(LazyLoadEntity))};
+                """,
+               new HashSet<IEntityType>
+               {
+                    GetIEntityType(typeof(LazyLoadEntity))
+               });  
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                DELETE FROM "{GetTableName(typeof(LazyLoadEntity))}";
+                """,
+               new HashSet<IEntityType>
+               {
+                    GetIEntityType(typeof(LazyLoadEntity))
+               }); 
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                DELETE FROM [{GetTableName(typeof(LazyLoadEntity))}];
                 """,
                new HashSet<IEntityType>
                {
@@ -66,11 +106,51 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
                new HashSet<IEntityType>
                {
                     GetIEntityType(typeof(LazyLoadEntity))
+               });   
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                DELETE "u"
+                FROM "{GetTableName(typeof(LazyLoadEntity))}"
+                "u";
+                """,
+               new HashSet<IEntityType>
+               {
+                    GetIEntityType(typeof(LazyLoadEntity))
+               });
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                DELETE [u]
+                FROM [{GetTableName(typeof(LazyLoadEntity))}]
+                [u];
+                """,
+               new HashSet<IEntityType>
+               {
+                    GetIEntityType(typeof(LazyLoadEntity))
                });
 
             yield return new TestCaseData(_cachedDbContext.TableEntity,
                 $"""
                     DELETE u FROM {GetTableName(typeof(LazyLoadEntity))} u;
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                });  
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                    DELETE "u" FROM "{GetTableName(typeof(LazyLoadEntity))}" "u";
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                });  
+            
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                    DELETE [u] FROM [{GetTableName(typeof(LazyLoadEntity))}] [u];
                 """,
                 new HashSet<IEntityType>
                 {
@@ -90,9 +170,9 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
         {
             yield return new TestCaseData(_cachedDbContext.TableEntity,
                $"""
-                UPDATE [u]
-                SET [u].[StringData] = 'test'
-                FROM [{GetTableName(typeof(LazyLoadEntity))}] AS [u];
+                UPDATE u
+                SET u.StringData = 'test'
+                FROM {GetTableName(typeof(LazyLoadEntity))} AS u;
                 """,
                 new HashSet<IEntityType>
                 {
@@ -108,15 +188,48 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
                 """,
                 new HashSet<IEntityType>
                 {
-                        GetIEntityType(typeof(LazyLoadEntity))
+                    GetIEntityType(typeof(LazyLoadEntity))
                 }
             );
 
             yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                UPDATE u
-                SET u.StringData = 'test'
-                FROM {GetTableName(typeof(LazyLoadEntity))} AS u;
+                $"""
+                UPDATE [u]
+                SET [u].[StringData] = 'test'
+                FROM [{GetTableName(typeof(LazyLoadEntity))}] AS [u];
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                UPDATE {GetTableName(typeof(LazyLoadEntity))}
+                SET StringData = 'test'
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                UPDATE "{GetTableName(typeof(LazyLoadEntity))}"
+                SET StringData = 'test'
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+                $"""
+                UPDATE [{GetTableName(typeof(LazyLoadEntity))}]
+                SET StringData = 'test'
                 """,
                 new HashSet<IEntityType>
                 {
@@ -127,6 +240,47 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 
         [TestCaseSource(nameof(GetUpdateTestCases))]
         public void Extract_Entities_From_Update_Query(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql, HashSet<IEntityType> expected)
+        {
+            var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
+
+            Assert.That(entities, Is.EquivalentTo(expected));
+        }
+
+        private static IEnumerable<TestCaseData> GetInsertTestCases()
+        {
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                INSERT INTO {GetTableName(typeof(LazyLoadEntity))} (StringData) VALUES ("test");
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                INSERT INTO "{GetTableName(typeof(LazyLoadEntity))}" (StringData) VALUES ("test");
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                INSERT INTO [{GetTableName(typeof(LazyLoadEntity))}] (StringData) VALUES ("test");
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+        }
+
+        [TestCaseSource(nameof(GetInsertTestCases))]
+        public void Extract_Entities_From_Insert_Query(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql, HashSet<IEntityType> expected)
         {
             var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 

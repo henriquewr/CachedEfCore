@@ -86,10 +86,16 @@ namespace CachedEfCore.SqlAnalysis
         [StringSyntax(StringSyntaxAttribute.Regex)]
         private const string TablesRegex = @"(\[(.+?)\]|""(.+?)""|\s?([^\s\[\]"";]+)\s?)";
 
-        [GeneratedRegex(@$"(UPDATE|DELETE\s+({TablesRegex}\s+)?FROM|INSERT\s+INTO)\s+{TablesRegex}", RegexOptions.IgnoreCase)]
+        [StringSyntax(StringSyntaxAttribute.Regex)]
+        private const string StateChangingTablesRegex = @$"(UPDATE|DELETE\s+({TablesRegex}\s+)?FROM|INSERT\s+INTO)\s+{TablesRegex}";
+
+        [StringSyntax(StringSyntaxAttribute.Regex)]
+        private const string GetTableAliasesRegex = @$"FROM\s{TablesRegex}\s+(?:AS\s+)?{TablesRegex}";
+
+        [GeneratedRegex(StateChangingTablesRegex, RegexOptions.IgnoreCase)]
         private static partial Regex StateChangingTables();
 
-        [GeneratedRegex(@$"FROM\s{TablesRegex}\s+(?:AS\s+)?{TablesRegex}", RegexOptions.IgnoreCase)]
+        [GeneratedRegex(GetTableAliasesRegex, RegexOptions.IgnoreCase)]
         private static partial Regex GetTableAliases();
     }
 }
