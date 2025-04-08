@@ -7,10 +7,10 @@ using CachedEfCore.Cache;
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore.Metadata;
-using System.Collections.Immutable;
 using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Linq;
+using CachedEfCore.EntityMapping;
 
 namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 {
@@ -159,7 +159,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
         }
 
         [TestCaseSource(nameof(GetDeleteTestCases))]
-        public void Extract_Entities_From_Delete_Query(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql, HashSet<IEntityType> expected)
+        public void Extract_Entities_From_Delete_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
             var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 
@@ -239,7 +239,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
         }
 
         [TestCaseSource(nameof(GetUpdateTestCases))]
-        public void Extract_Entities_From_Update_Query(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql, HashSet<IEntityType> expected)
+        public void Extract_Entities_From_Update_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
             var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 
@@ -280,7 +280,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
         }
 
         [TestCaseSource(nameof(GetInsertTestCases))]
-        public void Extract_Entities_From_Insert_Query(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql, HashSet<IEntityType> expected)
+        public void Extract_Entities_From_Insert_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
             var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 

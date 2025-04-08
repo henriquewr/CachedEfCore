@@ -5,12 +5,13 @@ using System.Text.RegularExpressions;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Collections.Immutable;
+using CachedEfCore.EntityMapping;
 
 namespace CachedEfCore.SqlAnalysis
 {
     public partial class SqlQueryEntityExtractor : ISqlQueryEntityExtractor
     {
-        public IEnumerable<IEntityType> GetStateChangingEntityTypesFromSql(IDictionary<string, ImmutableArray<IEntityType>> tableEntities, string sql)
+        public IEnumerable<IEntityType> GetStateChangingEntityTypesFromSql(TableEntityMapping tableEntities, string sql)
         {
             var aliases = GetAliases(sql).Dictionary;
 
@@ -22,7 +23,7 @@ namespace CachedEfCore.SqlAnalysis
                 ImmutableArray<IEntityType> entityTypes;
                 var tableName = GetTableMatch(match, 8).Value;
 
-                if (tableEntities.TryGetValue(tableName, out entityTypes))
+                if (tableEntities.Mapping.TryGetValue(tableName, out entityTypes))
                 {
                     foreach (var entityType in entityTypes)
                     {
@@ -33,7 +34,7 @@ namespace CachedEfCore.SqlAnalysis
                 {
                     foreach (var tableAlias in tableAliases)
                     {
-                        if (tableEntities.TryGetValue(tableAlias, out entityTypes))
+                        if (tableEntities.Mapping.TryGetValue(tableAlias, out entityTypes))
                         {
                             foreach (var entityType in entityTypes)
                             {
