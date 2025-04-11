@@ -19,7 +19,9 @@ namespace CachedEfCore.DependencyManager
             return _entityDependencyCache.GetOrAdd(dbContext.GetType(), key => new(dbContext.Model));
         }
 
-        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _cache = new();
+        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _underRelatedCache = new();
+        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _aboveRelatedCache = new();
+        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _allRelatedCache = new();
         private readonly ConcurrentDictionary<string, bool> _hasLazyLoadCache = new();
 
         private readonly FrozenDictionary<Type, IEntityType> _typeEntity;
@@ -60,64 +62,10 @@ namespace CachedEfCore.DependencyManager
         }
 
 
-        //public HashSet<IEntityType> GetAllRelatedEntities(Type rootType)
-        //{
-        //    var entities = GetAllEntitiesByType(GetAllTypes(rootType));
-        //    return GetEntities(entities, GetAllRelatedEntitiesImpl);
-        //}
-
-        //public HashSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType)
-        //{
-        //    return GetAllRelatedEntities(rootEntityType.ClrType);
-        //}
-
-        //private HashSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType)
-        //{
-        //    var key = $"{nameof(GetAllRelatedEntitiesImpl)}entity:{rootEntityType.ClrType.FullName}";
-
-        //    if (_cache.TryGetValue(key, out var cached))
-        //    {
-        //        return cached;
-        //    }
-
-        //    var visited = new HashSet<IEntityType>();
-        //    var stack = new Stack<IEntityType>();
-
-        //    stack.Push(rootEntityType);
-
-        //    while (stack.Count > 0)
-        //    {
-        //        var currentEntity = stack.Pop();
-
-        //        if (!visited.Add(currentEntity))
-        //        {
-        //            continue;
-        //        }
-
-        //        var underRelated = GetShallowUnderRelatedEntities(currentEntity);
-
-        //        foreach (var underRelatedEntity in underRelated)
-        //        {
-        //            stack.Push(underRelatedEntity);
-        //        }
-
-        //        var aboveRelated = GetShallowAboveRelatedEntities(currentEntity);
-        //        foreach (var aboveRelatedEntity in aboveRelated)
-        //        {
-        //            stack.Push(aboveRelatedEntity);
-        //        }
-        //    }
-
-        //    _cache[key] = visited;
-
-        //    return visited;
-        //}
-
-
 
         public HashSet<IEntityType> GetUnderRelatedEntities(IEntityType rootEntityType)
         {
-            return GetUnderRelatedEntities(rootEntityType.ClrType);
+            return GetUnderRelatedEntitiesImpl(rootEntityType, false);
         }
 
         public HashSet<IEntityType> GetUnderRelatedEntities(Type rootType)
@@ -139,9 +87,9 @@ namespace CachedEfCore.DependencyManager
 
         private HashSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool ignoreDependentOnEntityAttribute)
         {
-            var key = $"{nameof(GetUnderRelatedEntitiesImpl)}.{ignoreDependentOnEntityAttribute}.entity:{rootEntityType.ClrType.FullName}";
+            var key = $"{ignoreDependentOnEntityAttribute}.{rootEntityType.ClrType.FullName}";
 
-            if (_cache.TryGetValue(key, out var cached))
+            if (_underRelatedCache.TryGetValue(key, out var cached))
             {
                 return cached;
             }
@@ -168,7 +116,7 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            _cache[key] = visited;
+            _underRelatedCache[key] = visited;
 
             return visited;
         }
@@ -189,14 +137,14 @@ namespace CachedEfCore.DependencyManager
 
         public HashSet<IEntityType> GetAboveRelatedEntities(IEntityType rootEntityType)
         {
-            return GetAboveRelatedEntities(rootEntityType.ClrType);
+            return GetAboveRelatedEntitiesImpl(rootEntityType);
         }
 
         private HashSet<IEntityType> GetAboveRelatedEntitiesImpl(IEntityType rootEntityType)
         {
-            var key = $"{nameof(GetAboveRelatedEntitiesImpl)}entity:{rootEntityType.ClrType.FullName}";
+            var key = rootEntityType.ClrType.FullName!;
 
-            if (_cache.TryGetValue(key, out var cached))
+            if (_aboveRelatedCache.TryGetValue(key, out var cached))
             {
                 return cached;
             }
@@ -223,7 +171,69 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            _cache[key] = visited;
+            _aboveRelatedCache[key] = visited;
+
+            return visited;
+        }
+
+
+
+        public HashSet<IEntityType> GetAllRelatedEntities(Type rootType)
+        {
+            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            {
+                return GetAllRelatedEntitiesImpl(entityType);
+            }
+
+            var entities = GetAllEntitiesByType(GetAllTypes(rootType));
+
+            return GetEntities(entities, GetAllRelatedEntities);
+        }
+
+        public HashSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType)
+        {
+            return GetAllRelatedEntitiesImpl(rootEntityType);
+        }
+
+        private HashSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType)
+        {
+            var key = rootEntityType.ClrType.FullName!;
+
+            if (_allRelatedCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var visited = new HashSet<IEntityType>();
+            var stack = new Stack<IEntityType>();
+
+            stack.Push(rootEntityType);
+
+            while (stack.Count > 0)
+            {
+                var currentEntity = stack.Pop();
+
+                if (!visited.Add(currentEntity))
+                {
+                    continue;
+                }
+
+                var aboveRelated = GetShallowAboveRelatedEntities(currentEntity);
+
+                foreach (var aboveRelatedEntity in aboveRelated)
+                {
+                    stack.Push(aboveRelatedEntity);
+                }
+
+                var underRelated = GetShallowUnderRelatedEntities(currentEntity, false);
+
+                foreach (var underRelatedEntity in underRelated)
+                {
+                    stack.Push(underRelatedEntity);
+                }
+            }
+
+            _allRelatedCache[key] = visited;
 
             return visited;
         }

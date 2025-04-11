@@ -35,7 +35,7 @@ namespace CachedEfCore.Interceptors
 
                     if (modifiedEntitiesTypes.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveAllOfType(modifiedEntitiesTypes, context.DependencyManager);
+                        context.DbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context.DependencyManager);
                     }
                     return;
 
@@ -48,7 +48,7 @@ namespace CachedEfCore.Interceptors
 
                     if (stateChangingEntities.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveAllOfType(stateChangingEntities, context.DependencyManager);
+                        context.DbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context.DependencyManager);
                     }
                 return;
             }

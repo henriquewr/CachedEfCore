@@ -4,7 +4,6 @@ using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
@@ -35,7 +34,9 @@ namespace CachedEfCore.Cache
             };
         }
 
-        public event Action<HashSet<IEntityType>>? OnInvalidatingEntities;
+        public event Action<HashSet<IEntityType>, EntityDependency>? OnInvalidatingRootEntities;
+
+        public event Action<HashSet<IEntityType>>? OnInvalidatingDependentEntities;
 
         public void RemoveAllLazyLoadByContextId(Guid contextId, EntityDependency dependencyManager)
         {
@@ -45,25 +46,33 @@ namespace CachedEfCore.Cache
             }
         }
 
-        public void RemoveAllOfType(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager)
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true)
         {
-            OnInvalidatingEntities?.Invoke(entitiesToRemove);
+            if (fireEvent)
+            {
+                OnInvalidatingRootEntities?.Invoke(entitiesToRemove, dependencyManager);
+            }
 
-            RemoveAllOfTypeNoEvent(entitiesToRemove, dependencyManager);
-        }
-
-        public void RemoveAllOfTypeNoEvent(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager)
-        {
-            var typesToRemove = new HashSet<Type>();
+            var typesToRemove = new HashSet<IEntityType>();
 
             foreach (var typeToRemove in entitiesToRemove)
             {
-                typesToRemove.UnionWith(dependencyManager.GetAboveRelatedEntities(typeToRemove).Select(x => x.ClrType));
+                typesToRemove.UnionWith(dependencyManager.GetAboveRelatedEntities(typeToRemove));
             }
 
-            foreach (var item in typesToRemove)
+            RemoveDependentEntities(typesToRemove, fireEvent);
+        }
+
+        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
+        {
+            if (fireEvent)
             {
-                if (_cacheKeysByType.TryRemove(item, out var keysWithType))
+                OnInvalidatingDependentEntities?.Invoke(entitiesToRemove);
+            }
+
+            foreach (var item in entitiesToRemove)
+            {
+                if (_cacheKeysByType.TryRemove(item.ClrType, out var keysWithType))
                 {
                     RemoveKeys(keysWithType);
                 }

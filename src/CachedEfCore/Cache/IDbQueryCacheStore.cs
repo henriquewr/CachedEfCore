@@ -8,11 +8,12 @@ namespace CachedEfCore.Cache
 {
     public interface IDbQueryCacheStore 
     {
-        event Action<HashSet<IEntityType>> OnInvalidatingEntities;
+        event Action<HashSet<IEntityType>, EntityDependency>? OnInvalidatingRootEntities;
+        event Action<HashSet<IEntityType>>? OnInvalidatingDependentEntities;
 
         void RemoveAllLazyLoadByContextId(Guid contextId, EntityDependency dependencyManager);
-        void RemoveAllOfType(HashSet<IEntityType> typesToRemove, EntityDependency dependencyManager);
-        void RemoveAllOfTypeNoEvent(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager);
+        void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true);
+        void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
 
         void AddToCache(Guid contextId, Type rootEntityType, string key, object? dataToCache);
         T? GetCached<T>(string key);
