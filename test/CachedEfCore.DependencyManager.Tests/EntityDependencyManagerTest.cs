@@ -325,7 +325,7 @@ namespace CachedEfCore.DepencencyManager.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlQueryEntityExtractor()));
+                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
                 base.OnConfiguring(optionsBuilder);
             }
 

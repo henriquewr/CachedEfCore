@@ -7,8 +7,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <AssemblyVersion>2025.4.11.4</AssemblyVersion>
-    <FileVersion>2025.4.11.4</FileVersion>
+    <AssemblyVersion>2025.5.1.2</AssemblyVersion>
+    <FileVersion>2025.5.1.2</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

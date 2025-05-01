@@ -16,7 +16,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 {
     public class QueryCaching
     {
-        private static readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor = new SqlAnalysis.SqlQueryEntityExtractor();
+        private static readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor = new SqlServerQueryEntityExtractor();
         private static readonly CachedDbContext _cachedDbContext = new TestDbContext(new DbQueryCacheStore(new MemoryCache(new MemoryCacheOptions())));
 
         public QueryCaching()
@@ -277,6 +277,37 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
                     GetIEntityType(typeof(LazyLoadEntity))
                 }
             );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+              $"""
+                INSERT {GetTableName(typeof(LazyLoadEntity))} (StringData) VALUES ("test");
+                """,
+               new HashSet<IEntityType>
+               {
+                    GetIEntityType(typeof(LazyLoadEntity))
+               }
+           );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                INSERT "{GetTableName(typeof(LazyLoadEntity))}" (StringData) VALUES ("test");
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
+            yield return new TestCaseData(_cachedDbContext.TableEntity,
+               $"""
+                INSERT [{GetTableName(typeof(LazyLoadEntity))}] (StringData) VALUES ("test");
+                """,
+                new HashSet<IEntityType>
+                {
+                    GetIEntityType(typeof(LazyLoadEntity))
+                }
+            );
+
         }
 
         [TestCaseSource(nameof(GetInsertTestCases))]
@@ -301,7 +332,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlAnalysis.SqlQueryEntityExtractor()));
+                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlAnalysis.SqlServerQueryEntityExtractor()));
                 base.OnConfiguring(optionsBuilder);
             }
 

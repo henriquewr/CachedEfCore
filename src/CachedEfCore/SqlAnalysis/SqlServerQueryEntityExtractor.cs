@@ -9,7 +9,7 @@ using CachedEfCore.EntityMapping;
 
 namespace CachedEfCore.SqlAnalysis
 {
-    public partial class SqlQueryEntityExtractor : ISqlQueryEntityExtractor
+    public partial class SqlServerQueryEntityExtractor : ISqlQueryEntityExtractor
     {
         public IEnumerable<IEntityType> GetStateChangingEntityTypesFromSql(TableEntityMapping tableEntities, string sql)
         {
@@ -88,7 +88,7 @@ namespace CachedEfCore.SqlAnalysis
         private const string TablesRegex = @"(\[(.+?)\]|""(.+?)""|\s?([^\s\[\]"";]+)\s?)";
 
         [StringSyntax(StringSyntaxAttribute.Regex)]
-        private const string StateChangingTablesRegex = @$"(UPDATE|DELETE\s+({TablesRegex}\s+)?FROM|INSERT\s+INTO)\s+{TablesRegex}";
+        private const string StateChangingTablesRegex = @$"(UPDATE|DELETE\s+({TablesRegex}\s+)?FROM|INSERT(?:\s+INTO)?)\s+{TablesRegex}";
 
         [StringSyntax(StringSyntaxAttribute.Regex)]
         private const string GetTableAliasesRegex = @$"FROM\s{TablesRegex}\s+(?:AS\s+)?{TablesRegex}";
