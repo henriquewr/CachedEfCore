@@ -18,7 +18,7 @@ public void ConfigureServices(IServiceCollection services)
     services.AddDbContextPool<AppDbContext>(options =>
     {
         options.UseLazyLoadingProxies();
-        options.UseSqlServer(connectionString).AddInterceptors(new DbStateInterceptor(new SqlQueryEntityExtractor()));
+        options.UseSqlServer(connectionString).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor())); // currently only supports SQL Server
     });
 }
 ```
@@ -51,3 +51,7 @@ public async Task<IEnumerable<TResult>> SelectManyAsync<TResult>(Expression<Func
 ### **Performance impact**
 On my tests in a url shortner api:
 Without CachedEfCore I was getting 8k requests per second, and then when enabling the CachedEfCore i'm getting 107k requests per seconds improving over 13x the performance with less resource usage (yes LESS resources)
+
+
+### **Important**
+Don't save the instances returned by the cache
