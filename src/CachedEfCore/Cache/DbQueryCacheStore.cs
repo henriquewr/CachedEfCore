@@ -11,10 +11,8 @@ namespace CachedEfCore.Cache
 {
     public class DbQueryCacheStore : IDbQueryCacheStore
     {
-        private const string CacheKeyPrefix = "CachedEfCoreCache:";
-
-        private readonly ConcurrentDictionary<Guid, ConcurrentBag<string>> _cacheKeysByContextId = new();
-        private readonly ConcurrentDictionary<Type, ConcurrentBag<string>> _cacheKeysByType = new();
+        private readonly ConcurrentDictionary<Guid, ConcurrentBag<object>> _cacheKeysByContextId = new();
+        private readonly ConcurrentDictionary<Type, ConcurrentBag<object>> _cacheKeysByType = new();
 
         private readonly IMemoryCache _cache;
         private readonly MemoryCacheEntryOptions _cacheOptions;
@@ -79,7 +77,7 @@ namespace CachedEfCore.Cache
             }
         }
 
-        private void RemoveKeys(IEnumerable<string> keys)
+        private void RemoveKeys(IEnumerable<object> keys)
         {
             foreach (var key in keys)
             {
@@ -87,7 +85,7 @@ namespace CachedEfCore.Cache
             }
         }
 
-        private void RemoveLazyLoadKeys(IEnumerable<string> keysToRemove, EntityDependency dependencyManager)
+        private void RemoveLazyLoadKeys(IEnumerable<object> keysToRemove, EntityDependency dependencyManager)
         {
             foreach (var key in keysToRemove)
             {
@@ -109,49 +107,38 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetCached<T>(string key)
+        public T? GetCached<T>(object key)
         {
-            var cacheKey = GetCacheKey(key);
-
-            var cached = _cache.Get<T>(cacheKey);
+            var cached = _cache.Get<T>(key);
 
             return cached;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(Guid contextId, Type rootEntityType, string key, object? dataToCache)
+        public void AddToCache(Guid contextId, Type rootEntityType, object key, object? dataToCache)
         {
-            var cacheKey = GetCacheKey(key);
-
             if (_cacheKeysByContextId.TryGetValue(contextId, out var contextValues))
             {
-                contextValues.Add(cacheKey);
+                contextValues.Add(key);
             }
             else
             {
-                _cacheKeysByContextId[contextId] = new() { cacheKey };
+                _cacheKeysByContextId[contextId] = new() { key };
             }
 
             if (_cacheKeysByType.TryGetValue(rootEntityType, out var typeValues))
             {
-                typeValues.Add(cacheKey);
+                typeValues.Add(key);
             }
             else
             {
-                _cacheKeysByType[rootEntityType] = new() { cacheKey };
+                _cacheKeysByType[rootEntityType] = new() { key };
             }
 
-            _cache.Set(cacheKey, dataToCache, _cacheOptions);
+            _cache.Set(key, dataToCache, _cacheOptions);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static string GetCacheKey(string query)
-        {
-            var cacheKey = $"{CacheKeyPrefix}.{query}";
-            return cacheKey;
-        }
-
-        private void AddingToCache(Guid contextId, Type rootEntityType, string cacheKey)
+        private void AddingToCache(Guid contextId, Type rootEntityType, object cacheKey)
         {
             if (_cacheKeysByContextId.TryGetValue(contextId, out var contextValues))
             {
@@ -173,12 +160,10 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetOrAdd<T>(Guid contextId, Type rootEntityType, string key, Func<T?> create)
+        public T? GetOrAdd<T>(Guid contextId, Type rootEntityType, object key, Func<T?> create)
         {
-            var cacheKey = GetCacheKey(key);
-
-            var value = _cache.GetOrCreate(cacheKey, (cacheEntry) => {
-                AddingToCache(contextId, rootEntityType, cacheKey);
+            var value = _cache.GetOrCreate(key, (cacheEntry) => {
+                AddingToCache(contextId, rootEntityType, key);
                 return create();
             }, _cacheOptions);
 
@@ -186,12 +171,10 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, string key, Func<Task<T?>> create)
+        public Task<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create)
         {
-            var cacheKey = GetCacheKey(key);
-
-            var value = _cache.GetOrCreateAsync(cacheKey, (cacheEntry) => {
-                AddingToCache(contextId, rootEntityType, cacheKey);
+            var value = _cache.GetOrCreateAsync(key, (cacheEntry) => {
+                AddingToCache(contextId, rootEntityType, key);
                 return create();
             }, _cacheOptions);
 

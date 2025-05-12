@@ -1,24 +1,35 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CachedEfCore.ExpressionKeyGen
 {
-    public struct KeyGeneratorResult<T>
+    public readonly struct KeyGeneratorResult<T>
     {
-        public T Expression;
-        public bool IsPrintable;
+        public KeyGeneratorResult(T expression, string? json)
+        {
+            Expression = expression;
+            AdditionalJson = json;
+        }
+
+        public readonly T Expression;
+        public readonly string? AdditionalJson;
     }
 
-    public class KeyGeneratorVisitor : ExpressionVisitor
+    public class KeyGeneratorVisitor : ExpressionVisitor, IDisposable, IAsyncDisposable
     {
         private readonly GetParametersVisitor _getParametersVisitor;
+        private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         private readonly HashSet<Type> _printableTypes = new HashSet<Type>
         {
@@ -59,37 +70,42 @@ namespace CachedEfCore.ExpressionKeyGen
         };
 
         [ThreadStatic]
-        private static bool _isPrintable;
+        private static MemoryStream? _memoryStream;
 
-        public KeyGeneratorVisitor(IEnumerable<Type> printableTypes)
+        public KeyGeneratorVisitor(JsonSerializerOptions jsonSerializerOptions)
         {
-            _printableTypes.UnionWith(printableTypes);
+            _jsonSerializerOptions = jsonSerializerOptions;
             _getParametersVisitor = new GetParametersVisitor();
         }
 
-        public KeyGeneratorVisitor()
+        public KeyGeneratorVisitor(IEnumerable<Type> printableTypes) : this()
         {
-            _getParametersVisitor = new GetParametersVisitor();
+            _printableTypes.UnionWith(printableTypes);
+        }
+
+        public KeyGeneratorVisitor() : this(new JsonSerializerOptions { IncludeFields = true })
+        {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ResetState()
         {
-            _isPrintable = true;
+            if (_memoryStream is null)
+            {
+                _memoryStream = new MemoryStream();
+            }
+            else
+            {
+                _memoryStream.Position = 0;
+                _memoryStream.SetLength(0);
+            }
         }
 
-        public string? ExpressionToStringIfPrintable(Expression node)
-        {
-            var visited = VisitWithState(node);
-            var result = visited.IsPrintable ? visited.Expression.ToString() : null;
-            return result;
-        }
-
-        public string? SafeExpressionToStringIfPrintable(Expression node)
+        public KeyGeneratorResult<string>? SafeExpressionToString(Expression node)
         {
             try
             {
-                return ExpressionToStringIfPrintable(node);
+                return ExpressionToString(node);
             }
 #pragma warning disable CS0168 // Variable is declared but never used (for debug view)
             catch (Exception ex)
@@ -125,10 +141,10 @@ namespace CachedEfCore.ExpressionKeyGen
 
             var visited = VisitWithState(node);
             var result = new KeyGeneratorResult<string>
-            {
-                Expression = visited.Expression.ToString(),
-                IsPrintable = visited.IsPrintable,
-            };
+            (
+                visited.Expression.ToString(),
+                visited.AdditionalJson
+            );
 
             return result;
         }
@@ -136,11 +152,12 @@ namespace CachedEfCore.ExpressionKeyGen
         public KeyGeneratorResult<T> VisitExpr<T>(T expression) where T : Expression
         {
             var visited = VisitWithState(expression);
+
             var result = new KeyGeneratorResult<T>
-            {
-                Expression = (T)visited.Expression,
-                IsPrintable = visited.IsPrintable,
-            };
+            (
+                (T)visited.Expression,
+                visited.AdditionalJson
+            );
 
             return result;
         }
@@ -150,11 +167,15 @@ namespace CachedEfCore.ExpressionKeyGen
             ResetState();
             var expression = base.Visit(node);
 
+            var l_memoryStream = _memoryStream!;
+            l_memoryStream.Flush();
+            var additionalJson = l_memoryStream.Length == 0 ? null : Encoding.UTF8.GetString(l_memoryStream.GetBuffer(), 0, (int)l_memoryStream.Length);
+
             var result = new KeyGeneratorResult<Expression>
-            {
-                Expression = expression,
-                IsPrintable = _isPrintable,
-            };
+            (
+                expression,
+                additionalJson
+            );
 
             return result;
         }
@@ -201,27 +222,11 @@ namespace CachedEfCore.ExpressionKeyGen
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            if (node.Type != typeof(string) && node.Value is IEnumerable enumerable)
+            var isPrintable = IsPrintable(node.Value, node.Type);
+            if (!isPrintable)
             {
-                var underlyingTypes = node.Type.IsArray ? new Type[] { node.Type.GetElementType()! } : node.Type.GetGenericArguments();
-
-                _isPrintable &= IsPrintable(enumerable, underlyingTypes);
-
-                if (!_isPrintable)
-                {
-                    return base.VisitConstant(node);
-                }
-
-                var listWrapperType = typeof(PrintableList<>).MakeGenericType(underlyingTypes);
-
-                var wrapperInstance = Activator.CreateInstance(listWrapperType, node.Value)!;
-
-                var constantExpr = Expression.Constant(wrapperInstance, listWrapperType);
-
-                return base.VisitConstant(constantExpr);
+                JsonSerializer.Serialize(_memoryStream!, node.Value, _jsonSerializerOptions);
             }
-
-            _isPrintable &= IsPrintable(node.Value, node.Type);
 
             return base.VisitConstant(node);
         }
@@ -328,14 +333,19 @@ namespace CachedEfCore.ExpressionKeyGen
             return propVal;
         }
 
-        private sealed class PrintableList<T> : List<T>
+        public void Dispose()
         {
-            public PrintableList(IEnumerable collection) : base(collection.Cast<T>()) { }
+            _memoryStream?.Dispose();
+        }
 
-            public override string ToString()
+        public ValueTask DisposeAsync()
+        {
+            if (_memoryStream is null)
             {
-                return $"[{string.Join(", ", this)}]";
+                return ValueTask.CompletedTask;
             }
+
+            return _memoryStream.DisposeAsync();
         }
 
         private sealed class GetParametersVisitor : ExpressionVisitor

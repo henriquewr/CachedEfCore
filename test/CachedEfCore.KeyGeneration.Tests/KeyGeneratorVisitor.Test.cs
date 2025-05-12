@@ -1,5 +1,9 @@
 ﻿using CachedEfCore.ExpressionKeyGen;
+using Microsoft.EntityFrameworkCore.Metadata;
+using NUnit.Framework.Interfaces;
+using System.Diagnostics;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.KeyGeneration.Tests
 {
@@ -30,7 +34,18 @@ namespace CachedEfCore.KeyGeneration.Tests
             return list;
         }
 
-        [SetUp]
+        private static Dictionary<int, string> GetDefaultDict()
+        {
+            var dict = new Dictionary<int, string>
+            {
+                { 1, "First" },
+                { 2, "Second" },
+                { 3, "Third" },
+            };
+            return dict;
+        }
+
+        [Test]
         public void Test_Variable_Evaluation()
         {
             var variable = 1;
@@ -86,29 +101,17 @@ namespace CachedEfCore.KeyGeneration.Tests
 
             var list2 = GetDefaultList();
             var variable2 = 1;
-
             Expression<Func<TestClass, bool>> expression2 = x => list2.First(l => l.TestVal == variable2) == null;
             var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
 
-            if (result1.IsPrintable || result2.IsPrintable)
-            {
-                // check in the visitor if the type is printable
-                // if not, you probably broke something
-                Assert.Fail("One of the results is printable");
-            }
-            else
-            {
-                Assert.That(result1.IsPrintable, Is.EqualTo(result2.IsPrintable));
-            }
-        }
+            var list3 = GetDefaultList();
+            var variable3 = 2;
+            Expression<Func<TestClass, bool>> expression3 = x => list2.First(l => l.TestVal == variable3) == null;
+            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-        [Test]
-        public void Test_Null_Enumerable_Printer()
-        {
-            Expression<Func<TestClass, bool>> expression = x => ((List<TestClass>)null!).Contains(x);
-            var result = _keyGeneratorVisitor.ExpressionToString(expression);
+            Assert.That(result1, Is.EqualTo(result2));
 
-            Assert.That(result.IsPrintable, Is.True);
+            Assert.That(result1, Is.Not.EqualTo(result3));
         }
 
         [Test]
@@ -122,7 +125,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
 
             var list2 = GetDefaultList();
-            Expression<Func<TestClass, bool>> expression2 = x => list1.Select(l => l.TestVal).Contains(x.TestVal);
+            Expression<Func<TestClass, bool>> expression2 = x => list1.Select(l => l.TestVal).ToList().Contains(x.TestVal);
             var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
 
 
@@ -149,16 +152,14 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression2 = x => list2.Contains(x);
             var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
 
-            if (result1.IsPrintable || result2.IsPrintable)
-            {
-                // check in the visitor if the type is printable
-                // if not, you probably broke something
-                Assert.Fail("One of the results is printable");
-            }
-            else
-            {
-                Assert.That(result1.IsPrintable, Is.EqualTo(result2.IsPrintable));
-            }
+            var list3 = GetDefaultList();
+            list3.Add(new TestClass { TestVal = 1234, Test = "different" });
+            Expression<Func<TestClass, bool>> expression3 = x => list3.Contains(x);
+            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+
+            Assert.That(result1, Is.EqualTo(result2));
+
+            Assert.That(result1, Is.Not.EqualTo(result3));
         }
 
         [Test]
@@ -170,7 +171,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
 
             var list2 = GetDefaultList();
-            Expression<Func<TestClass, bool>> expression2 = x => list2.Select(l => (TestClass)null!).Contains(x);
+            Expression<Func<TestClass, bool>> expression2 = x => list2.Select(l => (TestClass)null!).ToList().Contains(x);
             var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
 
 
@@ -186,10 +187,30 @@ namespace CachedEfCore.KeyGeneration.Tests
         }
 
         [Test]
+        public void Test_Dictionary_Printer_With_Printable_Values()
+        {
+            var dict1 = GetDefaultDict();
+            Expression<Func<TestClass, bool>> expression = x => dict1.ContainsKey(x.TestVal);
+            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+
+            var dict2 = GetDefaultDict();
+            Expression<Func<TestClass, bool>> expression2 = x => dict2.ContainsKey(x.TestVal);
+            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+
+            var dict3 = GetDefaultDict();
+            dict3.Add(1234, "different");
+
+            Expression<Func<TestClass, bool>> expression3 = x => dict3.ContainsKey(x.TestVal);
+            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+
+            Assert.That(result1, Is.EqualTo(result2));
+
+            Assert.That(result1, Is.Not.EqualTo(result3));
+        }
+
+        [Test]
         public void Test_KeyGenerator_Is_Thread_Safe()
         {
-       
-
             var nonPrintableType = new TestClass();
             var nonPrintableType2 = new TestClass
             {
@@ -203,39 +224,26 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => nonPrintableType2 == null;
             Expression<Func<TestClass, bool>> expression4 = x => "1" == null;
 
-            var expressions = new List<(Expression, string?)>
+            var expressions = new List<(Expression, KeyGeneratorResult<string>?)>
             {
-                (expression1, _keyGeneratorVisitor.ExpressionToStringIfPrintable(expression1)),
-                (expression2, _keyGeneratorVisitor.ExpressionToStringIfPrintable(expression2)),
-                (expression3, _keyGeneratorVisitor.ExpressionToStringIfPrintable(expression3)),
-                (expression4, _keyGeneratorVisitor.ExpressionToStringIfPrintable(expression4)),
+                (expression1, _keyGeneratorVisitor.SafeExpressionToString(expression1)),
+                (expression2, _keyGeneratorVisitor.SafeExpressionToString(expression2)),
+                (expression3, _keyGeneratorVisitor.SafeExpressionToString(expression3)),
+                (expression4, _keyGeneratorVisitor.SafeExpressionToString(expression4)),
             };
-
-            if (expressions.All(x => x.Item2 == null))
-            {
-                Assert.Fail("The test is not testing anything, all items are not printable");
-            }
-            else if (expressions.All(x => x.Item2 != null))
-            {
-                Assert.Fail("The test is not testing anything, all items are printable");
-            }
 
             var parallelOptions = new ParallelOptions
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 10
             };
-
       
             Parallel.For(0, 5000, parallelOptions, i =>
             {
                 Parallel.ForEach(expressions, parallelOptions, x =>
                 {
-                    var keyStr = _keyGeneratorVisitor.ExpressionToStringIfPrintable(x.Item1);
+                    var keyStr = _keyGeneratorVisitor.SafeExpressionToString(x.Item1);
 
-                    if (keyStr != x.Item2)
-                    {
-                        Assert.Fail("Key generation is not thread safe");
-                    }
+                    Assert.That(keyStr, Is.EqualTo(x.Item2), "Key generation is not thread safe");
                 });
             });
         }

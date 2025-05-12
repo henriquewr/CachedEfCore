@@ -22,7 +22,8 @@ namespace CachedEfCore.Cache.Helper
             ReadOnlySpan<object> query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var key = "";
+            var expression = "";
+            var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -30,21 +31,30 @@ namespace CachedEfCore.Cache.Helper
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(expr);
+                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
                         return getDataFromDatabase();
                     }
 
-                    key += keyGenerated;
+                    expression += keyGenerated.Value.Expression;
+                    if (keyGenerated.Value.AdditionalJson != null)
+                    {
+                        additionalJson += keyGenerated.Value.AdditionalJson;
+                    }
                 }
                 else
                 {
-                    key += queryItem.ToString();
+                    expression += queryItem.ToString();
                 }
             }
 
-            return GetOrAdd<ReturnType, TEntity>(dbContext, getDataFromDatabase, key, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
         }
 
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
@@ -53,15 +63,19 @@ namespace CachedEfCore.Cache.Helper
             Expression query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(query);
+            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
                 return getDataFromDatabase();
             }
 
-            return GetOrAdd<ReturnType, TEntity>(dbContext, getDataFromDatabase, keyGenerated, getDataFromDatabaseStr);
-        }
+            var entityType = typeof(TEntity);
 
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
+        }
 
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
@@ -69,22 +83,32 @@ namespace CachedEfCore.Cache.Helper
             ReadOnlySpan<Expression> query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var key = "";
+            var expression = "";
+            var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(queryItem);
+                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
                     return getDataFromDatabase();
                 }
 
-                key += keyGenerated;
+                expression += keyGenerated.Value.Expression;
+                if (keyGenerated.Value.AdditionalJson != null)
+                {
+                    additionalJson += keyGenerated.Value.AdditionalJson;
+                }
             }
 
-            return GetOrAdd<ReturnType, TEntity>(dbContext, getDataFromDatabase, key, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
         }
 
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
@@ -95,7 +119,7 @@ namespace CachedEfCore.Cache.Helper
         {
             var entityType = typeof(TEntity);
 
-            var cacheKey = GenCacheKey(entityType.FullName!, key, getDataFromDatabaseStr);
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, key, null, getDataFromDatabaseStr);
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
 
             return result;
@@ -109,7 +133,8 @@ namespace CachedEfCore.Cache.Helper
             object[] query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var key = "";
+            var expression = "";
+            var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -117,21 +142,30 @@ namespace CachedEfCore.Cache.Helper
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(expr);
+                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
                         return getDataFromDatabase();
                     }
 
-                    key += keyGenerated;
+                    expression += keyGenerated.Value.Expression;
+                    if (keyGenerated.Value.AdditionalJson != null)
+                    {
+                        additionalJson += keyGenerated.Value.AdditionalJson;
+                    }
                 }
                 else
                 {
-                    key += queryItem.ToString();
+                    expression += queryItem.ToString();
                 }
             }
 
-            return GetOrAddAsync<ReturnType, TEntity>(dbContext, getDataFromDatabase, key, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
         }
 
         public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
@@ -140,13 +174,18 @@ namespace CachedEfCore.Cache.Helper
             Expression query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(query);
+            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
                 return getDataFromDatabase();
             }
 
-            return GetOrAddAsync<ReturnType, TEntity>(dbContext, getDataFromDatabase, keyGenerated, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
         }
 
         public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
@@ -155,22 +194,32 @@ namespace CachedEfCore.Cache.Helper
             Expression[] query,
             [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
         {
-            var key = "";
+            var expression = "";
+            var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToStringIfPrintable(queryItem);
+                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
                     return getDataFromDatabase();
                 }
 
-                key += keyGenerated;
+                expression += keyGenerated.Value.Expression;
+                if (keyGenerated.Value.AdditionalJson != null)
+                {
+                    additionalJson += keyGenerated.Value.AdditionalJson;
+                }
             }
 
-            return GetOrAddAsync<ReturnType, TEntity>(dbContext, getDataFromDatabase, key, getDataFromDatabaseStr);
+            var entityType = typeof(TEntity);
+
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+
+            return result;
         }
 
         public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
@@ -181,16 +230,10 @@ namespace CachedEfCore.Cache.Helper
         {
             var entityType = typeof(TEntity);
 
-            var cacheKey = GenCacheKey(entityType.FullName!, key, getDataFromDatabaseStr);
+            var cacheKey = new DbQueryCacheKey(entityType.FullName!, key, null, getDataFromDatabaseStr);
             var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
 
             return result;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static string GenCacheKey(string entityFullName, string query, string getFromDb)
-        {
-            return $"{entityFullName}.{getFromDb}.{query}";
         }
     }
 }
