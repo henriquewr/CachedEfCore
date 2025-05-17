@@ -4,8 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>2025.5.17.3</AssemblyVersion>
-    <FileVersion>2025.5.17.3</FileVersion>
+    <AssemblyVersion>2025.5.17.4</AssemblyVersion>
+    <FileVersion>2025.5.17.4</FileVersion>
+	<Version>$(AssemblyVersion)</Version>
   </PropertyGroup>
   <PropertyGroup>
 	<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
