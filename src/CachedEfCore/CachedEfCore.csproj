@@ -15,6 +15,7 @@
 	<Title>CachedEfCore</Title>
 	<Authors>henriquewr</Authors>
 	<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
+	<Description>A Caching library for Entity Framework Core with automatic cache invalidation</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
