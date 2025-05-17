@@ -317,7 +317,7 @@ namespace CachedEfCore.DependencyManager
 
         public bool HasLazyLoad(Type entityType)
         {
-            var key = $"{nameof(HasLazyLoad)}Entity:{entityType.FullName}";
+            var key = entityType.FullName!;
             if (_hasLazyLoadCache.TryGetValue(key, out bool cached))
             {
                 return cached;
