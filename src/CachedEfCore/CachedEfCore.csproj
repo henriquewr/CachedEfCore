@@ -4,13 +4,17 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>2025.5.17.4</AssemblyVersion>
-    <FileVersion>2025.5.17.4</FileVersion>
+    <AssemblyVersion>2025.5.17.6</AssemblyVersion>
+    <FileVersion>2025.5.17.6</FileVersion>
 	<Version>$(AssemblyVersion)</Version>
   </PropertyGroup>
   <PropertyGroup>
 	<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
 	<RepositoryType>git</RepositoryType>
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<Title>CachedEfCore</Title>
+	<Authors>henriquewr</Authors>
+	<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
