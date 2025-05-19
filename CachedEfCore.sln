@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.SqlQueryEntity
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.KeyGeneration.Tests", "test\CachedEfCore.KeyGeneration.Tests\CachedEfCore.KeyGeneration.Tests.csproj", "{B51CCCA0-CB41-4E0E-BCD2-AF0A03C89147}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.DbQueryCacheStore.Tests", "test\CachedEfCore.DbQueryCacheStore.Tests\CachedEfCore.DbQueryCacheStore.Tests.csproj", "{997F6CCC-06DC-4AED-B835-E02151F49288}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -37,6 +39,10 @@ Global
 		{B51CCCA0-CB41-4E0E-BCD2-AF0A03C89147}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B51CCCA0-CB41-4E0E-BCD2-AF0A03C89147}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B51CCCA0-CB41-4E0E-BCD2-AF0A03C89147}.Release|Any CPU.Build.0 = Release|Any CPU
+		{997F6CCC-06DC-4AED-B835-E02151F49288}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{997F6CCC-06DC-4AED-B835-E02151F49288}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{997F6CCC-06DC-4AED-B835-E02151F49288}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{997F6CCC-06DC-4AED-B835-E02151F49288}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -46,6 +52,7 @@ Global
 		{5C0DDE59-6DDC-606C-65E5-D7448274E9CB} = {06EDDDFE-E06E-4D80-8BD5-4C374EC45F5F}
 		{80CCB375-5268-9CE8-9602-C0F901F03388} = {06EDDDFE-E06E-4D80-8BD5-4C374EC45F5F}
 		{B51CCCA0-CB41-4E0E-BCD2-AF0A03C89147} = {06EDDDFE-E06E-4D80-8BD5-4C374EC45F5F}
+		{997F6CCC-06DC-4AED-B835-E02151F49288} = {06EDDDFE-E06E-4D80-8BD5-4C374EC45F5F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01E78B9F-FDD0-4A4E-A239-B715AD8CC31D}

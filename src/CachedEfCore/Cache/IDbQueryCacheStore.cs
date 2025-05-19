@@ -14,6 +14,7 @@ namespace CachedEfCore.Cache
         void RemoveAllLazyLoadByContextId(Guid contextId, EntityDependency dependencyManager);
         void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true);
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
+        void RemoveAll();
 
         void AddToCache(Guid contextId, Type rootEntityType, object key, object? dataToCache);
         T? GetCached<T>(object key);

@@ -44,6 +44,29 @@ namespace CachedEfCore.Cache
             }
         }
 
+        public void RemoveAll()
+        {
+            var l_cacheKeysByContextId = _cacheKeysByContextId;
+
+            foreach (var contextIdKey in l_cacheKeysByContextId.Keys)
+            {
+                if (l_cacheKeysByContextId.TryRemove(contextIdKey, out var keys))
+                {
+                    RemoveKeys(keys);
+                }
+            }
+
+            var l_cacheKeysByType = _cacheKeysByType;
+
+            foreach (var typeKey in l_cacheKeysByType.Keys)
+            {
+                if (l_cacheKeysByType.TryRemove(typeKey, out var keys))
+                {
+                    RemoveKeys(keys);
+                }
+            }
+        }
+
         public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true)
         {
             if (fireEvent)
@@ -117,23 +140,7 @@ namespace CachedEfCore.Cache
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddToCache(Guid contextId, Type rootEntityType, object key, object? dataToCache)
         {
-            if (_cacheKeysByContextId.TryGetValue(contextId, out var contextValues))
-            {
-                contextValues.Add(key);
-            }
-            else
-            {
-                _cacheKeysByContextId[contextId] = new() { key };
-            }
-
-            if (_cacheKeysByType.TryGetValue(rootEntityType, out var typeValues))
-            {
-                typeValues.Add(key);
-            }
-            else
-            {
-                _cacheKeysByType[rootEntityType] = new() { key };
-            }
+            AddingToCache(contextId, rootEntityType, key);
 
             _cache.Set(key, dataToCache, _cacheOptions);
         }
