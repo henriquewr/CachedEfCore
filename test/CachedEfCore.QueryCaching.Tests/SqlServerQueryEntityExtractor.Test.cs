@@ -14,13 +14,22 @@ using CachedEfCore.EntityMapping;
 
 namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 {
+    [TestFixtureSource(nameof(Implementations))]
     public class QueryCaching
     {
-        private static readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor = new SqlServerQueryEntityExtractor();
+        private static IEnumerable<ISqlQueryEntityExtractor> Implementations =>
+            new ISqlQueryEntityExtractor[]
+            {
+                new SqlServerQueryEntityExtractor(),
+                new GenericSqlQueryEntityExtractor()
+            };
+
+        private readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor;
         private static readonly CachedDbContext _cachedDbContext = new TestDbContext(new DbQueryCacheStore(new MemoryCache(new MemoryCacheOptions())));
 
-        public QueryCaching()
+        public QueryCaching(ISqlQueryEntityExtractor sqlQueryEntityExtractor)
         {
+            _sqlQueryEntityExtractor = sqlQueryEntityExtractor;
         }
 
         private static IEntityType GetIEntityType(Type entityType)
@@ -332,7 +341,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlAnalysis.SqlServerQueryEntityExtractor()));
+                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
                 base.OnConfiguring(optionsBuilder);
             }
 
