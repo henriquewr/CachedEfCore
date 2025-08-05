@@ -19,9 +19,9 @@ namespace CachedEfCore.DependencyManager
             return _entityDependencyCache.GetOrAdd(dbContext.GetType(), key => new(dbContext.Model));
         }
 
-        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _underRelatedCache = new();
-        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _aboveRelatedCache = new();
-        private readonly ConcurrentDictionary<string, HashSet<IEntityType>> _allRelatedCache = new();
+        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _underRelatedCache = new();
+        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _aboveRelatedCache = new();
+        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _allRelatedCache = new();
         private readonly ConcurrentDictionary<string, bool> _hasLazyLoadCache = new();
 
         private readonly FrozenDictionary<Type, IEntityType> _typeEntity;
@@ -49,7 +49,7 @@ namespace CachedEfCore.DependencyManager
             return propsTypes;
         }
 
-        private static HashSet<IEntityType> GetEntities(IEnumerable<IEntityType> entities, Func<IEntityType, IEnumerable<IEntityType>> getEntities)
+        private static FrozenSet<IEntityType> GetEntities(IEnumerable<IEntityType> entities, Func<IEntityType, IEnumerable<IEntityType>> getEntities)
         {
             var result = new HashSet<IEntityType>();
 
@@ -58,22 +58,22 @@ namespace CachedEfCore.DependencyManager
                 result.UnionWith(getEntities(entity));
             }
 
-            return result;
+            return result.ToFrozenSet();
         }
 
 
 
-        public HashSet<IEntityType> GetUnderRelatedEntities(IEntityType rootEntityType)
+        public FrozenSet<IEntityType> GetUnderRelatedEntities(IEntityType rootEntityType)
         {
             return GetUnderRelatedEntitiesImpl(rootEntityType, false);
         }
 
-        public HashSet<IEntityType> GetUnderRelatedEntities(Type rootType)
+        public FrozenSet<IEntityType> GetUnderRelatedEntities(Type rootType)
         {
             return GetUnderRelatedEntitiesInternal(rootType, false);
         }
 
-        private HashSet<IEntityType> GetUnderRelatedEntitiesInternal(Type rootType, bool ignoreDependentOnEntityAttribute)
+        private FrozenSet<IEntityType> GetUnderRelatedEntitiesInternal(Type rootType, bool ignoreDependentOnEntityAttribute)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
@@ -85,7 +85,7 @@ namespace CachedEfCore.DependencyManager
             return GetEntities(entities, entityType => GetUnderRelatedEntitiesImpl(entityType, ignoreDependentOnEntityAttribute));
         }
 
-        private HashSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool ignoreDependentOnEntityAttribute)
+        private FrozenSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool ignoreDependentOnEntityAttribute)
         {
             var key = $"{ignoreDependentOnEntityAttribute}.{rootEntityType.ClrType.FullName}";
 
@@ -116,14 +116,16 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            _underRelatedCache[key] = visited;
+            var cache = visited.ToFrozenSet();
 
-            return visited;
+            _underRelatedCache[key] = cache;
+
+            return cache;
         }
 
 
 
-        public HashSet<IEntityType> GetAboveRelatedEntities(Type rootType)
+        public FrozenSet<IEntityType> GetAboveRelatedEntities(Type rootType)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
@@ -135,12 +137,12 @@ namespace CachedEfCore.DependencyManager
             return GetEntities(entities, GetAboveRelatedEntitiesImpl);
         }
 
-        public HashSet<IEntityType> GetAboveRelatedEntities(IEntityType rootEntityType)
+        public FrozenSet<IEntityType> GetAboveRelatedEntities(IEntityType rootEntityType)
         {
             return GetAboveRelatedEntitiesImpl(rootEntityType);
         }
 
-        private HashSet<IEntityType> GetAboveRelatedEntitiesImpl(IEntityType rootEntityType)
+        private FrozenSet<IEntityType> GetAboveRelatedEntitiesImpl(IEntityType rootEntityType)
         {
             var key = rootEntityType.ClrType.FullName!;
 
@@ -171,14 +173,16 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            _aboveRelatedCache[key] = visited;
+            var cache = visited.ToFrozenSet();
 
-            return visited;
+            _aboveRelatedCache[key] = cache;
+
+            return cache;
         }
 
 
 
-        public HashSet<IEntityType> GetAllRelatedEntities(Type rootType)
+        public FrozenSet<IEntityType> GetAllRelatedEntities(Type rootType)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
@@ -190,12 +194,12 @@ namespace CachedEfCore.DependencyManager
             return GetEntities(entities, GetAllRelatedEntities);
         }
 
-        public HashSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType)
+        public FrozenSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType)
         {
             return GetAllRelatedEntitiesImpl(rootEntityType);
         }
 
-        private HashSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType)
+        private FrozenSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType)
         {
             var key = rootEntityType.ClrType.FullName!;
 
@@ -233,9 +237,11 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            _allRelatedCache[key] = visited;
+            var cache = visited.ToFrozenSet();
 
-            return visited;
+            _allRelatedCache[key] = cache;
+
+            return cache;
         }
 
 
