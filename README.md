@@ -12,13 +12,14 @@ public void ConfigureServices(IServiceCollection services)
     services.AddSingleton<KeyGeneratorVisitor>();
     services.AddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
     services.AddSingleton<IDbQueryCacheStore, DbQueryCacheStore>();
-
+    services.AddSingleton<ISqlQueryEntityExtractor, SqlServerQueryEntityExtractor>();  // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
+    services.AddSingleton<DbStateInterceptor>();
 
     // AddDbContextPool or AddDbContext
-    services.AddDbContextPool<AppDbContext>(options =>
+    services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
     {
         options.UseLazyLoadingProxies();
-        options.UseSqlServer(connectionString).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor())); // currently only supports SQL Server
+        options.UseSqlServer(connectionString).AddInterceptors(serviceProvider.GetRequiredService<DbStateInterceptor>());
     });
 }
 ```
