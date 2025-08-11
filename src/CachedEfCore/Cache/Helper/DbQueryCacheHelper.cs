@@ -1,21 +1,41 @@
 ﻿using CachedEfCore.Context;
-using CachedEfCore.ExpressionKeyGen;
+using CachedEfCore.KeyGeneration;
+using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache.Helper
 {
     public class DbQueryCacheHelper : IDbQueryCacheHelper
     {
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor;
+        private static readonly AsyncLocal<ValuePrinter> _printerAsyncLocal = new();
 
-        public DbQueryCacheHelper(KeyGeneratorVisitor keyGeneratorVisitor)
+        private static void ResetAsyncLocalPrinter()
         {
-            _keyGeneratorVisitor = keyGeneratorVisitor;
+            if (_printerAsyncLocal.Value is null)
+            {
+                _printerAsyncLocal.Value = new();
+            }
+            else
+            {
+                _printerAsyncLocal.Value.ResetState();
+            }
         }
 
+        private readonly KeyGeneratorVisitor _keyGeneratorVisitor;
+        private readonly PrintabilityChecker _printabilityChecker;
+
+        public DbQueryCacheHelper(KeyGeneratorVisitor keyGeneratorVisitor,
+            PrintabilityChecker printabilityChecker)
+        {
+            _keyGeneratorVisitor = keyGeneratorVisitor;
+            _printabilityChecker = printabilityChecker;
+        }
+
+        [OverloadResolutionPriority(-1)]
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
@@ -24,6 +44,8 @@ namespace CachedEfCore.Cache.Helper
         {
             var expression = "";
             var additionalJson = "";
+
+            ResetAsyncLocalPrinter();
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -43,10 +65,20 @@ namespace CachedEfCore.Cache.Helper
                         additionalJson += keyGenerated.Value.AdditionalJson;
                     }
                 }
-                else
+                else if (_printabilityChecker.IsPrintable(queryItem))
                 {
                     expression += queryItem.ToString();
                 }
+                else
+                {
+                    _printerAsyncLocal.Value!.Print(queryItem);
+                }
+            }
+
+            var printerResult = _printerAsyncLocal.Value!.GetResult();
+            if (!string.IsNullOrEmpty(printerResult))
+            {
+                expression += printerResult;
             }
 
             var entityType = typeof(TEntity);
@@ -126,7 +158,7 @@ namespace CachedEfCore.Cache.Helper
         }
 
 
-
+        [OverloadResolutionPriority(-1)]
         public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
@@ -135,6 +167,8 @@ namespace CachedEfCore.Cache.Helper
         {
             var expression = "";
             var additionalJson = "";
+
+            ResetAsyncLocalPrinter();
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -154,10 +188,20 @@ namespace CachedEfCore.Cache.Helper
                         additionalJson += keyGenerated.Value.AdditionalJson;
                     }
                 }
-                else
+                else if (_printabilityChecker.IsPrintable(queryItem))
                 {
                     expression += queryItem.ToString();
                 }
+                else
+                {
+                    _printerAsyncLocal.Value!.Print(queryItem);
+                }
+            }
+
+            var printerResult = _printerAsyncLocal.Value!.GetResult();
+            if (!string.IsNullOrEmpty(printerResult))
+            {
+                expression += printerResult;
             }
 
             var entityType = typeof(TEntity);

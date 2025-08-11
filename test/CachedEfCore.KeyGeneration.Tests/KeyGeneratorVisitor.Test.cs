@@ -1,15 +1,11 @@
-﻿using CachedEfCore.ExpressionKeyGen;
-using Microsoft.EntityFrameworkCore.Metadata;
-using NUnit.Framework.Interfaces;
-using System.Diagnostics;
+﻿using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.KeyGeneration.Tests
 {
     public class Tests
     {
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor = new();
+        private readonly KeyGeneratorVisitor _keyGeneratorVisitor = new(new PrintabilityChecker());
 
         private class TestClass
         {

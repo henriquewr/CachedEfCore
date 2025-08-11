@@ -1,18 +1,15 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CachedEfCore.ExpressionKeyGen
+namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 {
     public readonly struct KeyGeneratorResult<T>
     {
@@ -31,73 +28,32 @@ namespace CachedEfCore.ExpressionKeyGen
         private readonly GetParametersVisitor _getParametersVisitor;
         private readonly JsonSerializerOptions _jsonSerializerOptions;
 
-        private readonly HashSet<Type> _printableTypes = new HashSet<Type>
-        {
-            typeof(bool), typeof(bool?),
-            typeof(byte), typeof(byte?),
-            typeof(sbyte), typeof(sbyte?),
-
-            typeof(short), typeof(short?),
-            typeof(ushort), typeof(ushort?),
-
-            typeof(char), typeof(char?),
-
-            typeof(int), typeof(int?),
-            typeof(uint), typeof(uint?),
-            typeof(nint), typeof(nint?),
-
-            typeof(nuint), typeof(nuint?),
-
-            typeof(long), typeof(long?),
-            typeof(ulong), typeof(ulong?),
-
-            typeof(float), typeof(float?),
-            typeof(double), typeof(double?),
-            typeof(decimal), typeof(decimal?),
-
-            typeof(DateTime), typeof(DateTime?),
-            typeof(TimeSpan), typeof(TimeSpan?),
-            typeof(Guid), typeof(Guid?),
-
-            /*
-                * typeof(string?) does not exists
-                * string? nullableString = "";
-                * nullableString.GetType() == typeof(string)
-                * the expression returns true
-                * both types are System.String
-                */
-            typeof(string),
-        };
+        private readonly IPrintabilityChecker _printableHelper;
 
         [ThreadStatic]
-        private static MemoryStream? _memoryStream;
+        private static ValuePrinter? _valuePrinter;
 
-        public KeyGeneratorVisitor(JsonSerializerOptions jsonSerializerOptions)
+        public KeyGeneratorVisitor(IPrintabilityChecker printableHelper, JsonSerializerOptions jsonSerializerOptions)
         {
+            _printableHelper = printableHelper;
             _jsonSerializerOptions = jsonSerializerOptions;
             _getParametersVisitor = new GetParametersVisitor();
         }
 
-        public KeyGeneratorVisitor(IEnumerable<Type> printableTypes) : this()
-        {
-            _printableTypes.UnionWith(printableTypes);
-        }
-
-        public KeyGeneratorVisitor() : this(new JsonSerializerOptions { IncludeFields = true })
+        public KeyGeneratorVisitor(IPrintabilityChecker printableHelper) : this(printableHelper, new JsonSerializerOptions { IncludeFields = true })
         {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ResetState()
+        private void ResetState()
         {
-            if (_memoryStream is null)
+            if (_valuePrinter is null)
             {
-                _memoryStream = new MemoryStream();
+                _valuePrinter = new(_jsonSerializerOptions);
             }
             else
             {
-                _memoryStream.Position = 0;
-                _memoryStream.SetLength(0);
+                _valuePrinter.ResetState();
             }
         }
 
@@ -167,9 +123,7 @@ namespace CachedEfCore.ExpressionKeyGen
             ResetState();
             var expression = base.Visit(node);
 
-            var l_memoryStream = _memoryStream!;
-            l_memoryStream.Flush();
-            var additionalJson = l_memoryStream.Length == 0 ? null : Encoding.UTF8.GetString(l_memoryStream.GetBuffer(), 0, (int)l_memoryStream.Length);
+            var additionalJson = _valuePrinter?.GetResult();
 
             var result = new KeyGeneratorResult<Expression>
             (
@@ -222,10 +176,10 @@ namespace CachedEfCore.ExpressionKeyGen
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            var isPrintable = IsPrintable(node.Value, node.Type);
+            var isPrintable = _printableHelper.IsPrintable(node.Value, node.Type);
             if (!isPrintable)
             {
-                JsonSerializer.Serialize(_memoryStream!, node.Value, _jsonSerializerOptions);
+                _valuePrinter!.Print(node.Value);
             }
 
             return base.VisitConstant(node);
@@ -244,42 +198,6 @@ namespace CachedEfCore.ExpressionKeyGen
             {
                 return base.VisitMember(node);
             }
-        }
-
-        private bool IsPrintable(IEnumerable values, Type[] types)
-        {
-            if (types.All(IsTypePrintable))
-            {
-                return true;
-            }
-
-            foreach (var item in values)
-            {
-                if (item is not null)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private bool IsPrintable(object? value, Type type)
-        {
-            if (value == null)
-            {
-                // null is always printable regardless of type
-                return true;
-            }
-
-            return IsTypePrintable(type);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsTypePrintable(Type type)
-        {
-            //Enums are always printable
-            return type.IsEnum || _printableTypes.Contains(type);
         }
 
         private bool CanBeEvaluated(MemberExpression exp)
@@ -335,17 +253,17 @@ namespace CachedEfCore.ExpressionKeyGen
 
         public void Dispose()
         {
-            _memoryStream?.Dispose();
+            _valuePrinter?.Dispose();
         }
 
         public ValueTask DisposeAsync()
         {
-            if (_memoryStream is null)
+            if (_valuePrinter is null)
             {
                 return ValueTask.CompletedTask;
             }
 
-            return _memoryStream.DisposeAsync();
+            return _valuePrinter.DisposeAsync();
         }
 
         private sealed class GetParametersVisitor : ExpressionVisitor
