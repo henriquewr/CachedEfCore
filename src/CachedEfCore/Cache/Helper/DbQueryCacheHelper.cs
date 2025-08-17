@@ -26,10 +26,10 @@ namespace CachedEfCore.Cache.Helper
         }
 
         private readonly KeyGeneratorVisitor _keyGeneratorVisitor;
-        private readonly PrintabilityChecker _printabilityChecker;
+        private readonly IPrintabilityChecker _printabilityChecker;
 
         public DbQueryCacheHelper(KeyGeneratorVisitor keyGeneratorVisitor,
-            PrintabilityChecker printabilityChecker)
+            IPrintabilityChecker printabilityChecker)
         {
             _keyGeneratorVisitor = keyGeneratorVisitor;
             _printabilityChecker = printabilityChecker;
