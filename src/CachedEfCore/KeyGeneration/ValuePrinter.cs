@@ -11,6 +11,7 @@ namespace CachedEfCore.KeyGeneration
     {
         private readonly MemoryStream _memoryStream;
         private readonly JsonSerializerOptions _jsonSerializerOptions;
+        public bool IsDisposed { get; private set; }
 
         public ValuePrinter(JsonSerializerOptions jsonSerializerOptions, MemoryStream memoryStream)
         {
@@ -51,11 +52,13 @@ namespace CachedEfCore.KeyGeneration
 
         public void Dispose()
         {
+            IsDisposed = true;
             _memoryStream.Dispose();
         }
 
         public ValueTask DisposeAsync()
         {
+            IsDisposed = true;
             return _memoryStream.DisposeAsync();
         }
     }

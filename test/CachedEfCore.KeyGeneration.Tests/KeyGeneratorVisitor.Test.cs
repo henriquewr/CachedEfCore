@@ -1,11 +1,29 @@
-﻿using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+﻿using CachedEfCore.DependencyInjection;
+using CachedEfCore.KeyGeneration.EvalTypeChecker;
+using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace CachedEfCore.KeyGeneration.Tests
 {
-    public class Tests
+    public class KeyGeneratorVisitorTests
     {
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor = new(new PrintabilityChecker());
+        private static readonly PrintabilityChecker DefaultPrintabilityChecker = new PrintabilityChecker();
+        private static KeyGeneratorVisitor CreateVisitor(params IEnumerable<Type> nonEvaluableTypes)
+        {
+            return new KeyGeneratorVisitor
+            (
+                DefaultPrintabilityChecker,
+                new ExpressionEvalTypeCheckerVisitor(new TypeCompatibilityChecker(nonEvaluableTypes)),
+                CachedEfCoreOptions.DefaultKeyGeneratorJsonSerializerOptions
+            );
+        }
+
+        private readonly KeyGeneratorVisitor _keyGeneratorVisitor = CreateVisitor([]);
 
         private class TestClass
         {
@@ -41,7 +59,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             return dict;
         }
 
-        [Test]
+        [Fact]
         public void Test_Variable_Evaluation()
         {
             var variable = 1;
@@ -57,12 +75,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => notTheSameVariable == x.TestVal;
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Function_Evaluation_With_Printable_Values()
         {
             var list1 = GetDefaultList();
@@ -81,12 +99,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => list2.First(l => l.TestVal == variable3).TestVal == x.TestVal;
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Function_Evaluation_With_Non_Printable_Values()
         {
             var list1 = GetDefaultList();
@@ -105,12 +123,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => list2.First(l => l.TestVal == variable3) == null;
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Enumerable_Printer_With_Printable_Values()
         {
             var list1 = GetDefaultList();
@@ -132,12 +150,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => listWithPrintableValues3.Contains(x.TestVal);
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Enumerable_Printer_With_Non_Printable_Values()
         {
             var list1 = GetDefaultList();
@@ -153,12 +171,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => list3.Contains(x);
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Enumerable_Printer_With_Printable_Null_Values()
         {
             var list1 = GetDefaultList().Select(x => (TestClass)null!).ToList();
@@ -177,12 +195,12 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => list3.Contains(x);
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        [Fact]
         public void Test_Dictionary_Printer_With_Printable_Values()
         {
             var dict1 = GetDefaultDict();
@@ -199,12 +217,57 @@ namespace CachedEfCore.KeyGeneration.Tests
             Expression<Func<TestClass, bool>> expression3 = x => dict3.ContainsKey(x.TestVal);
             var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
 
-            Assert.That(result1, Is.EqualTo(result2));
+            Assert.Equal(result1, result2);
 
-            Assert.That(result1, Is.Not.EqualTo(result3));
+            Assert.NotEqual(result1, result3);
         }
 
-        [Test]
+        private interface INonEvaluable;
+        private class NonEvaluableTestClass : INonEvaluable
+        {
+            public int AnyMethod()
+            {
+                throw new InvalidOperationException($"{nameof(AnyMethod)} Called");
+            }
+
+            public int Anything { get { throw new InvalidOperationException($"Tried to get the value from prop: {nameof(Anything)}"); } }
+        }
+
+        public static TheoryData<Expression, KeyGeneratorVisitor> GetNonEvaluableTypesTestCases()
+        {
+            var variable = new NonEvaluableTestClass();
+            Expression<Func<int>> test1 = () => variable.AnyMethod();
+            Expression<Func<int>> test2 = () => variable.Anything;
+            return new()
+            {
+                {
+                    test1,
+                    CreateVisitor(typeof(INonEvaluable))
+                },
+                {
+                    test1,
+                    CreateVisitor(typeof(NonEvaluableTestClass))
+                },
+
+                {
+                    test2,
+                    CreateVisitor(typeof(INonEvaluable))
+                },
+                {
+                    test2,
+                    CreateVisitor(typeof(NonEvaluableTestClass))
+                },
+            };
+        }
+        [Theory]
+        [MemberData(nameof(GetNonEvaluableTypesTestCases))]
+        public void KeyGeneratorVisitor_Should_Not_Eval_Non_Evaluable_Types(Expression expression, KeyGeneratorVisitor keyGeneratorVisitor)
+        {
+            //Expected to not throw
+            var result = keyGeneratorVisitor.ExpressionToString(expression);
+        }
+
+        [Fact]
         public void Test_KeyGenerator_Is_Thread_Safe()
         {
             var nonPrintableType = new TestClass();
@@ -239,7 +302,7 @@ namespace CachedEfCore.KeyGeneration.Tests
                 {
                     var keyStr = _keyGeneratorVisitor.SafeExpressionToString(x.Item1);
 
-                    Assert.That(keyStr, Is.EqualTo(x.Item2), "Key generation is not thread safe");
+                    Assert.Equal(x.Item2, keyStr);
                 });
             });
         }

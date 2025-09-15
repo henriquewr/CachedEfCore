@@ -1,36 +1,30 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
+﻿using CachedEfCore.Cache;
 using CachedEfCore.Context;
-using CachedEfCore.Cache;
+using CachedEfCore.EntityMapping;
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
-using CachedEfCore.EntityMapping;
+using Xunit;
 
 namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 {
-    [TestFixtureSource(nameof(Implementations))]
     public class QueryCaching
     {
-        private static IEnumerable<ISqlQueryEntityExtractor> Implementations =>
+        private static IEnumerable<ISqlQueryEntityExtractor> SqlQueryEntityExtractorImplementations =>
             new ISqlQueryEntityExtractor[]
             {
                 new SqlServerQueryEntityExtractor(),
                 new GenericSqlQueryEntityExtractor()
             };
 
-        private readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor;
         private static readonly CachedDbContext _cachedDbContext = new TestDbContext(new DbQueryCacheStore(new MemoryCache(new MemoryCacheOptions())));
-
-        public QueryCaching(ISqlQueryEntityExtractor sqlQueryEntityExtractor)
-        {
-            _sqlQueryEntityExtractor = sqlQueryEntityExtractor;
-        }
 
         private static IEntityType GetIEntityType(Type entityType)
         {
@@ -44,293 +38,234 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
             return tableName;
         }
 
-
-        private static IEnumerable<TestCaseData> GetDeleteTestCases()
+        private static IEnumerable<Func<string, string>> GetSqlVariantsTransformFunc()
         {
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE FROM
-                {GetTableName(typeof(LazyLoadEntity))};
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                DELETE FROM
-                "{GetTableName(typeof(LazyLoadEntity))}";
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                DELETE FROM
-                [{GetTableName(typeof(LazyLoadEntity))}];
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE FROM {GetTableName(typeof(LazyLoadEntity))};
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });  
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE FROM "{GetTableName(typeof(LazyLoadEntity))}";
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               }); 
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE FROM [{GetTableName(typeof(LazyLoadEntity))}];
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE u
-                FROM {GetTableName(typeof(LazyLoadEntity))}
-                u;
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });   
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE "u"
-                FROM "{GetTableName(typeof(LazyLoadEntity))}"
-                "u";
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                DELETE [u]
-                FROM [{GetTableName(typeof(LazyLoadEntity))}]
-                [u];
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               });
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                    DELETE u FROM {GetTableName(typeof(LazyLoadEntity))} u;
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                });  
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                    DELETE "u" FROM "{GetTableName(typeof(LazyLoadEntity))}" "u";
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                });  
-            
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                    DELETE [u] FROM [{GetTableName(typeof(LazyLoadEntity))}] [u];
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                });
+            yield return identifier => identifier;
+            yield return identifier => $"[{identifier}]";
+            yield return identifier => $"\"{identifier}\"";
         }
 
-        [TestCaseSource(nameof(GetDeleteTestCases))]
-        public void Extract_Entities_From_Delete_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
+        public static TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>> GetDeleteTestCases()
         {
-            var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
+            var theoryData = new TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>>();
+            
+            foreach (var implementation in SqlQueryEntityExtractorImplementations)
+            {
+                var variantFuncs = GetSqlVariantsTransformFunc().ToList();
+                foreach (var applyVariantFunc in variantFuncs)
+                {
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        DELETE FROM
+                        {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
 
-            Assert.That(entities, Is.EquivalentTo(expected));
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        DELETE FROM {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        DELETE {applyVariantFunc("u")}
+                        FROM {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))}
+                        {applyVariantFunc("u")};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                            DELETE {applyVariantFunc("u")} FROM {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} {applyVariantFunc("u")};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+                }
+            }
+
+            return theoryData;
         }
 
-        private static IEnumerable<TestCaseData> GetUpdateTestCases()
+        [Theory]
+        [MemberData(nameof(GetDeleteTestCases))]
+        public void Extract_Entities_From_Delete_Query(ISqlQueryEntityExtractor sqlQueryEntityExtractor, TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                UPDATE u
-                SET u.StringData = 'test'
-                FROM {GetTableName(typeof(LazyLoadEntity))} AS u;
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
+            var entities = sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                UPDATE "u"
-                SET u.StringData = 'test'
-                FROM {GetTableName(typeof(LazyLoadEntity))} AS "u";
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                UPDATE [u]
-                SET [u].[StringData] = 'test'
-                FROM [{GetTableName(typeof(LazyLoadEntity))}] AS [u];
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                UPDATE {GetTableName(typeof(LazyLoadEntity))}
-                SET StringData = 'test'
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                UPDATE "{GetTableName(typeof(LazyLoadEntity))}"
-                SET StringData = 'test'
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-                $"""
-                UPDATE [{GetTableName(typeof(LazyLoadEntity))}]
-                SET StringData = 'test'
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
+            Assert.True(expected.SetEquals(entities));
         }
 
-        [TestCaseSource(nameof(GetUpdateTestCases))]
-        public void Extract_Entities_From_Update_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
+        public static TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>> GetUpdateTestCases()
         {
-            var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
+            var theoryData = new TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>>();
 
-            Assert.That(entities, Is.EquivalentTo(expected));
+            foreach (var implementation in SqlQueryEntityExtractorImplementations)
+            {
+                var variantFuncs = GetSqlVariantsTransformFunc().ToList();
+                foreach (var applyVariantFunc in variantFuncs)
+                {
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        UPDATE {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))}
+                        SET StringData = 'test'
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        UPDATE {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} SET StringData = 'test'
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        UPDATE {applyVariantFunc("u")}
+                        SET {applyVariantFunc("u")}.StringData = 'test'
+                        FROM {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} AS {applyVariantFunc("u")};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        UPDATE {applyVariantFunc("u")} SET {applyVariantFunc("u")}.StringData = 'test' FROM {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} AS {applyVariantFunc("u")};
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+                }
+            }
+
+            return theoryData;
         }
 
-        private static IEnumerable<TestCaseData> GetInsertTestCases()
+        [Theory]
+        [MemberData(nameof(GetUpdateTestCases))]
+        public void Extract_Entities_From_Update_Query(ISqlQueryEntityExtractor sqlQueryEntityExtractor, TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                INSERT INTO {GetTableName(typeof(LazyLoadEntity))} (StringData) VALUES ("test");
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
+            var entities = sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
 
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                INSERT INTO "{GetTableName(typeof(LazyLoadEntity))}" (StringData) VALUES ("test");
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                INSERT INTO [{GetTableName(typeof(LazyLoadEntity))}] (StringData) VALUES ("test");
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-              $"""
-                INSERT {GetTableName(typeof(LazyLoadEntity))} (StringData) VALUES ("test");
-                """,
-               new HashSet<IEntityType>
-               {
-                    GetIEntityType(typeof(LazyLoadEntity))
-               }
-           );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                INSERT "{GetTableName(typeof(LazyLoadEntity))}" (StringData) VALUES ("test");
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
-            yield return new TestCaseData(_cachedDbContext.TableEntity,
-               $"""
-                INSERT [{GetTableName(typeof(LazyLoadEntity))}] (StringData) VALUES ("test");
-                """,
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity))
-                }
-            );
-
+            Assert.True(expected.SetEquals(entities));
         }
 
-        [TestCaseSource(nameof(GetInsertTestCases))]
-        public void Extract_Entities_From_Insert_Query(TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
+        public static TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>> GetInsertTestCases()
         {
-            var entities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
+            var theoryData = new TheoryData<ISqlQueryEntityExtractor, TableEntityMapping, string, HashSet<IEntityType>>();
 
-            Assert.That(entities, Is.EquivalentTo(expected));
+            foreach (var implementation in SqlQueryEntityExtractorImplementations)
+            {
+                var variantFuncs = GetSqlVariantsTransformFunc().ToList();
+                foreach (var applyVariantFunc in variantFuncs)
+                {
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        INSERT INTO {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} (StringData) VALUES ("test");
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        INSERT {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} (StringData) VALUES ("test");
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        INSERT INTO 
+                        {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} (StringData) 
+                        VALUES ("test");
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+
+                    theoryData.Add(
+                        implementation,
+                        _cachedDbContext.TableEntity,
+                        $"""
+                        INSERT 
+                        {applyVariantFunc(GetTableName(typeof(LazyLoadEntity)))} (StringData) 
+                        VALUES ("test");
+                        """,
+                        new HashSet<IEntityType>
+                        {
+                            GetIEntityType(typeof(LazyLoadEntity))
+                        }
+                    );
+                }
+            }
+
+            return theoryData;
         }
-
-        [OneTimeTearDown]
-        public void Dispose()
+        
+        [Theory]
+        [MemberData(nameof(GetInsertTestCases))]
+        public void Extract_Entities_From_Insert_Query(ISqlQueryEntityExtractor sqlQueryEntityExtractor, TableEntityMapping tableEntities, string sql, HashSet<IEntityType> expected)
         {
-            _cachedDbContext.Dispose();
+            var entities = sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntities, sql).ToHashSet();
+
+            Assert.True(expected.SetEquals(entities));
         }
 
         public class TestDbContext : CachedDbContext

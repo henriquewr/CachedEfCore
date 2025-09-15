@@ -1,9 +1,11 @@
 ﻿using CachedEfCore.Cache;
 using Microsoft.Extensions.Caching.Memory;
+using System;
+using Xunit;
 
 namespace CachedEfCore.DbQueryCacheStore.Tests
 {
-    public class DbQueryCacheStoreTest
+    public class DbQueryCacheStoreTest : IDisposable
     {
         private readonly IMemoryCache _dbQueryCacheStoreMemoryCache;
         private readonly IDbQueryCacheStore _dbQueryCacheStore;
@@ -17,21 +19,20 @@ namespace CachedEfCore.DbQueryCacheStore.Tests
             _dbQueryCacheStore = new Cache.DbQueryCacheStore(_dbQueryCacheStoreMemoryCache);
         }
 
-        [Test]
+        [Fact]
         public void AddToCache_Adds_To_Cache()
         {
             object cacheKey = "cacheKeyAddToCache";
             var existing = _dbQueryCacheStore.GetCached<string>(cacheKey);
-            Assert.That(existing, Is.EqualTo(null), "Key already existing");
+            Assert.True(existing is null, "Key already existing");
 
             _dbQueryCacheStore.AddToCache(Guid.NewGuid(), typeof(object) /* any type */, cacheKey, "cachedString");
 
             var cached = _dbQueryCacheStore.GetCached<string>(cacheKey);
-            Assert.That(cached, Is.EqualTo("cachedString"), "Value is not added");
+            Assert.Equal("cachedString", cached);
         }
 
-        [Test]
-        [NonParallelizable]
+        [Fact]
         public void RemoveAll_Removes_All_Entries()
         {
             var startEntryCount = GetEntryCount();
@@ -44,11 +45,11 @@ namespace CachedEfCore.DbQueryCacheStore.Tests
                 _dbQueryCacheStore.AddToCache(fakeGuid, typeof(object) /* any type */, key, i);
             }
 
-            Assert.That(GetEntryCount(), Is.EqualTo(startEntryCount + addingCount));
+            Assert.Equal(startEntryCount + addingCount, GetEntryCount());
 
             _dbQueryCacheStore.RemoveAll();
 
-            Assert.That(GetEntryCount(), Is.EqualTo(0));
+            Assert.Equal(0, GetEntryCount());
 
             long GetEntryCount()
             {
@@ -57,8 +58,6 @@ namespace CachedEfCore.DbQueryCacheStore.Tests
             }
         }
 
-
-        [OneTimeTearDown]
         public void Dispose()
         {
             _dbQueryCacheStoreMemoryCache.Dispose();

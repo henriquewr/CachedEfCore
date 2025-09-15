@@ -12,10 +12,10 @@ using CachedEfCore.DependencyManager.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
+using Xunit;
 
 namespace CachedEfCore.DepencencyManager.Tests
 {
-    [TestFixture]
     public class EntityDependencyDiscover
     {
         private static readonly CachedDbContext _cachedDbContext = new TestDbContext(new DbQueryCacheStore(new MemoryCache(new MemoryCacheOptions())));
@@ -29,292 +29,332 @@ namespace CachedEfCore.DepencencyManager.Tests
             return _cachedDbContext.Model.GetEntityTypes().First(x => x.ClrType == entityType);
         }
 
-        private static IEnumerable<TestCaseData> GetUnderRelatedEntitiesTestCases()
+        public static TheoryData<Type, Type, Type, HashSet<IEntityType>> GetUnderRelatedEntitiesTestCases()
         {
-            yield return new TestCaseData(typeof(NonLazyLoadEntity),
-                new { A = default(NonLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
+            var theoryData = new TheoryData<Type, Type, Type, HashSet<IEntityType>>
+            {
                 {
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                });
+                    typeof(NonLazyLoadEntity),
+                    new { A = default(NonLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                    }
+                },
+                {
+                    typeof(LazyLoadEntity),
+                    new { A = default(LazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                    }
+                },
+                {
+                    typeof(AnotherLazyLoadEntity),
+                    new { A = default(AnotherLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                    }
+                },
+                {
+                    typeof(LazyLoadWithGenericEntity),
+                    new { A = default(LazyLoadWithGenericEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                    }
+                },
+                {
+                    typeof(EntityWithDependentAttribute),
+                    new { A = default(EntityWithDependentAttribute) }.GetType(),
+                    new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                    }
+                }
+            };
 
-            yield return new TestCaseData(typeof(LazyLoadEntity),
-                new { A = default(LazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                });
-
-            yield return new TestCaseData(typeof(AnotherLazyLoadEntity),
-                new { A = default(AnotherLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                });
-
-            yield return new TestCaseData(typeof(LazyLoadWithGenericEntity),
-                new { A = default(LazyLoadWithGenericEntity) }.GetType(),
-                new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                });
-
-            yield return new TestCaseData(typeof(EntityWithDependentAttribute), 
-                new { A = default(EntityWithDependentAttribute) }.GetType(),
-                new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                });
+            return theoryData;
         }
 
-        [TestCaseSource(nameof(GetUnderRelatedEntitiesTestCases))]
+        [Theory]
+        [MemberData(nameof(GetUnderRelatedEntitiesTestCases))]
         public void GetUnderRelatedEntities_Should_Return_Under_Related(Type type, Type anonymousType, Type genericAnonymousType, HashSet<IEntityType> expected)
         {
             var iEntityType = GetIEntityType(type);
             var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType);
-            Assert.That(entitiesByIEntityType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByIEntityType));
 
             var entities = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(type);
-            Assert.That(entities, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entities));
 
 
             var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(anonymousType);
-            Assert.That(entitiesByAnonymousType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByAnonymousType));
 
 
             var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(genericAnonymousType);
-            Assert.That(entitiesByGenericAnonymousType, Is.EquivalentTo(expected));
-
+            Assert.True(expected.SetEquals(entitiesByGenericAnonymousType));
         }
 
 
 
 
-        private static IEnumerable<TestCaseData> GetAboveRelatedEntitiesTestCases()
+        public static TheoryData<Type, Type, Type, HashSet<IEntityType>> GetAboveRelatedEntitiesTestCases()
         {
-            yield return new TestCaseData(typeof(NonLazyLoadEntity),
-                new { A = default(NonLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
+            var theoryData = new TheoryData<Type, Type, Type, HashSet<IEntityType>>
+            {
                 {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
+                    typeof(NonLazyLoadEntity),
+                    new { A = default(NonLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(LazyLoadEntity),
+                    new { A = default(LazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(AnotherLazyLoadEntity),
+                    new { A = default(AnotherLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                    }
+                },
+                {
+                    typeof(LazyLoadWithGenericEntity),
+                    new { A = default(LazyLoadWithGenericEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(EntityWithDependentAttribute),
+                    new { A = default(EntityWithDependentAttribute) }.GetType(),
+                    new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                }
+            };
 
-            yield return new TestCaseData(typeof(LazyLoadEntity), 
-                new { A = default(LazyLoadEntity) }.GetType(), 
-                new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(), 
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
-
-            yield return new TestCaseData(typeof(AnotherLazyLoadEntity),
-                new { A = default(AnotherLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                });
-
-            yield return new TestCaseData(typeof(LazyLoadWithGenericEntity),
-                new { A = default(LazyLoadWithGenericEntity) }.GetType(),
-                new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
-
-            yield return new TestCaseData(typeof(EntityWithDependentAttribute),
-                new { A = default(EntityWithDependentAttribute) }.GetType(),
-                new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
+            return theoryData;
         }
 
-        [TestCaseSource(nameof(GetAboveRelatedEntitiesTestCases))]
+        [Theory]
+        [MemberData(nameof(GetAboveRelatedEntitiesTestCases))]
         public void GetAboveRelatedEntities_Should_Return_Above_Related(Type type, Type anonymousType, Type genericAnonymousType, HashSet<IEntityType> expected)
         {
             var iEntityType = GetIEntityType(type);
             var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetAboveRelatedEntities(iEntityType);
-            Assert.That(entitiesByIEntityType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByIEntityType));
 
 
             var entities = _cachedDbContext.DependencyManager.GetAboveRelatedEntities(type);
-            Assert.That(entities, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entities));
 
 
             var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetAboveRelatedEntities(anonymousType);
-            Assert.That(entitiesByAnonymousType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByAnonymousType));
 
 
             var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetAboveRelatedEntities(genericAnonymousType);
-            Assert.That(entitiesByGenericAnonymousType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByGenericAnonymousType));
         }
 
 
 
 
-        private static IEnumerable<TestCaseData> GetHasLazyLoadTestCases()
+        public static TheoryData<Type, Type, Type, bool> GetHasLazyLoadTestCases()
         {
-            yield return new TestCaseData(typeof(NonLazyLoadEntity), 
-                new { A = default(NonLazyLoadEntity) }.GetType(), 
-                new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(), 
-                false);
+            var theoryData = new TheoryData<Type, Type, Type, bool>
+            {
+                {
+                    typeof(NonLazyLoadEntity),
+                    new { A = default(NonLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
+                    false
+                },
+                {
+                    typeof(LazyLoadEntity),
+                    new { A = default(LazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
+                    true
+                },
+                {
+                    typeof(AnotherLazyLoadEntity),
+                    new { A = default(AnotherLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
+                    true
+                },
+                {
+                    typeof(LazyLoadWithGenericEntity),
+                    new { A = default(LazyLoadWithGenericEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
+                    true
+                },
+                {
+                    typeof(EntityWithDependentAttribute),
+                    new { A = default(EntityWithDependentAttribute) }.GetType(),
+                    new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
+                    false
+                },
+            };
 
-            yield return new TestCaseData(typeof(LazyLoadEntity),
-                new { A = default(LazyLoadEntity) }.GetType(), 
-                new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(), 
-                true);
-
-            yield return new TestCaseData(typeof(AnotherLazyLoadEntity), 
-                new { A = default(AnotherLazyLoadEntity) }.GetType(), 
-                new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(), 
-                true);
-
-            yield return new TestCaseData(typeof(LazyLoadWithGenericEntity), 
-                new { A = default(LazyLoadWithGenericEntity) }.GetType(), 
-                new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(), 
-                true);    
-            
-            yield return new TestCaseData(typeof(EntityWithDependentAttribute), 
-                new { A = default(EntityWithDependentAttribute) }.GetType(), 
-                new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(), 
-                false);
+            return theoryData;
         }
 
-        [TestCaseSource(nameof(GetHasLazyLoadTestCases))]
+        [Theory]
+        [MemberData(nameof(GetHasLazyLoadTestCases))]
         public void HasLazyLoad_Should_Return_HasLazyLoad(Type type, Type anonymousType, Type genericAnonymousType, bool expected)
         {
             var iEntityType = GetIEntityType(type);
             var lazyLoadByIEntityType = _cachedDbContext.DependencyManager.HasLazyLoad(iEntityType);
-            Assert.That(lazyLoadByIEntityType, Is.EqualTo(expected));
+            Assert.Equal(expected, lazyLoadByIEntityType);
+
 
             var lazyLoadByType = _cachedDbContext.DependencyManager.HasLazyLoad(type);
-            Assert.That(lazyLoadByType, Is.EqualTo(expected));
+            Assert.Equal(expected, lazyLoadByType);
 
 
             var lazyLoadByAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(anonymousType);
-            Assert.That(lazyLoadByAnonymousType, Is.EqualTo(expected));
+            Assert.Equal(expected, lazyLoadByAnonymousType);
 
 
             var lazyLoadByGenericAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(genericAnonymousType);
-            Assert.That(lazyLoadByGenericAnonymousType, Is.EqualTo(expected));
+            Assert.Equal(expected, lazyLoadByGenericAnonymousType);
         }
 
 
 
 
-        private static IEnumerable<TestCaseData> GetAllRelatedEntitiesTestCases()
+        public static TheoryData<Type, Type, Type, HashSet<IEntityType>> GetAllRelatedEntitiesTestCases()
         {
-            yield return new TestCaseData(typeof(NonLazyLoadEntity),
-                new { A = default(NonLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
+            var theoryData = new TheoryData<Type, Type, Type, HashSet<IEntityType>>
+            {
                 {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
+                    typeof(NonLazyLoadEntity),
+                    new { A = default(NonLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<NonLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(LazyLoadEntity),
+                    new { A = default(LazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(AnotherLazyLoadEntity),
+                    new { A = default(AnotherLazyLoadEntity) }.GetType(),
+                    new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(LazyLoadWithGenericEntity),
+                    new { A = default(LazyLoadWithGenericEntity) }.GetType(),
+                    new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+                {
+                    typeof(EntityWithDependentAttribute),
+                    new { A = default(EntityWithDependentAttribute) }.GetType(),
+                    new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
+                    new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadEntity)),
+                        GetIEntityType(typeof(NonLazyLoadEntity)),
+                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
+                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                    }
+                },
+            };
 
-            yield return new TestCaseData(typeof(LazyLoadEntity),
-                new { A = default(LazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<LazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
-
-            yield return new TestCaseData(typeof(AnotherLazyLoadEntity),
-                new { A = default(AnotherLazyLoadEntity) }.GetType(),
-                new { A = default(IEnumerable<AnotherLazyLoadEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
-
-            yield return new TestCaseData(typeof(LazyLoadWithGenericEntity),
-                new { A = default(LazyLoadWithGenericEntity) }.GetType(),
-                new { A = default(IEnumerable<LazyLoadWithGenericEntity>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
-
-            yield return new TestCaseData(typeof(EntityWithDependentAttribute),
-                new { A = default(EntityWithDependentAttribute) }.GetType(),
-                new { A = default(IEnumerable<EntityWithDependentAttribute>) }.GetType(),
-                new HashSet<IEntityType>
-                {
-                    GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadEntity)),
-                    GetIEntityType(typeof(NonLazyLoadEntity)),
-                    GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    GetIEntityType(typeof(EntityWithDependentAttribute)),
-                });
+            return theoryData;
         }
 
-        [TestCaseSource(nameof(GetAllRelatedEntitiesTestCases))]
+        [Theory]
+        [MemberData(nameof(GetAllRelatedEntitiesTestCases))]
         public void GetAllRelatedEntities_Should_Return_Above_Related(Type type, Type anonymousType, Type genericAnonymousType, HashSet<IEntityType> expected)
         {
             var iEntityType = GetIEntityType(type);
             var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(iEntityType);
-            Assert.That(entitiesByIEntityType, Is.EquivalentTo(expected));
-
+            Assert.True(expected.SetEquals(entitiesByIEntityType));
 
             var entities = _cachedDbContext.DependencyManager.GetAllRelatedEntities(type);
-            Assert.That(entities, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entities));
 
 
             var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(anonymousType);
-            Assert.That(entitiesByAnonymousType, Is.EquivalentTo(expected));
+            Assert.True(expected.SetEquals(entitiesByAnonymousType));
 
 
             var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(genericAnonymousType);
-            Assert.That(entitiesByGenericAnonymousType, Is.EquivalentTo(expected));
-        }
-
-
-        [OneTimeTearDown]
-        public void Dispose()
-        {
-            _cachedDbContext.Dispose();
+            Assert.True(expected.SetEquals(entitiesByGenericAnonymousType));
         }
 
         private class TestDbContext : CachedDbContext

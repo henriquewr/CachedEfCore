@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CachedEfCore.KeyGeneration.EvalTypeChecker;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -29,25 +30,27 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         private readonly IPrintabilityChecker _printableHelper;
+        private readonly IExpressionEvalTypeChecker _expressionEvalTypeChecker;
 
         [ThreadStatic]
         private static ValuePrinter? _valuePrinter;
 
-        public KeyGeneratorVisitor(IPrintabilityChecker printableHelper, JsonSerializerOptions jsonSerializerOptions)
+        public KeyGeneratorVisitor(
+            IPrintabilityChecker printableHelper,
+            IExpressionEvalTypeChecker expressionEvalTypeChecker,
+            JsonSerializerOptions jsonSerializerOptions
+        )
         {
             _printableHelper = printableHelper;
             _jsonSerializerOptions = jsonSerializerOptions;
+            _expressionEvalTypeChecker = expressionEvalTypeChecker;
             _getParametersVisitor = new GetParametersVisitor();
-        }
-
-        public KeyGeneratorVisitor(IPrintabilityChecker printableHelper) : this(printableHelper, new JsonSerializerOptions { IncludeFields = true })
-        {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResetState()
         {
-            if (_valuePrinter is null)
+            if (_valuePrinter is null || _valuePrinter.IsDisposed)
             {
                 _valuePrinter = new(_jsonSerializerOptions);
             }
@@ -162,7 +165,9 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         {
             var hasAllScopes = _getParametersVisitor.HasAllParamsScopes(node);
 
-            return hasAllScopes;
+            var canEval = hasAllScopes && !_expressionEvalTypeChecker.WillEvalTypes(node);
+
+            return canEval;
         }
 
         private static (object? Result, Type ResultType) EvalMethodCall(MethodCallExpression node)
@@ -176,10 +181,13 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            var isPrintable = _printableHelper.IsPrintable(node.Value, node.Type);
-            if (!isPrintable)
+            if (!_expressionEvalTypeChecker.WillEvalTypes(node))
             {
-                _valuePrinter!.Print(node.Value);
+                var isPrintable = _printableHelper.IsPrintable(node.Value, node.Type);
+                if (!isPrintable)
+                {
+                    _valuePrinter!.Print(node.Value);
+                }
             }
 
             return base.VisitConstant(node);
@@ -202,6 +210,11 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         private bool CanBeEvaluated(MemberExpression exp)
         {
+            if (_expressionEvalTypeChecker.WillEvalTypes(exp))
+            {
+                return false;
+            }
+
             while (exp.Expression != null && exp.Expression.NodeType == ExpressionType.MemberAccess)
             {
                 exp = (MemberExpression)exp.Expression;

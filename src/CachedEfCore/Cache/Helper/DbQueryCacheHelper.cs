@@ -15,7 +15,7 @@ namespace CachedEfCore.Cache.Helper
 
         private static void ResetAsyncLocalPrinter()
         {
-            if (_printerAsyncLocal.Value is null)
+            if (_printerAsyncLocal.Value is null || _printerAsyncLocal.Value.IsDisposed)
             {
                 _printerAsyncLocal.Value = new();
             }
