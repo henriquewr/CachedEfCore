@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.KeyGeneration.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.DbQueryCacheStore.Tests", "test\CachedEfCore.DbQueryCacheStore.Tests\CachedEfCore.DbQueryCacheStore.Tests.csproj", "{997F6CCC-06DC-4AED-B835-E02151F49288}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.DependencyInjection.Tests", "CachedEfCore.DependencyInjection.Tests\CachedEfCore.DependencyInjection.Tests.csproj", "{812BDE35-D120-41BE-817C-7E2BB5669BAB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CachedEfCore.DependencyInjection.Tests", "test\CachedEfCore.DependencyInjection.Tests\CachedEfCore.DependencyInjection.Tests.csproj", "{812BDE35-D120-41BE-817C-7E2BB5669BAB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
