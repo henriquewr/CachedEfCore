@@ -20,7 +20,7 @@ namespace CachedEfCore.DependencyManager
         }
 
         private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _underRelatedCache = new();
-        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _aboveRelatedCache = new();
+        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _upperRelatedCache = new();
         private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _allRelatedCache = new();
         private readonly ConcurrentDictionary<string, bool> _hasLazyLoadCache = new();
 
@@ -62,32 +62,43 @@ namespace CachedEfCore.DependencyManager
         }
 
 
-
-        public FrozenSet<IEntityType> GetUnderRelatedEntities(IEntityType rootEntityType)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="rootEntityType"></param>
+        /// <param name="includingRelatedInFks">Uses Foreign Keys in the search, in C# entities cannot have the Navigation, so in C# it's not related, but still related using DB logic (using Fks)</param>
+        /// <returns></returns>
+        public FrozenSet<IEntityType> GetUnderRelatedEntities(IEntityType rootEntityType, bool includingRelatedInFks)
         {
-            return GetUnderRelatedEntitiesImpl(rootEntityType, false);
+            return GetUnderRelatedEntitiesImpl(rootEntityType, includingRelatedInFks, false);
         }
 
-        public FrozenSet<IEntityType> GetUnderRelatedEntities(Type rootType)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="rootType"></param>
+        /// <param name="includingRelatedInFks">Uses Foreign Keys in the search, in C# entities cannot have the Navigation, so in C# it's not related, but still related using DB logic (using Fks)</param>
+        /// <returns></returns>
+        public FrozenSet<IEntityType> GetUnderRelatedEntities(Type rootType, bool includingRelatedInFks)
         {
-            return GetUnderRelatedEntitiesInternal(rootType, false);
+            return GetUnderRelatedEntitiesInternal(rootType, includingRelatedInFks, false);
         }
 
-        private FrozenSet<IEntityType> GetUnderRelatedEntitiesInternal(Type rootType, bool ignoreDependentOnEntityAttribute)
+        private FrozenSet<IEntityType> GetUnderRelatedEntitiesInternal(Type rootType, bool relatedInFks, bool ignoreDependentOnEntityAttribute)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
-                return GetUnderRelatedEntitiesImpl(entityType, ignoreDependentOnEntityAttribute);
+                return GetUnderRelatedEntitiesImpl(entityType, relatedInFks, ignoreDependentOnEntityAttribute);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
 
-            return GetEntities(entities, entityType => GetUnderRelatedEntitiesImpl(entityType, ignoreDependentOnEntityAttribute));
+            return GetEntities(entities, entityType => GetUnderRelatedEntitiesImpl(entityType, relatedInFks, ignoreDependentOnEntityAttribute));
         }
 
-        private FrozenSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool ignoreDependentOnEntityAttribute)
+        private FrozenSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool relatedInFks, bool ignoreDependentOnEntityAttribute)
         {
-            var key = $"{ignoreDependentOnEntityAttribute}.{rootEntityType.ClrType.FullName}";
+            var key = $"{relatedInFks}.{ignoreDependentOnEntityAttribute}.{rootEntityType.Name}";
 
             if (_underRelatedCache.TryGetValue(key, out var cached))
             {
@@ -108,7 +119,7 @@ namespace CachedEfCore.DependencyManager
                     continue;
                 }
 
-                var underRelated = GetShallowUnderRelatedEntities(currentEntity, ignoreDependentOnEntityAttribute);
+                var underRelated = GetShallowUnderRelatedEntities(currentEntity, relatedInFks, ignoreDependentOnEntityAttribute);
 
                 foreach (var underRelatedEntity in underRelated)
                 {
@@ -125,28 +136,28 @@ namespace CachedEfCore.DependencyManager
 
 
 
-        public FrozenSet<IEntityType> GetAboveRelatedEntities(Type rootType)
+        public FrozenSet<IEntityType> GetUpperRelatedEntities(Type rootType)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
-                return GetAboveRelatedEntitiesImpl(entityType);
+                return GetUpperRelatedEntitiesImpl(entityType);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
 
-            return GetEntities(entities, GetAboveRelatedEntitiesImpl);
+            return GetEntities(entities, GetUpperRelatedEntitiesImpl);
         }
 
-        public FrozenSet<IEntityType> GetAboveRelatedEntities(IEntityType rootEntityType)
+        public FrozenSet<IEntityType> GetUpperRelatedEntities(IEntityType rootEntityType)
         {
-            return GetAboveRelatedEntitiesImpl(rootEntityType);
+            return GetUpperRelatedEntitiesImpl(rootEntityType);
         }
 
-        private FrozenSet<IEntityType> GetAboveRelatedEntitiesImpl(IEntityType rootEntityType)
+        private FrozenSet<IEntityType> GetUpperRelatedEntitiesImpl(IEntityType rootEntityType)
         {
-            var key = rootEntityType.ClrType.FullName!;
+            var key = rootEntityType.Name;
 
-            if (_aboveRelatedCache.TryGetValue(key, out var cached))
+            if (_upperRelatedCache.TryGetValue(key, out var cached))
             {
                 return cached;
             }
@@ -165,44 +176,43 @@ namespace CachedEfCore.DependencyManager
                     continue;
                 }
 
-                var aboveRelated = GetShallowAboveRelatedEntities(currentEntity);
+                var upperRelated = GetShallowUpperRelatedEntities(currentEntity);
 
-                foreach (var aboveRelatedEntity in aboveRelated)
+                foreach (var upperRelatedEntity in upperRelated)
                 {
-                    stack.Push(aboveRelatedEntity);
+                    stack.Push(upperRelatedEntity);
                 }
             }
 
             var cache = visited.ToFrozenSet();
 
-            _aboveRelatedCache[key] = cache;
+            _upperRelatedCache[key] = cache;
 
             return cache;
         }
 
 
 
-        public FrozenSet<IEntityType> GetAllRelatedEntities(Type rootType)
+        public FrozenSet<IEntityType> GetAllRelatedEntities(Type rootType, bool underRelatedIncludingFks)
         {
             if (_typeEntity.TryGetValue(rootType, out var entityType))
             {
-                return GetAllRelatedEntitiesImpl(entityType);
+                return GetAllRelatedEntitiesImpl(entityType, underRelatedIncludingFks);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
 
-            return GetEntities(entities, GetAllRelatedEntities);
+            return GetEntities(entities, x => GetAllRelatedEntities(x, underRelatedIncludingFks));
         }
 
-        public FrozenSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType)
+        public FrozenSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType, bool underRelatedIncludingFks)
         {
-            return GetAllRelatedEntitiesImpl(rootEntityType);
+            return GetAllRelatedEntitiesImpl(rootEntityType, underRelatedIncludingFks);
         }
 
-        private FrozenSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType)
+        private FrozenSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType, bool underRelatedIncludingFks)
         {
-            var key = rootEntityType.ClrType.FullName!;
-
+            var key = $"{underRelatedIncludingFks}.{rootEntityType.Name}";
             if (_allRelatedCache.TryGetValue(key, out var cached))
             {
                 return cached;
@@ -222,14 +232,14 @@ namespace CachedEfCore.DependencyManager
                     continue;
                 }
 
-                var aboveRelated = GetShallowAboveRelatedEntities(currentEntity);
+                var upperRelated = GetShallowUpperRelatedEntities(currentEntity);
 
-                foreach (var aboveRelatedEntity in aboveRelated)
+                foreach (var upperRelatedEntity in upperRelated)
                 {
-                    stack.Push(aboveRelatedEntity);
+                    stack.Push(upperRelatedEntity);
                 }
 
-                var underRelated = GetShallowUnderRelatedEntities(currentEntity, false);
+                var underRelated = GetShallowUnderRelatedEntities(currentEntity, underRelatedIncludingFks, false);
 
                 foreach (var underRelatedEntity in underRelated)
                 {
@@ -246,7 +256,7 @@ namespace CachedEfCore.DependencyManager
 
 
 
-        private IEnumerable<IEntityType> GetShallowAboveRelatedEntities(IEntityType entityType)
+        private IEnumerable<IEntityType> GetShallowUpperRelatedEntities(IEntityType entityType)
         {
             var withAttr = GetEntitiesReferencingTypeInDependentOnEntityAttribute(entityType.ClrType);
             foreach (var item in withAttr)
@@ -254,10 +264,47 @@ namespace CachedEfCore.DependencyManager
                 yield return item;
             }
 
-            var foreignKeys = entityType.GetForeignKeys();
+            /*
+                EntityManyToManySkipNavigation.GetSkipNavigations() will return OtherEntityManyToManySkipNavigation
 
+                class EntityManyToManySkipNavigation
+                {
+                    //skip navigation
+                    public virtual ICollection<OtherEntityManyToManySkipNavigation>? OtherEntityManyToManySkipNavigation { get; set; }
+                }
+
+                class OtherEntityManyToManySkipNavigation
+                {
+                    //skip navigation
+                    public virtual ICollection<EntityManyToManySkipNavigation>? EntityManyToManySkipNavigation { get; set; }
+                }
+
+                Ef creates that:
+                class JunctionEntity
+                {
+                    public int OtherEntityManyToManySkipNavigationId { get; set; }
+                    public int EntityManyToManySkipNavigationId { get; set; }
+                }   
+              */
+            var skipNavigations = entityType.GetSkipNavigations();
+            foreach (var skipNavigation in skipNavigations)
+            {
+                yield return skipNavigation.TargetEntityType;
+            }
+
+            var foreignKeys = entityType.GetForeignKeys();
             foreach (var foreignKey in foreignKeys)
             {
+                var referencingSkipNavigations = foreignKey.GetReferencingSkipNavigations();
+
+                foreach (var item in referencingSkipNavigations)
+                {
+                    if (item.ForeignKey == foreignKey && item.IsCollection == true)
+                    {
+                        yield return item.TargetEntityType;
+                    }
+                }
+
                 var navigation = foreignKey.GetNavigation(false);
 
                 if (navigation is not null && navigation.ForeignKey == foreignKey && navigation.IsCollection == true)
@@ -273,7 +320,7 @@ namespace CachedEfCore.DependencyManager
             }
         }
 
-        private IEnumerable<IEntityType> GetShallowUnderRelatedEntities(IEntityType entityType, bool ignoreDependentOnEntityAttribute)
+        private IEnumerable<IEntityType> GetShallowUnderRelatedEntities(IEntityType entityType, bool underRelatedIncludingFks, bool ignoreDependentOnEntityAttribute)
         {
             if (!ignoreDependentOnEntityAttribute)
             {
@@ -284,8 +331,16 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            var navigations = entityType.GetNavigations();
+            if (underRelatedIncludingFks)
+            {
+                var foreignKeys = entityType.GetForeignKeys();
+                foreach (var foreignKey in foreignKeys)
+                {
+                    yield return foreignKey.PrincipalEntityType;
+                }
+            }
 
+            var navigations = entityType.GetNavigations();
             foreach (var navigation in navigations)
             {
                 yield return navigation.TargetEntityType;
@@ -294,6 +349,7 @@ namespace CachedEfCore.DependencyManager
             var skipNavigations = entityType.GetSkipNavigations();
             foreach (var skipNavigation in skipNavigations)
             {
+                yield return skipNavigation.JoinEntityType;
                 yield return skipNavigation.TargetEntityType;
             }
         }
@@ -321,25 +377,46 @@ namespace CachedEfCore.DependencyManager
             return typesWithAttr;
         }
 
-        public bool HasLazyLoad(Type entityType)
+        public bool HasLazyLoad(Type rootType)
         {
-            var key = entityType.FullName!;
-            if (_hasLazyLoadCache.TryGetValue(key, out bool cached))
+            var key = rootType.FullName!;
+
+            if (_hasLazyLoadCache.TryGetValue(key, out var value))
             {
-                return cached;
+                return value;
             }
 
-            var underRelated = GetUnderRelatedEntitiesInternal(entityType, true);
-            var hasLazyLoad = underRelated.Count > 1;
+            bool result;
 
-            _hasLazyLoadCache[key] = hasLazyLoad;
+            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            {
+                result = HasLazyLoad(entityType);
+            }
+            else
+            {
+                var entities = GetAllEntitiesByType(GetAllTypes(rootType));
 
-            return hasLazyLoad;
+                result = entities.Any(HasLazyLoad);
+            }
+
+            _hasLazyLoadCache[key] = result;
+
+            return result;
         }
 
         public bool HasLazyLoad(IEntityType entityType)
         {
-            return HasLazyLoad(entityType.ClrType);
+            var key = entityType.Name;
+            if (_hasLazyLoadCache.TryGetValue(key, out var value))
+            {
+                return value;
+            }
+
+            var anyHasLazyLoading = entityType.GetNavigations().Any(navigation => navigation.LazyLoadingEnabled);
+
+            _hasLazyLoadCache[key] = anyHasLazyLoading;
+
+            return anyHasLazyLoading;
         }
     }
 }
