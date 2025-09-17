@@ -78,7 +78,7 @@ namespace CachedEfCore.Cache
 
             foreach (var typeToRemove in entitiesToRemove)
             {
-                typesToRemove.UnionWith(dependencyManager.GetAboveRelatedEntities(typeToRemove));
+                typesToRemove.UnionWith(dependencyManager.GetUpperRelatedEntities(typeToRemove));
             }
 
             RemoveDependentEntities(typesToRemove, fireEvent);
