@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using System;
 using System.Collections.Generic;
@@ -28,8 +29,10 @@ namespace CachedEfCore.DependencyInjection
             typeof(DbContext),
             typeof(DbSet<>), // DbContext.SomeEntity
 #pragma warning disable EF1001 
-            typeof(EntityQueryable<>) // DbContext.SomeEntity.Where(x => true).GetType(),
+            typeof(EntityQueryable<>), // DbContext.SomeEntity.Where(x => true).GetType(),
 #pragma warning restore EF1001
+            typeof(EntityQueryRootExpression),
+
         };
         public static JsonSerializerOptions DefaultKeyGeneratorJsonSerializerOptions => new JsonSerializerOptions { IncludeFields = true };
     }

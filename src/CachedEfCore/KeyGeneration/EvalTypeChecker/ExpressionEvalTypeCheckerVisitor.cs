@@ -56,6 +56,13 @@ namespace CachedEfCore.KeyGeneration.EvalTypeChecker
             return base.Visit(node);
         }
 
+        protected override Expression VisitExtension(Expression node)
+        {
+            _willEvalAnyType |= WillEvalType(node.GetType());
+
+            return base.VisitExtension(node);
+        }
+
         protected override Expression VisitConstant(ConstantExpression node)
         {
             _willEvalAnyType |= WillEvalType(node.Value, node.Type);
