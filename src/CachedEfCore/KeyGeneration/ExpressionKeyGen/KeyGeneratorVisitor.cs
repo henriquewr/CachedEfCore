@@ -172,6 +172,14 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         private static (object? Result, Type ResultType) EvalMethodCall(MethodCallExpression node)
         {
+            //TODO Maybe use preferInterpretation true in the Compile method, it was way faster in some tests, but it needs more thinking about that
+            /*
+                //that code was faster but it needs more testing
+                var instance = node.Object != null ? Evaluate(node.Object) : null;
+                var arguments = node.Arguments.Select(x => x is LambdaExpression lambda ? lambda.Compile() : Evaluate(x)).ToArray();
+                var result = node.Method.Invoke(instance, arguments);
+            */
+
             var lambda = Expression.Lambda(node);
             var compiledLambda = lambda.Compile();
             var result = compiledLambda.DynamicInvoke();
