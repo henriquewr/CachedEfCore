@@ -8,12 +8,7 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 ```
 public void ConfigureServices(IServiceCollection services)
 {
-    services.AddMemoryCache();
-    services.AddSingleton<KeyGeneratorVisitor>();
-    services.AddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
-    services.AddSingleton<IDbQueryCacheStore, DbQueryCacheStore>();
-    services.AddSingleton<ISqlQueryEntityExtractor, SqlServerQueryEntityExtractor>();  // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
-    services.AddSingleton<DbStateInterceptor>();
+    services.AddCachedEfCore<SqlServerQueryEntityExtractor>(); // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
 
     // AddDbContextPool or AddDbContext
     services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
