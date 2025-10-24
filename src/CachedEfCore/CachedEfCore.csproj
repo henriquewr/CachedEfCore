@@ -4,9 +4,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>2025.9.18.2</AssemblyVersion>
-    <FileVersion>2025.9.18.2</FileVersion>
+    <AssemblyVersion>2025.10.24.2</AssemblyVersion>
+    <FileVersion>2025.10.24.2</FileVersion>
 	<Version>$(AssemblyVersion)</Version>
+	<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
   </PropertyGroup>
   <PropertyGroup>
 	<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
@@ -22,4 +23,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(Configuration)'=='TestDebug'">
+	<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='TestRelease'">
+	<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+  </PropertyGroup>
 </Project>

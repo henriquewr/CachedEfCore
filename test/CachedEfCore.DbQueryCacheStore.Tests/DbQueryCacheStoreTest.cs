@@ -1,66 +1,121 @@
-﻿using CachedEfCore.Cache;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace CachedEfCore.DbQueryCacheStore.Tests
 {
-    public class DbQueryCacheStoreTest : IDisposable
+    public class DbQueryCacheStoreTest
     {
-        private readonly IMemoryCache _dbQueryCacheStoreMemoryCache;
-        private readonly IDbQueryCacheStore _dbQueryCacheStore;
-
-        public DbQueryCacheStoreTest()
+        private static IMemoryCache CreateMemoryCache()
         {
-            _dbQueryCacheStoreMemoryCache = new MemoryCache(new MemoryCacheOptions()
+            return new MemoryCache(new MemoryCacheOptions()
             {
                 TrackStatistics = true
             });
-            _dbQueryCacheStore = new Cache.DbQueryCacheStore(_dbQueryCacheStoreMemoryCache);
+        }
+
+        public DbQueryCacheStoreTest()
+        {
         }
 
         [Fact]
         public void AddToCache_Adds_To_Cache()
         {
+            var dbQueryCacheStore = new Cache.DbQueryCacheStore(CreateMemoryCache());
             object cacheKey = "cacheKeyAddToCache";
-            var existing = _dbQueryCacheStore.GetCached<string>(cacheKey);
-            Assert.True(existing is null, "Key already existing");
+            const string valueToCache = "cachedString";
+            var contextId = Guid.NewGuid();
+            var rootType = typeof(object); // any type
 
-            _dbQueryCacheStore.AddToCache(Guid.NewGuid(), typeof(object) /* any type */, cacheKey, "cachedString");
+            dbQueryCacheStore.AddToCache(contextId, rootType, cacheKey, valueToCache);
 
-            var cached = _dbQueryCacheStore.GetCached<string>(cacheKey);
-            Assert.Equal("cachedString", cached);
+            Assert.Single(dbQueryCacheStore.TestCacheKeysByContextId);
+            var contextIdKeys = dbQueryCacheStore.TestCacheKeysByContextId[contextId];
+            Assert.True(contextIdKeys.Count == 1 && contextIdKeys.All(x => (string)x == (string)cacheKey));
+
+            Assert.Single(dbQueryCacheStore.TestCacheKeysByType);
+            var typeKeys = dbQueryCacheStore.TestCacheKeysByType[rootType];
+            Assert.True(typeKeys.Count == 1 && typeKeys.All(x => (string)x == (string)cacheKey));
+
+            var cached = dbQueryCacheStore.GetCached<string>(cacheKey);
+            Assert.Equal(valueToCache, cached);
+        }
+
+        [Fact]
+        public void AddToCache_Is_Thread_Safe()
+        {
+            using var memoryCache = CreateMemoryCache();
+            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
+            const string valueToCache = "cachedString";
+            const int totalAdds = 100000;
+
+            var contextId = Guid.NewGuid();
+            var rootType = typeof(object); // any type
+
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 16
+            };
+
+            var keys = Enumerable.Range(0, totalAdds).Select(x => "cacheKeyAddToCache" + x).ToArray();
+
+            Parallel.ForEach(keys, parallelOptions, key =>
+            {
+                dbQueryCacheStore.AddToCache(contextId, rootType, key, valueToCache);
+            });
+
+            Assert.Single(dbQueryCacheStore.TestCacheKeysByContextId);
+            var contextIdKeys = dbQueryCacheStore.TestCacheKeysByContextId[contextId];
+            Assert.True(contextIdKeys.Count == totalAdds);
+
+            Assert.Single(dbQueryCacheStore.TestCacheKeysByType);
+            var typeKeys = dbQueryCacheStore.TestCacheKeysByType[rootType];
+            Assert.True(typeKeys.Count == totalAdds);
+
+            var contextIdKeysHashSet = contextIdKeys.Select(x => (string)x).ToHashSet();
+            var typeKeysHashSet = typeKeys.Select(x => (string)x).ToHashSet();
+
+            Assert.All(keys, key =>
+            {
+                contextIdKeysHashSet.Contains(key);
+                typeKeysHashSet.Contains(key);
+            });
+
+            Assert.Equal(totalAdds, GetEntryCount(memoryCache));
         }
 
         [Fact]
         public void RemoveAll_Removes_All_Entries()
         {
-            var startEntryCount = GetEntryCount();
+            using var memoryCache = CreateMemoryCache();
+            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
+
+            var startEntryCount = GetEntryCount(memoryCache);
 
             var addingCount = 1000;
             var fakeGuid = Guid.NewGuid();
             for (int i = 0; i < addingCount; i++)
             {
                 var key = "removeAllKey" + i;
-                _dbQueryCacheStore.AddToCache(fakeGuid, typeof(object) /* any type */, key, i);
+                dbQueryCacheStore.AddToCache(fakeGuid, typeof(object) /* any type */, key, i);
             }
 
-            Assert.Equal(startEntryCount + addingCount, GetEntryCount());
+            Assert.Equal(startEntryCount + addingCount, GetEntryCount(memoryCache));
 
-            _dbQueryCacheStore.RemoveAll();
+            dbQueryCacheStore.RemoveAll();
 
-            Assert.Equal(0, GetEntryCount());
+            Assert.Empty(dbQueryCacheStore.TestCacheKeysByContextId);
+            Assert.Empty(dbQueryCacheStore.TestCacheKeysByType);
 
-            long GetEntryCount()
-            {
-                var entryCount = _dbQueryCacheStoreMemoryCache.GetCurrentStatistics()!.CurrentEntryCount;
-                return entryCount;
-            }
+            Assert.Equal(0, GetEntryCount(memoryCache));
         }
 
-        public void Dispose()
+        private static long GetEntryCount(IMemoryCache memoryCache)
         {
-            _dbQueryCacheStoreMemoryCache.Dispose();
+            var entryCount = memoryCache.GetCurrentStatistics()!.CurrentEntryCount;
+            return entryCount;
         }
     }
 }

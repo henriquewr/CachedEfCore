@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache
 {
-    public class DbQueryCacheStore : IDbQueryCacheStore
+    public partial class DbQueryCacheStore : IDbQueryCacheStore
     {
         private readonly ConcurrentDictionary<Guid, ConcurrentBag<object>> _cacheKeysByContextId = new();
         private readonly ConcurrentDictionary<Type, ConcurrentBag<object>> _cacheKeysByType = new();
@@ -100,6 +100,7 @@ namespace CachedEfCore.Cache
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveKeys(IEnumerable<object> keys)
         {
             foreach (var key in keys)
@@ -145,25 +146,24 @@ namespace CachedEfCore.Cache
             _cache.Set(key, dataToCache, _cacheOptions);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddingToCache(Guid contextId, Type rootEntityType, object cacheKey)
         {
-            if (_cacheKeysByContextId.TryGetValue(contextId, out var contextValues))
-            {
-                contextValues.Add(cacheKey);
-            }
-            else
-            {
-                _cacheKeysByContextId[contextId] = new() { cacheKey };
-            }
+            _cacheKeysByContextId.AddOrUpdate(contextId,
+                (_) => new() { cacheKey },
+                (_, existingBag) =>
+                {
+                    existingBag.Add(cacheKey);
+                    return existingBag;
+                });
 
-            if (_cacheKeysByType.TryGetValue(rootEntityType, out var typeValues))
-            {
-                typeValues.Add(cacheKey);
-            }
-            else
-            {
-                _cacheKeysByType[rootEntityType] = new() { cacheKey };
-            }
+            _cacheKeysByType.AddOrUpdate(rootEntityType,
+                (_) => new() { cacheKey },
+                (_, existingBag) =>
+                {
+                    existingBag.Add(cacheKey);
+                    return existingBag;
+                });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

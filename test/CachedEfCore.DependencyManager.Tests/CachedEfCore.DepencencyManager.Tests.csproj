@@ -7,8 +7,9 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <AssemblyVersion>2025.9.18.2</AssemblyVersion>
-    <FileVersion>2025.9.18.2</FileVersion>
+    <AssemblyVersion>2025.10.24.2</AssemblyVersion>
+    <FileVersion>2025.10.24.2</FileVersion>
+    <Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

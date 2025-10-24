@@ -5,7 +5,12 @@ using System.Threading.Tasks;
 
 namespace CachedEfCore.Helpers.Perf
 {
-    internal class Performance
+#if TEST_BUILD
+    public
+#else
+    internal
+#endif
+        class Performance
     {
         private static void ForceGC()
         {
