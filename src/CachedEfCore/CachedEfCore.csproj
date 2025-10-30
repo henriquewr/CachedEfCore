@@ -4,8 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>2025.10.24.2</AssemblyVersion>
-    <FileVersion>2025.10.24.2</FileVersion>
+    <AssemblyVersion>2025.10.30.1</AssemblyVersion>
+    <FileVersion>2025.10.30.1</FileVersion>
 	<Version>$(AssemblyVersion)</Version>
 	<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
   </PropertyGroup>

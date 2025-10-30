@@ -44,9 +44,12 @@ namespace CachedEfCore.DependencyManager
 
         private static IEnumerable<Type> GetAllTypes(Type type)
         {
-            var propsTypes = type.GetProperties().SelectMany(x => x.PropertyType.GetGenericArguments().Append(x.PropertyType)).Append(type);
+            var propsTypes = type.GetProperties().SelectMany(x => x.PropertyType.GetGenericArguments().Append(x.PropertyType));
+            var fieldTypes = type.GetFields().SelectMany(x => x.FieldType.GetGenericArguments().Append(x.FieldType));
 
-            return propsTypes;
+            var allTypes = propsTypes.Concat(fieldTypes).Append(type);
+
+            return allTypes;
         }
 
         private static FrozenSet<IEntityType> GetEntities(IEnumerable<IEntityType> entities, Func<IEntityType, IEnumerable<IEntityType>> getEntities)
