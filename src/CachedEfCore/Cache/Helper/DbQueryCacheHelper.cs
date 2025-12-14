@@ -39,8 +39,7 @@ namespace CachedEfCore.Cache.Helper
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            ReadOnlySpan<object> query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            ReadOnlySpan<object> query)
         {
             var expression = "";
             var additionalJson = "";
@@ -81,10 +80,8 @@ namespace CachedEfCore.Cache.Helper
                 expression += printerResult;
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -92,8 +89,7 @@ namespace CachedEfCore.Cache.Helper
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            Expression query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
@@ -101,10 +97,8 @@ namespace CachedEfCore.Cache.Helper
                 return getDataFromDatabase();
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -112,8 +106,7 @@ namespace CachedEfCore.Cache.Helper
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            ReadOnlySpan<Expression> query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            ReadOnlySpan<Expression> query)
         {
             var expression = "";
             var additionalJson = "";
@@ -135,10 +128,8 @@ namespace CachedEfCore.Cache.Helper
                 }
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -146,24 +137,20 @@ namespace CachedEfCore.Cache.Helper
         public ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            string key,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            string key)
         {
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, key, null, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
 
 
         [OverloadResolutionPriority(-1)]
-        public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            object[] query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            object[] query)
         {
             var expression = "";
             var additionalJson = "";
@@ -179,7 +166,7 @@ namespace CachedEfCore.Cache.Helper
                     var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
-                        return getDataFromDatabase();
+                        return await getDataFromDatabase();
                     }
 
                     expression += keyGenerated.Value.Expression;
@@ -204,39 +191,33 @@ namespace CachedEfCore.Cache.Helper
                 expression += printerResult;
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            Expression query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
-                return getDataFromDatabase();
+                return await getDataFromDatabase();
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            Expression[] query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            Expression[] query)
         {
             var expression = "";
             var additionalJson = "";
@@ -248,7 +229,7 @@ namespace CachedEfCore.Cache.Helper
                 var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
-                    return getDataFromDatabase();
+                    return await getDataFromDatabase();
                 }
 
                 expression += keyGenerated.Value.Expression;
@@ -258,24 +239,19 @@ namespace CachedEfCore.Cache.Helper
                 }
             }
 
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, expression, additionalJson, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            string key,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!)
+            string key)
         {
-            var entityType = typeof(TEntity);
-
-            var cacheKey = new DbQueryCacheKey(entityType.FullName!, key, null, getDataFromDatabaseStr);
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, entityType, cacheKey, getDataFromDatabase);
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext.Id, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
         }

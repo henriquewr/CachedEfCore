@@ -169,23 +169,37 @@ namespace CachedEfCore.Cache
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetOrAdd<T>(Guid contextId, Type rootEntityType, object key, Func<T?> create)
         {
-            var value = _cache.GetOrCreate(key, (cacheEntry) => {
-                AddingToCache(contextId, rootEntityType, key);
-                return create();
-            }, _cacheOptions);
+            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            {
+                return cachedValue;
+            }
 
-            return value;
+            AddingToCache(contextId, rootEntityType, key);
+
+            var createdValue = create();
+
+            _cache.Set(key, createdValue, _cacheOptions);
+
+            return createdValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create)
+        public async ValueTask<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create)
         {
-            var value = _cache.GetOrCreateAsync(key, (cacheEntry) => {
-                AddingToCache(contextId, rootEntityType, key);
-                return create();
-            }, _cacheOptions);
+            if (_cache.TryGetValue<T> (key, out var cachedValue))
+            {
+                return cachedValue;
+            }
 
-            return value;
+            var createdValueTask = create();
+
+            AddingToCache(contextId, rootEntityType, key);
+
+            var createdValue = await createdValueTask.ConfigureAwait(false);
+
+            _cache.Set(key, createdValue, _cacheOptions);
+
+            return createdValue;
         }
     }
 }

@@ -4,18 +4,18 @@ namespace CachedEfCore.Cache
 {
     public readonly struct DbQueryCacheKey : IEquatable<DbQueryCacheKey>
     {
-        public DbQueryCacheKey(string entityFullName, string expression, string? additionalExpressionData, string queryStructure)
+        public DbQueryCacheKey(Type entityType, string expression, string? additionalExpressionData, nint delegateFunctionPointer)
         {
-            EntityFullName = entityFullName;
+            EntityType = entityType;
             Expression = expression;
             AdditionalExpressionData = additionalExpressionData;
-            QueryStructure = queryStructure;
+            DelegateFunctionPointer = delegateFunctionPointer;
         }
 
-        public readonly string EntityFullName;
+        public readonly Type EntityType;
         public readonly string Expression;
         public readonly string? AdditionalExpressionData;
-        public readonly string QueryStructure;
+        public readonly nint DelegateFunctionPointer;
 
         public override bool Equals(object? obj)
         {
@@ -24,15 +24,15 @@ namespace CachedEfCore.Cache
 
         public bool Equals(DbQueryCacheKey other)
         {
-            return EntityFullName == other.EntityFullName &&
+            return EntityType == other.EntityType &&
                    Expression == other.Expression &&
                    AdditionalExpressionData == other.AdditionalExpressionData &&
-                   QueryStructure == other.QueryStructure;
+                   DelegateFunctionPointer == other.DelegateFunctionPointer;
         }
 
         public override int GetHashCode()
         {
-            int hash = HashCode.Combine(EntityFullName, Expression, QueryStructure);
+            int hash = HashCode.Combine(EntityType, Expression, DelegateFunctionPointer);
             if (AdditionalExpressionData != null)
             {
                 hash = HashCode.Combine(hash, AdditionalExpressionData);

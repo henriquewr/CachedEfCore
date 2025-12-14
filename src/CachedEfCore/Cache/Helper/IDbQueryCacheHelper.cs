@@ -1,7 +1,6 @@
 ﻿using CachedEfCore.Context;
 using System;
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache.Helper
@@ -11,50 +10,42 @@ namespace CachedEfCore.Cache.Helper
         ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            ReadOnlySpan<object> query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            ReadOnlySpan<object> query);
 
         ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            Expression query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            Expression query);
 
         ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            ReadOnlySpan<Expression> query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            ReadOnlySpan<Expression> query);
 
         ReturnType? GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType?> getDataFromDatabase,
-            string key,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            string key);
 
 
-        Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            object[] query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            object[] query);
 
-        Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            Expression query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            Expression query);
 
-        Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            Expression[] query,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            Expression[] query);
 
-        Task<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType?>> getDataFromDatabase,
-            string key,
-            [CallerArgumentExpression(nameof(getDataFromDatabase))] string getDataFromDatabaseStr = null!);
+            string key);
     }
 }

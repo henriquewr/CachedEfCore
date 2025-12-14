@@ -20,6 +20,6 @@ namespace CachedEfCore.Cache
         T? GetCached<T>(object key);
 
         T? GetOrAdd<T>(Guid contextId, Type rootEntityType, object key, Func<T?> create);
-        Task<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create);
+        ValueTask<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create);
     }
 }
