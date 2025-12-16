@@ -37,13 +37,13 @@ namespace CachedEfCore.Context
 
         public override void Dispose()
         {
-            DbQueryCacheStore.RemoveAllLazyLoadByContextId(ContextId.InstanceId, DependencyManager);
+            DbQueryCacheStore.RemoveAllDbContextDependent(Id);
 
             base.Dispose();
         }
         public override ValueTask DisposeAsync()
         {
-            DbQueryCacheStore.RemoveAllLazyLoadByContextId(ContextId.InstanceId, DependencyManager);
+            DbQueryCacheStore.RemoveAllDbContextDependent(Id);
 
             return base.DisposeAsync();
         }

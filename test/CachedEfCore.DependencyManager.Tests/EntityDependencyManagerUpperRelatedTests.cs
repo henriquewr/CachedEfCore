@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -18,11 +19,14 @@ namespace CachedEfCore.DepencencyManager.Tests
             public required Type GenericAnonymousType { get; init; }
             public required Type TupleLiteralType { get; init; }
             public required Type GenericTupleLiteralType { get; init; }
+            public required Type ProxyType { get; init; }
 
             public required HashSet<IEntityType> Expected { get; init; }
 
             public static UpperRelatedData Create<T>(HashSet<IEntityType> expected)
             {
+                var proxyType = _cachedDbContext.CreateProxy<T>()!.GetType();
+
                 return new UpperRelatedData
                 {
                     Type = typeof(T),
@@ -30,7 +34,8 @@ namespace CachedEfCore.DepencencyManager.Tests
                     GenericAnonymousType = new { A = default(IEnumerable<T>) }.GetType(),
                     TupleLiteralType = (first: default(T), sec: default(T)).GetType(),
                     GenericTupleLiteralType = (first: default(IEnumerable<T>), sec: default(IEnumerable<T>)).GetType(),
-                    Expected = expected
+                    ProxyType = proxyType,
+                    Expected = expected,
                 };
             }
         }
@@ -151,6 +156,10 @@ namespace CachedEfCore.DepencencyManager.Tests
 
             var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.GenericTupleLiteralType);
             Assert.True(upperRelatedData.Expected.SetEquals(entitiesByGenericTupleLiteralType));
+
+
+            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.ProxyType);
+            Assert.True(upperRelatedData.Expected.SetEquals(entitiesByProxyType));
         }
 
 

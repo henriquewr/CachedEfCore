@@ -1,12 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
-using System.Collections.Concurrent;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using CachedEfCore.DependencyManager.Attributes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
-using CachedEfCore.DependencyManager.Attributes;
+using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.DependencyManager
 {
@@ -64,6 +66,15 @@ namespace CachedEfCore.DependencyManager
             return result.ToFrozenSet();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryGetIEntityType(Type type, [NotNullWhen(true)] out IEntityType? entityType)
+        {
+            var success = _typeEntity.TryGetValue(type, out entityType) ||
+                //Probably Lazy load proxies
+                (type.BaseType is not null && _typeEntity.TryGetValue(type.BaseType, out entityType));
+
+            return success;
+        }
 
         /// <summary>
         /// 
@@ -89,9 +100,9 @@ namespace CachedEfCore.DependencyManager
 
         private FrozenSet<IEntityType> GetUnderRelatedEntitiesInternal(Type rootType, bool relatedInFks, bool ignoreDependentOnEntityAttribute)
         {
-            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            if (TryGetIEntityType(rootType, out var fastEntityType))
             {
-                return GetUnderRelatedEntitiesImpl(entityType, relatedInFks, ignoreDependentOnEntityAttribute);
+                return GetUnderRelatedEntitiesImpl(fastEntityType, relatedInFks, ignoreDependentOnEntityAttribute);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
@@ -141,9 +152,9 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetUpperRelatedEntities(Type rootType)
         {
-            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            if (TryGetIEntityType(rootType, out var fastEntityType))
             {
-                return GetUpperRelatedEntitiesImpl(entityType);
+                return GetUpperRelatedEntitiesImpl(fastEntityType);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
@@ -198,9 +209,9 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetAllRelatedEntities(Type rootType, bool underRelatedIncludingFks)
         {
-            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            if (TryGetIEntityType(rootType, out var fastEntityType))
             {
-                return GetAllRelatedEntitiesImpl(entityType, underRelatedIncludingFks);
+                return GetAllRelatedEntitiesImpl(fastEntityType, underRelatedIncludingFks);
             }
 
             var entities = GetAllEntitiesByType(GetAllTypes(rootType));
@@ -391,9 +402,9 @@ namespace CachedEfCore.DependencyManager
 
             bool result;
 
-            if (_typeEntity.TryGetValue(rootType, out var entityType))
+            if (TryGetIEntityType(rootType, out var fastEntityType))
             {
-                result = HasLazyLoad(entityType);
+                result = HasLazyLoad(fastEntityType);
             }
             else
             {

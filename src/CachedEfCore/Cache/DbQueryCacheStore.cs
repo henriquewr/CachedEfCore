@@ -1,21 +1,25 @@
-﻿using CachedEfCore.DependencyManager;
+﻿using CachedEfCore.Context;
+using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache
 {
     public partial class DbQueryCacheStore : IDbQueryCacheStore
     {
-        private readonly ConcurrentDictionary<Guid, ConcurrentBag<object>> _cacheKeysByContextId = new();
-        private readonly ConcurrentDictionary<Type, ConcurrentBag<object>> _cacheKeysByType = new();
+        private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _dbContextDependentKeys = new();
+        private readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
 
         private readonly IMemoryCache _cache;
         private readonly MemoryCacheEntryOptions _cacheOptions;
+
         public DbQueryCacheStore(IMemoryCache cache, MemoryCacheEntryOptions cacheOptions)
         {
             _cache = cache;
@@ -36,35 +40,32 @@ namespace CachedEfCore.Cache
 
         public event Action<HashSet<IEntityType>>? OnInvalidatingDependentEntities;
 
-        public void RemoveAllLazyLoadByContextId(Guid contextId, EntityDependency dependencyManager)
+        public void RemoveAllDbContextDependent(Guid contextId)
         {
-            if (_cacheKeysByContextId.TryRemove(contextId, out var keys))
+            if (_dbContextDependentKeys.TryRemove(contextId, out var keys))
             {
-                RemoveLazyLoadKeys(keys, dependencyManager);
+                keys.Cancel();
+                keys.Dispose();
             }
         }
 
         public void RemoveAll()
         {
-            var l_cacheKeysByContextId = _cacheKeysByContextId;
-
-            foreach (var contextIdKey in l_cacheKeysByContextId.Keys)
+            var l_cacheKeysByContextId = _dbContextDependentKeys;
+            foreach (var item in l_cacheKeysByContextId)
             {
-                if (l_cacheKeysByContextId.TryRemove(contextIdKey, out var keys))
-                {
-                    RemoveKeys(keys);
-                }
+                item.Value.Cancel();
+                item.Value.Dispose();
             }
+            l_cacheKeysByContextId.Clear();
 
-            var l_cacheKeysByType = _cacheKeysByType;
-
-            foreach (var typeKey in l_cacheKeysByType.Keys)
+            var l_cacheKeysByType = _typeKeys;
+            foreach (var item in l_cacheKeysByType)
             {
-                if (l_cacheKeysByType.TryRemove(typeKey, out var keys))
-                {
-                    RemoveKeys(keys);
-                }
+                item.Value.Cancel();
+                item.Value.Dispose();
             }
+            l_cacheKeysByType.Clear();
         }
 
         public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true)
@@ -93,39 +94,10 @@ namespace CachedEfCore.Cache
 
             foreach (var item in entitiesToRemove)
             {
-                if (_cacheKeysByType.TryRemove(item.ClrType, out var keysWithType))
+                if (_typeKeys.TryRemove(item.ClrType, out var keysWithType))
                 {
-                    RemoveKeys(keysWithType);
-                }
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveKeys(IEnumerable<object> keys)
-        {
-            foreach (var key in keys)
-            {
-                _cache.Remove(key);
-            }
-        }
-
-        private void RemoveLazyLoadKeys(IEnumerable<object> keysToRemove, EntityDependency dependencyManager)
-        {
-            foreach (var key in keysToRemove)
-            {
-                var cachedItem = _cache.Get(key);
-
-                if (cachedItem is null)
-                {
-                    continue;
-                }
-
-                var type = cachedItem.GetType();
-                var hasLazyLoad = dependencyManager.HasLazyLoad(type);
-
-                if (hasLazyLoad)
-                {
-                    _cache.Remove(key);
+                    keysWithType.Cancel();
+                    keysWithType.Dispose();
                 }
             }
         }
@@ -139,65 +111,68 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(Guid contextId, Type rootEntityType, object key, object? dataToCache)
+        public void AddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, object key, object? dataToCache)
         {
-            AddingToCache(contextId, rootEntityType, key);
-
-            _cache.Set(key, dataToCache, _cacheOptions);
+            InternalAddToCache(cachedDbContext, rootEntityType, key, dataToCache);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddingToCache(Guid contextId, Type rootEntityType, object cacheKey)
+        private void InternalAddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, object cacheKey, object? dataToCache)
         {
-            _cacheKeysByContextId.AddOrUpdate(contextId,
-                (_) => new() { cacheKey },
-                (_, existingBag) =>
-                {
-                    existingBag.Add(cacheKey);
-                    return existingBag;
-                });
+            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_cacheOptions);
 
-            _cacheKeysByType.AddOrUpdate(rootEntityType,
-                (_) => new() { cacheKey },
-                (_, existingBag) =>
+            cacheEntry.Value = dataToCache;
+
+            if (dataToCache is not null && cachedDbContext.DependencyManager.HasLazyLoad(dataToCache.GetType()))
+            {
+                CancellationTokenSource dbContextDependentCts;
+
+                if (!_dbContextDependentKeys.TryGetValue(cachedDbContext.Id, out dbContextDependentCts!))
                 {
-                    existingBag.Add(cacheKey);
-                    return existingBag;
-                });
+                    dbContextDependentCts = new CancellationTokenSource();
+                    _dbContextDependentKeys.TryAdd(cachedDbContext.Id, dbContextDependentCts);
+                }
+
+                cacheEntry.AddExpirationToken(new CancellationChangeToken(dbContextDependentCts.Token));
+            }
+
+            CancellationTokenSource ctsByType;
+
+            if (!_typeKeys.TryGetValue(rootEntityType, out ctsByType!))
+            {
+                ctsByType = new CancellationTokenSource();
+                _typeKeys.TryAdd(rootEntityType, ctsByType);
+            }
+
+            cacheEntry.AddExpirationToken(new CancellationChangeToken(ctsByType.Token));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetOrAdd<T>(Guid contextId, Type rootEntityType, object key, Func<T?> create)
+        public T? GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<T?> create)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
                 return cachedValue;
             }
 
-            AddingToCache(contextId, rootEntityType, key);
-
             var createdValue = create();
 
-            _cache.Set(key, createdValue, _cacheOptions);
+            InternalAddToCache(cachedDbContext, rootEntityType, key, createdValue);
 
             return createdValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create)
+        public async ValueTask<T?> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<Task<T?>> create)
         {
-            if (_cache.TryGetValue<T> (key, out var cachedValue))
+            if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
                 return cachedValue;
             }
 
-            var createdValueTask = create();
+            var createdValue = await create().ConfigureAwait(false);
 
-            AddingToCache(contextId, rootEntityType, key);
-
-            var createdValue = await createdValueTask.ConfigureAwait(false);
-
-            _cache.Set(key, createdValue, _cacheOptions);
+            InternalAddToCache(cachedDbContext, rootEntityType, key, createdValue);
 
             return createdValue;
         }

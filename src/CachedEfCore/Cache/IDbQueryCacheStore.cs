@@ -1,3 +1,4 @@
+using CachedEfCore.Context;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
@@ -11,15 +12,15 @@ namespace CachedEfCore.Cache
         event Action<HashSet<IEntityType>, EntityDependency>? OnInvalidatingRootEntities;
         event Action<HashSet<IEntityType>>? OnInvalidatingDependentEntities;
 
-        void RemoveAllLazyLoadByContextId(Guid contextId, EntityDependency dependencyManager);
+        void RemoveAllDbContextDependent(Guid contextId);
         void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true);
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
         void RemoveAll();
 
-        void AddToCache(Guid contextId, Type rootEntityType, object key, object? dataToCache);
+        void AddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, object key, object? dataToCache);
         T? GetCached<T>(object key);
 
-        T? GetOrAdd<T>(Guid contextId, Type rootEntityType, object key, Func<T?> create);
-        ValueTask<T?> GetOrAddAsync<T>(Guid contextId, Type rootEntityType, object key, Func<Task<T?>> create);
+        T? GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<T?> create);
+        ValueTask<T?> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<Task<T?>> create);
     }
 }

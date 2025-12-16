@@ -1,6 +1,7 @@
 ﻿#if TEST_BUILD
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace CachedEfCore.Cache
 {
@@ -9,12 +10,12 @@ namespace CachedEfCore.Cache
         /// <summary>
         /// Access for testing purposes only
         /// </summary>
-        public ConcurrentDictionary<Guid, ConcurrentBag<object>> TestCacheKeysByContextId => _cacheKeysByContextId;
+        public ConcurrentDictionary<Guid, CancellationTokenSource> TestDbContextDependentKeys => _dbContextDependentKeys;
 
         /// <summary>
         /// Access for testing purposes only
         /// </summary>
-        public ConcurrentDictionary<Type, ConcurrentBag<object>> TestCacheKeysByType => _cacheKeysByType;
+        public ConcurrentDictionary<Type, CancellationTokenSource> TestTypeKeys => _typeKeys;
     }
 }
 #endif
