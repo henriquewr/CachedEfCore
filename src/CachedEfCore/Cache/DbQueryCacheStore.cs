@@ -148,11 +148,11 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<T?> create)
+        public T GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<T> create)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                return cachedValue;
+                return cachedValue!;
             }
 
             var createdValue = create();
@@ -163,11 +163,11 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T?> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<Task<T?>> create)
+        public async ValueTask<T> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<Task<T>> create)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                return cachedValue;
+                return cachedValue!;
             }
 
             var createdValue = await create().ConfigureAwait(false);

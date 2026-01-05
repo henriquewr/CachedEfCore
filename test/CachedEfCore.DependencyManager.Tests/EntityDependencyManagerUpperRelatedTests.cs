@@ -2,41 +2,95 @@
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using Xunit;
+using Xunit.Abstractions;
 
-namespace CachedEfCore.DepencencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests
 {
     public class EntityDependencyManagerUpperRelatedTests : EntityDependencyManagerTestBase
     {
-        public record UpperRelatedData
+
+        [DebuggerDisplay("{Type.Name}")]
+        public record UpperRelatedData : IXunitSerializable
         {
-            private UpperRelatedData()
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+            public UpperRelatedData()
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
             {
             }
 
-            public required Type Type { get; init; }
-            public required Type AnonymousType { get; init; }
-            public required Type GenericAnonymousType { get; init; }
-            public required Type TupleLiteralType { get; init; }
-            public required Type GenericTupleLiteralType { get; init; }
-            public required Type ProxyType { get; init; }
+            public Type Type { get; private set; }
+            public Type AnonymousType { get; private set; }
+            public Type GenericAnonymousType { get; private set; }
+            public Type TupleLiteralType { get; private set; }
+            public Type GenericTupleLiteralType { get; private set; }
+            public Type ProxyType { get; private set; }
 
-            public required HashSet<IEntityType> Expected { get; init; }
+            public HashSet<IEntityType> Expected { get; private set; }
 
             public static UpperRelatedData Create<T>(HashSet<IEntityType> expected)
             {
-                var proxyType = _cachedDbContext.CreateProxy<T>()!.GetType();
+                return Create(typeof(T), expected);
+            }
+
+            public static UpperRelatedData Create(Type type, HashSet<IEntityType> expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
 
                 return new UpperRelatedData
                 {
-                    Type = typeof(T),
-                    AnonymousType = new { A = default(T) }.GetType(),
-                    GenericAnonymousType = new { A = default(IEnumerable<T>) }.GetType(),
-                    TupleLiteralType = (first: default(T), sec: default(T)).GetType(),
-                    GenericTupleLiteralType = (first: default(IEnumerable<T>), sec: default(IEnumerable<T>)).GetType(),
+                    Type = type,
+                    AnonymousType = TypeHelper.AnonymousType.Create(type),
+                    GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type),
+                    TupleLiteralType = TypeHelper.Tuple.Create(type),
+                    GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type),
                     ProxyType = proxyType,
                     Expected = expected,
                 };
+            }
+
+            private static UpperRelatedData MapToExisting(UpperRelatedData instance, Type type, HashSet<IEntityType> expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
+
+                instance.Type = type;
+                instance.AnonymousType = TypeHelper.AnonymousType.Create(type);
+                instance.GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type);
+                instance.TupleLiteralType = TypeHelper.Tuple.Create(type);
+                instance.GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type);
+                instance.ProxyType = proxyType;
+                instance.Expected = expected;
+
+                return instance;
+            }
+
+            public void Serialize(IXunitSerializationInfo info)
+            {
+                var expected = Expected.Select(x => x.Name).ToArray();
+                var expectedJson = System.Text.Json.JsonSerializer.Serialize(expected);
+
+                info.AddValue(nameof(Type), Type.FullName);
+                
+                info.AddValue(nameof(Expected), expectedJson);
+            }
+
+            public void Deserialize(IXunitSerializationInfo info)
+            {
+                var type = Type.GetType(info.GetValue<string>(nameof(Type)), throwOnError: true)!;
+                var expectedJson = info.GetValue<string>(nameof(Expected));
+
+                var expected = System.Text.Json.JsonSerializer.Deserialize<string[]>(expectedJson)!;
+
+                var expectedSet = expected.Select(GetIEntityType).ToHashSet();
+
+                MapToExisting(this, type, expectedSet);
+            }
+
+            public override string ToString()
+            {
+                return $"Type={Type.Name}, Expected={Expected.Count}";
             }
         }
 
@@ -123,7 +177,21 @@ namespace CachedEfCore.DepencencyManager.Tests
                     {
                         GetIEntityType(typeof(EntityWithDependentAttribute)),
                     })
-                }
+                },
+                {
+                    UpperRelatedData.Create<SharedPkPrincipal>(new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(SharedPkDependent)),
+                        GetIEntityType(typeof(SharedPkPrincipal)),
+                    })
+                },
+                {
+                    UpperRelatedData.Create<SharedPkDependent>(new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(SharedPkDependent)),
+                        GetIEntityType(typeof(SharedPkPrincipal)),
+                    })
+                },
             };
 
             return theoryData;

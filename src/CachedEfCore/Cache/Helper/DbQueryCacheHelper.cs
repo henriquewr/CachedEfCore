@@ -36,9 +36,9 @@ namespace CachedEfCore.Cache.Helper
         }
 
         [OverloadResolutionPriority(-1)]
-        public ReturnType? GetOrAdd<ReturnType, TEntity>(
+        public ReturnType GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType?> getDataFromDatabase,
+            Func<ReturnType> getDataFromDatabase,
             ReadOnlySpan<object> query)
         {
             var expression = "";
@@ -86,9 +86,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType? GetOrAdd<ReturnType, TEntity>(
+        public ReturnType GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType?> getDataFromDatabase,
+            Func<ReturnType> getDataFromDatabase,
             Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
@@ -103,9 +103,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType? GetOrAdd<ReturnType, TEntity>(
+        public ReturnType GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType?> getDataFromDatabase,
+            Func<ReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
             var expression = "";
@@ -134,9 +134,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType? GetOrAdd<ReturnType, TEntity>(
+        public ReturnType GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType?> getDataFromDatabase,
+            Func<ReturnType> getDataFromDatabase,
             string key)
         {
             var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());
@@ -147,9 +147,9 @@ namespace CachedEfCore.Cache.Helper
 
 
         [OverloadResolutionPriority(-1)]
-        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType?>> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             object[] query)
         {
             var expression = "";
@@ -197,9 +197,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType?>> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
@@ -214,9 +214,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public async ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType?>> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             Expression[] query)
         {
             var expression = "";
@@ -245,9 +245,9 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ValueTask<ReturnType?> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType?>> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             string key)
         {
             var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer());

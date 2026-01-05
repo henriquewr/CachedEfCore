@@ -5,6 +5,7 @@ using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 
-namespace CachedEfCore.DepencencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests
 {
     public class EntityDependencyManagerTestBase
     {
@@ -44,45 +45,32 @@ namespace CachedEfCore.DepencencyManager.Tests
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
-                modelBuilder.Entity<EntityManyToManySkipNavigation>()
-                    .HasMany(p => p.OtherEntityManyToManySkipNavigation)
-                    .WithMany(t => t.EntityManyToManySkipNavigation)
-                    .UsingEntity(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName);
-
-
-                modelBuilder.Entity<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>();
-
-                modelBuilder.Entity<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>()
-                    .HasOne<EntityManyToManyWithoutNavigation>()
-                    .WithMany(e => e.EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)
-                    .HasForeignKey(e => e.EntityManyToManyWithoutNavigationId);
-
-                modelBuilder.Entity<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>()
-                    .HasOne<OtherEntityManyToManyWithoutNavigation>()
-                    .WithMany(e => e.EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)
-                    .HasForeignKey(e => e.OtherEntityManyToManyWithoutNavigationId);
-
+                modelBuilder.ApplyConfigurationsFromAssembly(typeof(TestDbContext).Assembly);
 
                 base.OnModelCreating(modelBuilder);
             }
 
-            public DbSet<LazyLoadEntity> LazyLoadEntity { get; set; }
-            public DbSet<NonLazyLoadEntity> NonLazyLoadEntity { get; set; }
-            public DbSet<AnotherLazyLoadEntity> AnotherLazyLoadEntity { get; set; }
-            public DbSet<LazyLoadWithGenericEntity> LazyLoadWithGenericEntity { get; set; }
-            public DbSet<EntityWithDependentAttribute> EntityWithDependentAttribute { get; set; }
+            public DbSet<LazyLoadEntity> LazyLoadEntity => Set<LazyLoadEntity>();
+            public DbSet<NonLazyLoadEntity> NonLazyLoadEntity => Set<NonLazyLoadEntity>();
+            public DbSet<AnotherLazyLoadEntity> AnotherLazyLoadEntity => Set<AnotherLazyLoadEntity>();
+            public DbSet<LazyLoadWithGenericEntity> LazyLoadWithGenericEntity => Set<LazyLoadWithGenericEntity>();
+            public DbSet<EntityWithDependentAttribute> EntityWithDependentAttribute => Set<EntityWithDependentAttribute>();
 
-            public DbSet<EntityManyToMany> EntityManyToMany { get; set; }
-            public DbSet<EntityManyToManyOtherEntityManyToMany> EntityManyToManyOtherEntityManyToMany { get; set; }
-            public DbSet<OtherEntityManyToMany> OtherEntityManyToMany { get; set; }
+            public DbSet<EntityManyToMany> EntityManyToMany => Set<EntityManyToMany>();
+            public DbSet<EntityManyToManyOtherEntityManyToMany> EntityManyToManyOtherEntityManyToMany => Set<EntityManyToManyOtherEntityManyToMany>();
+            public DbSet<OtherEntityManyToMany> OtherEntityManyToMany => Set<OtherEntityManyToMany>();
 
 
-            public DbSet<EntityManyToManyWithoutNavigation> EntityManyToManyWithoutNavigation { get; set; }
-            public DbSet<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation> EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation { get; set; }
-            public DbSet<OtherEntityManyToManyWithoutNavigation> OtherEntityManyToManyWithoutNavigation { get; set; }
+            public DbSet<EntityManyToManyWithoutNavigation> EntityManyToManyWithoutNavigation => Set<EntityManyToManyWithoutNavigation>();
+            public DbSet<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation> EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation => Set<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>();
+            public DbSet<OtherEntityManyToManyWithoutNavigation> OtherEntityManyToManyWithoutNavigation => Set<OtherEntityManyToManyWithoutNavigation>();
 
-            public DbSet<EntityManyToManySkipNavigation> EntityManyToManySkipNavigation { get; set; }
-            public DbSet<OtherEntityManyToManySkipNavigation> OtherEntityManyToManySkipNavigation { get; set; }
+            public DbSet<EntityManyToManySkipNavigation> EntityManyToManySkipNavigation => Set<EntityManyToManySkipNavigation>();
+            public DbSet<OtherEntityManyToManySkipNavigation> OtherEntityManyToManySkipNavigation => Set<OtherEntityManyToManySkipNavigation>();
+           
+
+            public DbSet<SharedPkPrincipal> SharedPkPrincipal => Set<SharedPkPrincipal>();
+            public DbSet<SharedPkDependent> SharedPkDependent => Set<SharedPkDependent>();
         }
 
         public class AnotherLazyLoadEntity
@@ -197,6 +185,20 @@ namespace CachedEfCore.DepencencyManager.Tests
             public int? EntityManyToManyWithoutNavigationId { get; set; }
 
             public int? OtherEntityManyToManyWithoutNavigationId { get; set; }
+
+            public class Configuration : IEntityTypeConfiguration<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>
+            {
+                public void Configure(EntityTypeBuilder<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation> builder)
+                {
+                    builder.HasOne<EntityManyToManyWithoutNavigation>()
+                        .WithMany(e => e.EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)
+                        .HasForeignKey(e => e.EntityManyToManyWithoutNavigationId);
+
+                    builder.HasOne<OtherEntityManyToManyWithoutNavigation>()
+                        .WithMany(e => e.EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)
+                        .HasForeignKey(e => e.OtherEntityManyToManyWithoutNavigationId);
+                }
+            }
         }
 
         public class OtherEntityManyToManyWithoutNavigation
@@ -216,6 +218,16 @@ namespace CachedEfCore.DepencencyManager.Tests
             public int Id { get; set; }
 
             public virtual ICollection<OtherEntityManyToManySkipNavigation>? OtherEntityManyToManySkipNavigation { get; set; }
+
+            public class Configuration : IEntityTypeConfiguration<EntityManyToManySkipNavigation>
+            {
+                public void Configure(EntityTypeBuilder<EntityManyToManySkipNavigation> builder)
+                {
+                    builder.HasMany(p => p.OtherEntityManyToManySkipNavigation)
+                        .WithMany(t => t.EntityManyToManySkipNavigation)
+                        .UsingEntity(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName);
+                }
+            }
         }
 
         public static class EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation
@@ -229,6 +241,41 @@ namespace CachedEfCore.DepencencyManager.Tests
             public int Id { get; set; }
 
             public virtual ICollection<EntityManyToManySkipNavigation>? EntityManyToManySkipNavigation { get; set; }
+        }
+
+        public class SharedPkPrincipal
+        {
+            public int Id { get; set; }
+            public virtual SharedPkDependent SharedPkDependent { get; set; } = null!;
+
+            public class Configuration : IEntityTypeConfiguration<SharedPkPrincipal>
+            {
+                public void Configure(EntityTypeBuilder<SharedPkPrincipal> builder)
+                {
+                    builder.HasKey(x => x.Id);
+
+                    builder.HasOne(x => x.SharedPkDependent)
+                        .WithOne(x => x.SharedPkPrincipal)
+                        .HasForeignKey<SharedPkDependent>(x => x.Id);
+                }
+            }
+        }
+
+        public class SharedPkDependent
+        {
+            public int Id { get; set; }
+            public virtual SharedPkPrincipal SharedPkPrincipal { get; set; } = null!;
+
+            public class Configuration : IEntityTypeConfiguration<SharedPkDependent>
+            {
+                public void Configure(EntityTypeBuilder<SharedPkDependent> builder)
+                {
+                    builder.HasKey(x => x.Id);
+
+                    builder.Property(x => x.Id)
+                        .ValueGeneratedNever();
+                }
+            }
         }
     }
 }

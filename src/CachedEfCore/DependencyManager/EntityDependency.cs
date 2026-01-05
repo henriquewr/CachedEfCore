@@ -321,12 +321,26 @@ namespace CachedEfCore.DependencyManager
 
                 var navigation = foreignKey.GetNavigation(false);
 
-                if (navigation is not null && navigation.ForeignKey == foreignKey && navigation.IsCollection == true)
+                if (navigation is not null && navigation.ForeignKey == foreignKey)
                 {
                     yield return foreignKey.PrincipalEntityType;
                 }
             }
 
+            /*
+                public class Referenced
+                {
+                    public int Id { get; set; }
+                }
+
+                public class EntityReferencingForeignKey
+                {
+                    public int ReferencedId { get; set; }
+                    public Referenced Referenced { get; set; }
+                }
+
+                ((IEntity)Referenced).GetReferencingForeignKeys(); => EntityReferencingForeignKey
+            */
             var referencingForeignKeys = entityType.GetReferencingForeignKeys();
             foreach (var referencingForeignKey in referencingForeignKeys)
             {

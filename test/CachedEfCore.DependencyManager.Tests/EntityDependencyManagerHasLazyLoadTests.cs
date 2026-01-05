@@ -1,41 +1,86 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using Xunit;
+using Xunit.Abstractions;
 
-namespace CachedEfCore.DepencencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests
 {
     public class EntityDependencyManagerHasLazyLoadTests : EntityDependencyManagerTestBase
     {
-        public record HasLazyLoadData
+        [DebuggerDisplay("{Type.Name}")]
+        public record HasLazyLoadData : IXunitSerializable
         {
-            private HasLazyLoadData()
+
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+            public HasLazyLoadData()
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
             {
             }
 
-            public required Type Type { get; init; }
-            public required Type AnonymousType { get; init; }
-            public required Type GenericAnonymousType { get; init; }
-            public required Type TupleLiteralType { get; init; }
-            public required Type GenericTupleLiteralType { get; init; }
-            public required Type ProxyType { get; init; }
+            public Type Type { get; private set; }
+            public Type AnonymousType { get; private set; }
+            public Type GenericAnonymousType { get; private set; }
+            public Type TupleLiteralType { get; private set; }
+            public Type GenericTupleLiteralType { get; private set; }
+            public Type ProxyType { get; private set; }
 
-            public required bool Expected { get; init; }
+            public bool Expected { get; private set; }
 
             public static HasLazyLoadData Create<T>(bool expected)
             {
-                var proxyType = _cachedDbContext.CreateProxy<T>()!.GetType();
+                return Create(typeof(T), expected);
+            }
+
+            public static HasLazyLoadData Create(Type type, bool expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
 
                 return new HasLazyLoadData
                 {
-                    Type = typeof(T),
-                    AnonymousType = new { A = default(T) }.GetType(),
-                    GenericAnonymousType = new { A = default(IEnumerable<T>) }.GetType(),
-                    TupleLiteralType = (first: default(T), sec: default(T)).GetType(),
-                    GenericTupleLiteralType = (first: default(IEnumerable<T>), sec: default(IEnumerable<T>)).GetType(),
+                    Type = type,
+                    AnonymousType = TypeHelper.AnonymousType.Create(type),
+                    GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type),
+                    TupleLiteralType = TypeHelper.Tuple.Create(type),
+                    GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type),
                     ProxyType = proxyType,
                     Expected = expected,
                 };
+            }
+
+            private static HasLazyLoadData MapToExisting(HasLazyLoadData instance, Type type, bool expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
+
+                instance.Type = type;
+                instance.AnonymousType = TypeHelper.AnonymousType.Create(type);
+                instance.GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type);
+                instance.TupleLiteralType = TypeHelper.Tuple.Create(type);
+                instance.GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type);
+                instance.ProxyType = proxyType;
+                instance.Expected = expected;
+
+                return instance;
+            }
+
+            public void Serialize(IXunitSerializationInfo info)
+            {
+                info.AddValue(nameof(Type), Type.FullName);
+
+                info.AddValue(nameof(Expected), Expected);
+            }
+
+            public void Deserialize(IXunitSerializationInfo info)
+            {
+                var type = Type.GetType(info.GetValue<string>(nameof(Type)), throwOnError: true)!;
+                var expected = info.GetValue<bool>(nameof(Expected));
+
+                MapToExisting(this, type, expected);
+            }
+
+            public override string ToString()
+            {
+                return $"Type={Type.Name}, Expected={Expected}";
             }
         }
 
@@ -57,6 +102,12 @@ namespace CachedEfCore.DepencencyManager.Tests
                 },
                 {
                     HasLazyLoadData.Create<EntityWithDependentAttribute>(false)
+                },
+                {
+                    HasLazyLoadData.Create<SharedPkPrincipal>(true)
+                },
+                {
+                    HasLazyLoadData.Create<SharedPkDependent>(true)
                 },
             };
 

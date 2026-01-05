@@ -32,12 +32,7 @@ namespace CachedEfCore.Cache
 
         public override int GetHashCode()
         {
-            int hash = HashCode.Combine(EntityType, Expression, DelegateFunctionPointer);
-            if (AdditionalExpressionData != null)
-            {
-                hash = HashCode.Combine(hash, AdditionalExpressionData);
-            }
-            return hash;
+            return HashCode.Combine(EntityType, Expression, AdditionalExpressionData, DelegateFunctionPointer);
         }
 
         public static bool operator ==(DbQueryCacheKey left, DbQueryCacheKey right)

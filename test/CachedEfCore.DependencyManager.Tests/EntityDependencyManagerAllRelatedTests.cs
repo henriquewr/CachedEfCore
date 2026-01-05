@@ -1,55 +1,97 @@
-﻿using CachedEfCore.Context;
-using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using CachedEfCore.Cache;
-using CachedEfCore.DependencyManager.Attributes;
-using Microsoft.Extensions.Caching.Memory;
-using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
+using System.Diagnostics;
+using System.Linq;
 using Xunit;
-using System.IO;
+using Xunit.Abstractions;
 
-namespace CachedEfCore.DepencencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests
 {
     public class EntityDependencyManagerAllRelatedTests : EntityDependencyManagerTestBase
     {
-        public record AllRelatedData
+        [DebuggerDisplay("{Type.Name}")]
+        public record AllRelatedData : IXunitSerializable
         {
-            private AllRelatedData()
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+            public AllRelatedData()
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
             {
             }
 
-            public required Type Type { get; init; }
-            public required Type AnonymousType { get; init; }
-            public required Type GenericAnonymousType { get; init; }
-            public required Type TupleLiteralType { get; init; }
-            public required Type GenericTupleLiteralType { get; init; }
-            public required Type ProxyType { get; init; }
+            public Type Type { get; private set; }
+            public Type AnonymousType { get; private set; }
+            public Type GenericAnonymousType { get; private set; }
+            public Type TupleLiteralType { get; private set; }
+            public Type GenericTupleLiteralType { get; private set; }
+            public Type ProxyType { get; private set; }
 
-            public required HashSet<IEntityType> Expected { get; init; }
+            public HashSet<IEntityType> Expected { get; private set; }
 
             public static AllRelatedData Create<T>(HashSet<IEntityType> expected)
             {
-                var proxyType = _cachedDbContext.CreateProxy<T>()!.GetType();
+                return Create(typeof(T), expected);
+            }
+
+            public static AllRelatedData Create(Type type, HashSet<IEntityType> expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
 
                 return new AllRelatedData
                 {
-                    Type = typeof(T),
-                    AnonymousType = new { A = default(T) }.GetType(),
-                    GenericAnonymousType = new { A = default(IEnumerable<T>) }.GetType(),
-                    TupleLiteralType = (first: default(T), sec: default(T)).GetType(),
-                    GenericTupleLiteralType = (first: default(IEnumerable<T>), sec: default(IEnumerable<T>)).GetType(),
+                    Type = type,
+                    AnonymousType = TypeHelper.AnonymousType.Create(type),
+                    GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type),
+                    TupleLiteralType = TypeHelper.Tuple.Create(type),
+                    GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type),
                     ProxyType = proxyType,
                     Expected = expected,
                 };
             }
-        }
 
+            private static AllRelatedData MapToExisting(AllRelatedData instance, Type type, HashSet<IEntityType> expected)
+            {
+                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
+
+                instance.Type = type;
+                instance.AnonymousType = TypeHelper.AnonymousType.Create(type);
+                instance.GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type);
+                instance.TupleLiteralType = TypeHelper.Tuple.Create(type);
+                instance.GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type);
+                instance.ProxyType = proxyType;
+                instance.Expected = expected;
+
+                return instance;
+            }
+
+            public void Serialize(IXunitSerializationInfo info)
+            {
+                var expected = Expected.Select(x => x.Name).ToArray();
+                var expectedJson = System.Text.Json.JsonSerializer.Serialize(expected);
+
+                info.AddValue(nameof(Type), Type.FullName);
+
+                info.AddValue(nameof(Expected), expectedJson);
+            }
+
+            public void Deserialize(IXunitSerializationInfo info)
+            {
+                var type = Type.GetType(info.GetValue<string>(nameof(Type)), throwOnError: true)!;
+                var expectedJson = info.GetValue<string>(nameof(Expected));
+
+                var expected = System.Text.Json.JsonSerializer.Deserialize<string[]>(expectedJson)!;
+
+                var expectedSet = expected.Select(GetIEntityType).ToHashSet();
+
+                MapToExisting(this, type, expectedSet);
+            }
+
+            public override string ToString()
+            {
+                return $"Type={Type.Name}, Expected={Expected.Count}";
+            }
+        }
 
         public static TheoryData<AllRelatedData> GetAllRelatedEntitiesTestCases()
         {
@@ -96,13 +138,17 @@ namespace CachedEfCore.DepencencyManager.Tests
                     })
                 },
                 {
-                    AllRelatedData.Create<EntityWithDependentAttribute>(new HashSet<IEntityType>
+                    AllRelatedData.Create<SharedPkPrincipal>(new HashSet<IEntityType>
                     {
-                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                        GetIEntityType(typeof(EntityWithDependentAttribute)),
+                        GetIEntityType(typeof(SharedPkPrincipal)),
+                        GetIEntityType(typeof(SharedPkDependent)),
+                    })
+                },
+                {
+                    AllRelatedData.Create<SharedPkDependent>(new HashSet<IEntityType>
+                    {
+                        GetIEntityType(typeof(SharedPkDependent)),
+                        GetIEntityType(typeof(SharedPkPrincipal)),
                     })
                 },
             };

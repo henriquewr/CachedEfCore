@@ -1,0 +1,18 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="TestDebug" />
+    <BuildType Name="TestRelease" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/CachedEfCore/CachedEfCore.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/CachedEfCore.DbQueryCacheStore.Tests/CachedEfCore.DbQueryCacheStore.Tests.csproj" />
+    <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
+    <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
+    <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />
+    <Project Path="test/CachedEfCore.QueryCaching.Tests/CachedEfCore.SqlQueryEntityExtractor.Tests.csproj" />
+  </Folder>
+</Solution>
