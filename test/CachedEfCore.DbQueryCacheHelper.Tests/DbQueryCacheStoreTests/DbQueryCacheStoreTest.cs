@@ -1,18 +1,12 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Context;
-using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
+﻿using CachedEfCore.Cache.Tests.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Caching.Memory;
 using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace CachedEfCore.DbQueryCacheStore.Tests
+namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 {
     public class DbQueryCacheStoreTest
     {
@@ -85,6 +79,43 @@ namespace CachedEfCore.DbQueryCacheStore.Tests
             
             var cached = dbContext.TestDbQueryCacheStore.GetCached<object>(cacheKey);
             Assert.Equal(valueToCache, cached);
+        }
+
+        [Fact]
+        public void DbContextDependent_Entry_Should_Not_Be_Returned_To_Other_DbContext()
+        {
+            using var memoryCache = CreateMemoryCache();
+
+            using var dbContext = CreateDbContext(memoryCache);
+
+            var key = "cacheKeyAddToCache";
+
+            var dependentCacheKey = new TestCacheKey
+            {
+                Key = key,
+                DependentDbContext = dbContext.Id,
+            };
+            var rootType = typeof(object); // any type
+
+            object dbContextDependentValue = "someValue";
+
+            dbContext.TestDbQueryCacheStore.AddToCache(dbContext, rootType, dependentCacheKey, dbContextDependentValue);
+
+            Assert.Single(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+
+            Assert.Single(dbContext.TestDbQueryCacheStore.TestTypeKeys);
+
+            var cached = dbContext.TestDbQueryCacheStore.GetCached<object>(dependentCacheKey);
+            Assert.Equal(dbContextDependentValue, cached);
+
+            var otherDbContextCacheKey = new TestCacheKey
+            {
+                Key = key,
+                DependentDbContext = Guid.NewGuid(),
+            };
+
+            var cachedToOtherDb = dbContext.TestDbQueryCacheStore.GetCached<object>(otherDbContextCacheKey);
+            Assert.Null(cachedToOtherDb);
         }
 
         [Fact]
@@ -161,50 +192,11 @@ namespace CachedEfCore.DbQueryCacheStore.Tests
             Assert.DoesNotContain(keys, k => memoryCache.TryGetValue(k, out _));
         }
 
+
         private static long GetEntryCount(IMemoryCache memoryCache)
         {
             var entryCount = memoryCache.GetCurrentStatistics()!.CurrentEntryCount;
             return entryCount;
-        }
-
-        public class TestDbContext : CachedDbContext
-        {
-            public TestDbContext(Cache.DbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
-            {
-            }
-
-            public Cache.DbQueryCacheStore TestDbQueryCacheStore => (Cache.DbQueryCacheStore)this.DbQueryCacheStore;
-
-            protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-            {
-                optionsBuilder.UseLazyLoadingProxies();
-
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
-                base.OnConfiguring(optionsBuilder);
-            }
-
-            public DbSet<LazyLoadEntity> LazyLoadEntity { get; set; }
-            public DbSet<NonLazyLoadEntity> NonLazyLoadEntity { get; set; }
-        }
-
-        public class LazyLoadEntity
-        {
-            [Key]
-            public int Id { get; set; }
-
-            [ForeignKey(nameof(LazyLoadProp))]
-            public int? LazyLoadPropId { get; set; }
-
-            [ForeignKey(nameof(LazyLoadPropId))]
-            public virtual NonLazyLoadEntity? LazyLoadProp { get; set; }
-        }
-
-        public class NonLazyLoadEntity
-        {
-            [Key]
-            public int Id { get; set; }
-
-            public string? StringData { get; set; }
         }
     }
 }

@@ -9,7 +9,7 @@
     <Project Path="src/CachedEfCore/CachedEfCore.csproj" />
   </Folder>
   <Folder Name="/test/">
-    <Project Path="test/CachedEfCore.DbQueryCacheStore.Tests/CachedEfCore.DbQueryCacheStore.Tests.csproj" />
+    <Project Path="test/CachedEfCore.DbQueryCacheHelper.Tests/CachedEfCore.Cache.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
     <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />

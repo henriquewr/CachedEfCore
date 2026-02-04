@@ -103,7 +103,7 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetCached<T>(object key)
+        public T? GetCached<T>(IDbQueryCacheKey key)
         {
             var cached = _cache.Get<T>(key);
 
@@ -111,20 +111,21 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, object key, object? dataToCache)
+        public void AddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
         {
             InternalAddToCache(cachedDbContext, rootEntityType, key, dataToCache);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InternalAddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, object cacheKey, object? dataToCache)
+        private void InternalAddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, IDbQueryCacheKey cacheKey, object? dataToCache)
         {
             using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_cacheOptions);
 
             cacheEntry.Value = dataToCache;
 
-            if (dataToCache is not null && cachedDbContext.DependencyManager.HasLazyLoad(dataToCache.GetType()))
+            if (dataToCache is not null && cacheKey.DependentDbContext.HasValue)
             {
+                // if dataToCache is null the object is not really dependent to the DbContext instance
                 CancellationTokenSource dbContextDependentCts;
 
                 if (!_dbContextDependentKeys.TryGetValue(cachedDbContext.Id, out dbContextDependentCts!))
@@ -148,7 +149,7 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<T> create)
+        public T GetOrAdd<T>(ICachedDbContext cachedDbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
@@ -163,7 +164,7 @@ namespace CachedEfCore.Cache
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, object key, Func<Task<T>> create)
+        public async ValueTask<T> GetOrAddAsync<T>(ICachedDbContext cachedDbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
