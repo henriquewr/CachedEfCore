@@ -1,4 +1,5 @@
 # CachedEfCore
+[![Main Build](https://github.com/henriquewr/CachedEfCore/actions/workflows/main.yml/badge.svg)](https://github.com/henriquewr/CachedEfCore/actions/workflows/main.yml)
 
 CachedEfCore is a caching library for entity framework core
 
