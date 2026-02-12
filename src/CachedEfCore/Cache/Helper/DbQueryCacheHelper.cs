@@ -39,9 +39,10 @@ namespace CachedEfCore.Cache.Helper
         public ReturnType GetOrAdd<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<ReturnType> getDataFromDatabase,
-            ReadOnlySpan<object> query)
+            ReadOnlySpan<object?> query)
         {
-            var expression = "";
+            var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
+
             var additionalJson = "";
 
             ResetAsyncLocalPrinter();
@@ -58,7 +59,7 @@ namespace CachedEfCore.Cache.Helper
                         return getDataFromDatabase();
                     }
 
-                    expression += keyGenerated.Value.Expression;
+                    expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                     if (keyGenerated.Value.AdditionalJson != null)
                     {
                         additionalJson += keyGenerated.Value.AdditionalJson;
@@ -66,7 +67,7 @@ namespace CachedEfCore.Cache.Helper
                 }
                 else if (_printabilityChecker.IsPrintable(queryItem))
                 {
-                    expression += queryItem.ToString();
+                    expressionKeyBuilder.AddExpression(queryItem?.ToString());
                 }
                 else
                 {
@@ -77,10 +78,12 @@ namespace CachedEfCore.Cache.Helper
             var printerResult = _printerAsyncLocal.Value!.GetResult();
             if (!string.IsNullOrEmpty(printerResult))
             {
-                expression += printerResult;
+                expressionKeyBuilder.AddExpression(printerResult);
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = expressionKeyBuilder.GetKey();
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -97,7 +100,9 @@ namespace CachedEfCore.Cache.Helper
                 return getDataFromDatabase();
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression.GetHashCode(), keyGenerated.Value.Expression);
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -108,7 +113,8 @@ namespace CachedEfCore.Cache.Helper
             Func<ReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
-            var expression = "";
+            var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
+
             var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
@@ -121,14 +127,16 @@ namespace CachedEfCore.Cache.Helper
                     return getDataFromDatabase();
                 }
 
-                expression += keyGenerated.Value.Expression;
+                expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                 if (keyGenerated.Value.AdditionalJson != null)
                 {
                     additionalJson += keyGenerated.Value.AdditionalJson;
                 }
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = expressionKeyBuilder.GetKey();
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -139,7 +147,9 @@ namespace CachedEfCore.Cache.Helper
             Func<ReturnType> getDataFromDatabase,
             string key)
         {
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(key.GetHashCode(), key);
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -150,9 +160,10 @@ namespace CachedEfCore.Cache.Helper
         public async ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
             Func<Task<ReturnType>> getDataFromDatabase,
-            object[] query)
+            object?[] query)
         {
-            var expression = "";
+            var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
+
             var additionalJson = "";
 
             ResetAsyncLocalPrinter();
@@ -169,7 +180,7 @@ namespace CachedEfCore.Cache.Helper
                         return await getDataFromDatabase();
                     }
 
-                    expression += keyGenerated.Value.Expression;
+                    expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                     if (keyGenerated.Value.AdditionalJson != null)
                     {
                         additionalJson += keyGenerated.Value.AdditionalJson;
@@ -177,7 +188,7 @@ namespace CachedEfCore.Cache.Helper
                 }
                 else if (_printabilityChecker.IsPrintable(queryItem))
                 {
-                    expression += queryItem.ToString();
+                    expressionKeyBuilder.AddExpression(queryItem?.ToString());
                 }
                 else
                 {
@@ -188,10 +199,12 @@ namespace CachedEfCore.Cache.Helper
             var printerResult = _printerAsyncLocal.Value!.GetResult();
             if (!string.IsNullOrEmpty(printerResult))
             {
-                expression += printerResult;
+                expressionKeyBuilder.AddExpression(printerResult);
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = expressionKeyBuilder.GetKey();
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -208,7 +221,9 @@ namespace CachedEfCore.Cache.Helper
                 return await getDataFromDatabase();
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), keyGenerated.Value.Expression, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression.GetHashCode(), keyGenerated.Value.Expression);
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -219,7 +234,8 @@ namespace CachedEfCore.Cache.Helper
             Func<Task<ReturnType>> getDataFromDatabase,
             Expression[] query)
         {
-            var expression = "";
+            var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
+
             var additionalJson = "";
 
             for (var i = 0; i < query.Length; i++)
@@ -232,14 +248,16 @@ namespace CachedEfCore.Cache.Helper
                     return await getDataFromDatabase();
                 }
 
-                expression += keyGenerated.Value.Expression;
+                expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                 if (keyGenerated.Value.AdditionalJson != null)
                 {
                     additionalJson += keyGenerated.Value.AdditionalJson;
                 }
             }
 
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expression, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = expressionKeyBuilder.GetKey();
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
@@ -250,7 +268,9 @@ namespace CachedEfCore.Cache.Helper
             Func<Task<ReturnType>> getDataFromDatabase,
             string key)
         {
-            var cacheKey = new DbQueryCacheKey(typeof(TEntity), key, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(key.GetHashCode(), key);
+
+            var cacheKey = new DbQueryCacheKey(typeof(TEntity), expressionKey, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, typeof(TEntity), cacheKey, getDataFromDatabase);
 
             return result;
