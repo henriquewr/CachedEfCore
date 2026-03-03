@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace CachedEfCore.DependencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerHasLazyLoadTests : EntityDependencyManagerTestBase
     {
@@ -20,7 +20,9 @@ namespace CachedEfCore.DependencyManager.Tests
 
             public Type Type { get; private set; }
             public Type AnonymousType { get; private set; }
+            public Type NestedAnonymousType { get; private set; }
             public Type GenericAnonymousType { get; private set; }
+            public Type NestedGenericAnonymousType { get; private set; }
             public Type TupleLiteralType { get; private set; }
             public Type GenericTupleLiteralType { get; private set; }
             public Type ProxyType { get; private set; }
@@ -40,7 +42,9 @@ namespace CachedEfCore.DependencyManager.Tests
                 {
                     Type = type,
                     AnonymousType = TypeHelper.AnonymousType.Create(type),
+                    NestedAnonymousType = TypeHelper.AnonymousType.CreateNested(type),
                     GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type),
+                    NestedGenericAnonymousType = TypeHelper.AnonymousType.CreateNestedGeneric(type),
                     TupleLiteralType = TypeHelper.Tuple.Create(type),
                     GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type),
                     ProxyType = proxyType,
@@ -54,7 +58,9 @@ namespace CachedEfCore.DependencyManager.Tests
 
                 instance.Type = type;
                 instance.AnonymousType = TypeHelper.AnonymousType.Create(type);
+                instance.NestedAnonymousType = TypeHelper.AnonymousType.CreateNested(type);
                 instance.GenericAnonymousType = TypeHelper.AnonymousType.CreateGeneric(type);
+                instance.NestedGenericAnonymousType = TypeHelper.AnonymousType.CreateNestedGeneric(type);
                 instance.TupleLiteralType = TypeHelper.Tuple.Create(type);
                 instance.GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type);
                 instance.ProxyType = proxyType;
@@ -131,8 +137,16 @@ namespace CachedEfCore.DependencyManager.Tests
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByAnonymousType);
 
 
+            var lazyLoadByNestedAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.NestedAnonymousType);
+            Assert.Equal(hasLazyLoadData.Expected, lazyLoadByNestedAnonymousType);
+
+
             var lazyLoadByGenericAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.GenericAnonymousType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByGenericAnonymousType);
+
+
+            var lazyLoadByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.NestedGenericAnonymousType);
+            Assert.Equal(hasLazyLoadData.Expected, lazyLoadByNestedGenericAnonymousType);
 
 
             var lazyLoadByTupleLiteralType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.TupleLiteralType);

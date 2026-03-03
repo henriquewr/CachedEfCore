@@ -36,27 +36,32 @@ namespace CachedEfCore.Cache
             public readonly int Hash;
             public readonly string Expression;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override bool Equals(object? obj)
             {
                 return obj is ExpressionKey other && Equals(other);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool Equals(ExpressionKey other)
             {
                 return Hash == other.Hash &&
                        Expression == other.Expression;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override int GetHashCode()
             {
                 return HashCode.Combine(Hash, Expression);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool operator ==(ExpressionKey left, ExpressionKey right)
             {
                 return left.Equals(right);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool operator !=(ExpressionKey left, ExpressionKey right)
             {
                 return !(left == right);

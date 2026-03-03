@@ -40,7 +40,7 @@ namespace CachedEfCore.KeyGeneration
                 * nullableString.GetType() == typeof(string)
                 * the expression returns true
                 * both types are System.String
-                */
+            */
             typeof(string),
         };
 

@@ -13,7 +13,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 
-namespace CachedEfCore.DependencyManager.Tests
+namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerTestBase
     {

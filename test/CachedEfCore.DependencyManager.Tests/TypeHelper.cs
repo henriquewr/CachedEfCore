@@ -15,9 +15,23 @@ namespace CachedEfCore.DependencyManager.Tests
             {
                 var method = typeof(AnonymousType)
                     .GetMethods(BindingFlags.Public | BindingFlags.Static)
-                    .Single(m =>
-                        m.IsGenericMethodDefinition &&
-                        m.ReturnType == typeof(Type));
+                    .Single(m => m.Name == nameof(Create)
+                        && m.IsGenericMethodDefinition
+                        && m.ReturnType == typeof(Type));
+
+                return (Type)method
+                    .MakeGenericMethod(type)
+                    .Invoke(null, null)!;
+            }
+            public static Type CreateNested<T>() => new { A = new { V = default(T) } }.GetType();
+
+            public static Type CreateNested(Type type)
+            {
+                var method = typeof(AnonymousType)
+                    .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .Single(m => m.Name == nameof(CreateNested) 
+                        && m.IsGenericMethodDefinition
+                        && m.ReturnType == typeof(Type));
 
                 return (Type)method
                     .MakeGenericMethod(type)
@@ -28,6 +42,12 @@ namespace CachedEfCore.DependencyManager.Tests
             {
                 var enumerableType = typeof(IEnumerable<>).MakeGenericType(type);
                 return AnonymousType.Create(enumerableType);
+            }
+
+            public static Type CreateNestedGeneric(Type type)
+            {
+                var enumerableType = typeof(IEnumerable<>).MakeGenericType(type);
+                return AnonymousType.CreateNested(enumerableType);
             }
         }
 
