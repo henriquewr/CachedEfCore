@@ -12,6 +12,7 @@ namespace CachedEfCore.Context
         public IDbQueryCacheStore DbQueryCacheStore { get; }
         public EntityDependency DependencyManager { get; }
         public TableEntityMapping TableEntity { get; }
+        public DbContext DbContext => this;
         public Guid Id => this.ContextId.InstanceId;
 
         public CachedDbContext(IDbQueryCacheStore dbQueryCacheStore) : base()

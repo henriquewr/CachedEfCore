@@ -1,4 +1,6 @@
 ﻿using CachedEfCore.Cache;
+using CachedEfCore.Cache.Helper;
+using CachedEfCore.Configuration;
 using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.Interceptors;

@@ -1,5 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
+﻿using CachedEfCore.DependencyInjection;
+using CachedEfCore.SqlAnalysis;
+using CachedEfCore.Tests.Common.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,8 +12,321 @@ using Xunit.Abstractions;
 
 namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
-    public class EntityDependencyManagerUnderRelatedTests : EntityDependencyManagerTestBase
+    public class EntityDependencyManagerUnderRelatedTests : EntityDependencyManagerTestBase, IClassFixture<ServiceProviderFixture>
     {
+        private readonly ServiceProviderFixture _serviceProviderFixture;
+
+        public EntityDependencyManagerUnderRelatedTests(ServiceProviderFixture serviceProviderFixture)
+        {
+            _serviceProviderFixture = serviceProviderFixture;
+            _cachedDbContext = GetDbContext();
+        }
+
+        protected virtual IServiceProvider CreateProvider()
+         => _serviceProviderFixture.CreateProvider(services =>
+         {
+             services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
+
+             services.AddDbContext<TestDbContext>();
+         });
+
+        protected virtual TestDbContext GetDbContext()
+        {
+            return CreateProvider().GetRequiredService<TestDbContext>();
+        }
+
+        public static TheoryData<UnderRelatedData> GetUnderRelatedEntitiesNotIncludingFksTestCases()
+        {
+            var theoryData = new TheoryData<UnderRelatedData>
+            {
+                {
+                    UnderRelatedData.Create<EntityManyToMany>(new HashSet<string>
+                    {
+                        typeof(EntityManyToMany).FullName!,
+                        typeof(OtherEntityManyToMany).FullName!,
+                        typeof(EntityManyToManyOtherEntityManyToMany).FullName!
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManyWithoutNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManyWithoutNavigation).FullName!,
+                        typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManySkipNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManySkipNavigation).FullName!,
+                        typeof(OtherEntityManyToManySkipNavigation).FullName!,
+                        EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName,
+                    })
+                },
+
+                {
+                    UnderRelatedData.Create<NonLazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(NonLazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<LazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(LazyLoadEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<AnotherLazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(AnotherLazyLoadEntity).FullName!,
+                        typeof(LazyLoadEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<LazyLoadWithGenericEntity>(new HashSet<string>
+                    {
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityWithDependentAttribute>(new HashSet<string>
+                    {
+                        typeof(EntityWithDependentAttribute).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                        typeof(LazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<SharedPkPrincipal>(new HashSet<string>
+                    {
+                        typeof(SharedPkPrincipal).FullName!,
+                        typeof(SharedPkDependent).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<SharedPkDependent>(new HashSet<string>
+                    {
+                        typeof(SharedPkDependent).FullName!,
+                        typeof(SharedPkPrincipal).FullName!,
+                    })
+                },
+            };
+
+            return theoryData;
+        }
+
+        [Theory]
+        [MemberData(nameof(GetUnderRelatedEntitiesNotIncludingFksTestCases))]
+        public void GetUnderRelatedEntities_Should_Return_Under_Related_Not_IncludingFks(UnderRelatedData underRelatedData)
+        {
+            var expectedEntities = underRelatedData.Expected.Select(GetIEntityType).ToHashSet();
+
+            var iEntityType = GetIEntityType(underRelatedData.Type);
+            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByIEntityType));
+
+            var entities = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, false);
+            Assert.True(expectedEntities.SetEquals(entities));
+
+            var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByAnonymousType));
+
+            var entitiesByNestedAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousType));
+
+            var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousType));
+
+            var entitiesByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousType));
+
+            var entitiesTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesTupleLiteralType));
+
+            var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralType));
+
+            var proxyType = _cachedDbContext.CreateProxy(underRelatedData.Type).GetType();
+            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(proxyType, false);
+            Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
+        }
+
+
+
+        public static TheoryData<UnderRelatedData> GetUnderRelatedEntitiesIncludingFksTestCases()
+        {
+            var theoryData = new TheoryData<UnderRelatedData>
+            {
+                {
+                    UnderRelatedData.Create<EntityManyToMany>(new HashSet<string>
+                    {
+                        typeof(EntityManyToMany).FullName!,
+                        typeof(OtherEntityManyToMany).FullName!,
+                        typeof(EntityManyToManyOtherEntityManyToMany).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManyOtherEntityManyToMany>(new HashSet<string>
+                    {
+                        typeof(EntityManyToMany).FullName!,
+                        typeof(OtherEntityManyToMany).FullName!,
+                        typeof(EntityManyToManyOtherEntityManyToMany).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManyWithoutNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManyWithoutNavigation).FullName!,
+                        typeof(OtherEntityManyToManyWithoutNavigation).FullName!,
+                        typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManyWithoutNavigation).FullName!,
+                        typeof(OtherEntityManyToManyWithoutNavigation).FullName!,
+                        typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation).FullName!,
+                    })
+                },
+
+                {
+                    UnderRelatedData.Create<EntityManyToManySkipNavigation>(new HashSet<string>
+                    {
+                        typeof(EntityManyToManySkipNavigation).FullName!,
+                        typeof(OtherEntityManyToManySkipNavigation).FullName!,
+                        EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<NonLazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(NonLazyLoadEntity).FullName!,
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<LazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(LazyLoadEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<AnotherLazyLoadEntity>(new HashSet<string>
+                    {
+                        typeof(AnotherLazyLoadEntity).FullName!,
+                        typeof(LazyLoadEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<LazyLoadWithGenericEntity>(new HashSet<string>
+                    {
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                    })
+                },
+                {
+                    UnderRelatedData.Create<EntityWithDependentAttribute>(new HashSet<string>
+                    {
+                        typeof(EntityWithDependentAttribute).FullName!,
+                        typeof(NonLazyLoadEntity).FullName!,
+                        typeof(LazyLoadEntity).FullName!,
+                        typeof(LazyLoadWithGenericEntity).FullName!,
+                    })
+                }
+            };
+
+            return theoryData;
+        }
+
+        [Theory]
+        [MemberData(nameof(GetUnderRelatedEntitiesIncludingFksTestCases))]
+        public void GetUnderRelatedEntities_Should_Return_Under_Related_When_IncludingFks(UnderRelatedData underRelatedData)
+        {
+            var expectedEntities = underRelatedData.Expected.Select(GetIEntityType).ToHashSet();
+
+            var iEntityType = GetIEntityType(underRelatedData.Type);
+            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByIEntityTypeIncludingFks));
+
+            var entitiesIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, true);
+            Assert.True(expectedEntities.SetEquals(entitiesIncludingFks));
+
+            var entitiesByAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByAnonymousTypeIncludingFks));
+
+            var entitiesByNestedAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousTypeIncludingFks));
+
+            var entitiesByGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousTypeIncludingFks));
+
+            var entitiesByNestedGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousTypeIncludingFks));
+
+            var entitiesByTupleLiteralTypeFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByTupleLiteralTypeFks));
+
+            var entitiesByGenericTupleLiteralTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralTypeIncludingFks));
+
+            var proxyType = _cachedDbContext.CreateProxy(underRelatedData.Type).GetType();
+            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(proxyType, true);
+            Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
+        }
+
+
+
+        public static TheoryData<string, bool, HashSet<string>> GetUnderRelatedEntitiesGeneratedByEfTestCases()
+        {
+            var theoryData = new TheoryData<string, bool, HashSet<string>>
+            {
+                {
+                    EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName,
+                    false,
+                    new HashSet<string>
+                    {
+                        EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName,
+                    }
+                },
+                {
+                    EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName,
+                    true,
+                    new HashSet<string>
+                    {
+                        typeof(EntityManyToManySkipNavigation).FullName!,
+                        typeof(OtherEntityManyToManySkipNavigation).FullName!,
+                        EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName,
+                    }
+                },
+            };
+
+            return theoryData;
+        }
+
+        [Theory]
+        [MemberData(nameof(GetUnderRelatedEntitiesGeneratedByEfTestCases))]
+        public void GetUnderRelatedEntities_Should_Return_Under_Related_Generated_By_EF(string iEntityType, bool includingRelatedInFks, HashSet<string> expected)
+        {
+            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(GetIEntityType(iEntityType), includingRelatedInFks);
+           
+            var expectedEntities = expected.Select(GetIEntityType).ToHashSet();
+            Assert.True(expectedEntities.SetEquals(entitiesByIEntityTypeIncludingFks));
+        }
+
 
         [DebuggerDisplay("{Type.Name}")]
         public record UnderRelatedData : IXunitSerializable
@@ -28,19 +344,16 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
             public Type NestedGenericAnonymousType { get; private set; }
             public Type TupleLiteralType { get; private set; }
             public Type GenericTupleLiteralType { get; private set; }
-            public Type ProxyType { get; private set; }
 
-            public HashSet<IEntityType> Expected { get; private set; }
+            public HashSet<string> Expected { get; private set; }
 
-            public static UnderRelatedData Create<T>(HashSet<IEntityType> expected)
+            public static UnderRelatedData Create<T>(HashSet<string> expected)
             {
                 return Create(typeof(T), expected);
             }
 
-            public static UnderRelatedData Create(Type type, HashSet<IEntityType> expected)
+            public static UnderRelatedData Create(Type type, HashSet<string> expected)
             {
-                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
-
                 return new UnderRelatedData
                 {
                     Type = type,
@@ -50,15 +363,12 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
                     NestedGenericAnonymousType = TypeHelper.AnonymousType.CreateNestedGeneric(type),
                     TupleLiteralType = TypeHelper.Tuple.Create(type),
                     GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type),
-                    ProxyType = proxyType,
                     Expected = expected,
                 };
             }
 
-            private static UnderRelatedData MapToExisting(UnderRelatedData instance, Type type, HashSet<IEntityType> expected)
+            private static UnderRelatedData MapToExisting(UnderRelatedData instance, Type type, HashSet<string> expected)
             {
-                var proxyType = _cachedDbContext.CreateProxy(type).GetType();
-
                 instance.Type = type;
                 instance.AnonymousType = TypeHelper.AnonymousType.Create(type);
                 instance.NestedAnonymousType = TypeHelper.AnonymousType.CreateNested(type);
@@ -66,7 +376,6 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
                 instance.NestedGenericAnonymousType = TypeHelper.AnonymousType.CreateNestedGeneric(type);
                 instance.TupleLiteralType = TypeHelper.Tuple.Create(type);
                 instance.GenericTupleLiteralType = TypeHelper.Tuple.CreateGeneric(type);
-                instance.ProxyType = proxyType;
                 instance.Expected = expected;
 
                 return instance;
@@ -74,8 +383,7 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 
             public void Serialize(IXunitSerializationInfo info)
             {
-                var expected = Expected.Select(x => x.Name).ToArray();
-                var expectedJson = System.Text.Json.JsonSerializer.Serialize(expected);
+                var expectedJson = System.Text.Json.JsonSerializer.Serialize(Expected);
 
                 info.AddValue(nameof(Type), Type.FullName);
 
@@ -87,301 +395,15 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
                 var type = Type.GetType(info.GetValue<string>(nameof(Type)), throwOnError: true)!;
                 var expectedJson = info.GetValue<string>(nameof(Expected));
 
-                var expected = System.Text.Json.JsonSerializer.Deserialize<string[]>(expectedJson)!;
+                var expected = System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(expectedJson)!;
 
-                var expectedSet = expected.Select(GetIEntityType).ToHashSet();
-
-                MapToExisting(this, type, expectedSet);
+                MapToExisting(this, type, expected);
             }
 
             public override string ToString()
             {
                 return $"Type={Type.Name}, Expected={Expected.Count}";
             }
-        }
-
-        public static TheoryData<UnderRelatedData> GetUnderRelatedEntitiesNotIncludingFksTestCases()
-        {
-            var theoryData = new TheoryData<UnderRelatedData>
-            {
-                {
-                    UnderRelatedData.Create<EntityManyToMany>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToMany)),
-                        GetIEntityType(typeof(OtherEntityManyToMany)),
-                        GetIEntityType(typeof(EntityManyToManyOtherEntityManyToMany)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManyWithoutNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigation)),
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManySkipNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManySkipNavigation)),
-                        GetIEntityType(typeof(OtherEntityManyToManySkipNavigation)),
-                        GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    })
-                },
-
-                {
-                    UnderRelatedData.Create<NonLazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<LazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<AnotherLazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<LazyLoadWithGenericEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityWithDependentAttribute>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityWithDependentAttribute)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<SharedPkPrincipal>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(SharedPkPrincipal)),
-                        GetIEntityType(typeof(SharedPkDependent)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<SharedPkDependent>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(SharedPkDependent)),
-                        GetIEntityType(typeof(SharedPkPrincipal)),
-                    })
-                },
-            };
-
-            return theoryData;
-        }
-
-        [Theory]
-        [MemberData(nameof(GetUnderRelatedEntitiesNotIncludingFksTestCases))]
-        public void GetUnderRelatedEntities_Should_Return_Under_Related_Not_IncludingFks(UnderRelatedData underRelatedData)
-        {
-            var iEntityType = GetIEntityType(underRelatedData.Type);
-            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByIEntityType));
-
-            var entities = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entities));
-
-            var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByAnonymousType));
-
-            var entitiesByNestedAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByNestedAnonymousType));
-
-            var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByGenericAnonymousType));
-
-            var entitiesByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByNestedGenericAnonymousType));
-
-            var entitiesTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesTupleLiteralType));
-
-            var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByGenericTupleLiteralType));
-
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.ProxyType, false);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByProxyType));
-        }
-
-
-
-        public static TheoryData<UnderRelatedData> GetUnderRelatedEntitiesIncludingFksTestCases()
-        {
-            var theoryData = new TheoryData<UnderRelatedData>
-            {
-                {
-                    UnderRelatedData.Create<EntityManyToMany>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToMany)),
-                        GetIEntityType(typeof(OtherEntityManyToMany)),
-                        GetIEntityType(typeof(EntityManyToManyOtherEntityManyToMany)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManyOtherEntityManyToMany>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToMany)),
-                        GetIEntityType(typeof(OtherEntityManyToMany)),
-                        GetIEntityType(typeof(EntityManyToManyOtherEntityManyToMany)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManyWithoutNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigation)),
-                        GetIEntityType(typeof(OtherEntityManyToManyWithoutNavigation)),
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigation)),
-                        GetIEntityType(typeof(OtherEntityManyToManyWithoutNavigation)),
-                        GetIEntityType(typeof(EntityManyToManyWithoutNavigationOtherEntityManyToManyWithoutNavigation)),
-                    })
-                },
-
-                {
-                    UnderRelatedData.Create<EntityManyToManySkipNavigation>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManySkipNavigation)),
-                        GetIEntityType(typeof(OtherEntityManyToManySkipNavigation)),
-                        GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<NonLazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<LazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<AnotherLazyLoadEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(AnotherLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<LazyLoadWithGenericEntity>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                    })
-                },
-                {
-                    UnderRelatedData.Create<EntityWithDependentAttribute>(new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityWithDependentAttribute)),
-                        GetIEntityType(typeof(NonLazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadEntity)),
-                        GetIEntityType(typeof(LazyLoadWithGenericEntity)),
-                    })
-                }
-            };
-
-            return theoryData;
-        }
-
-        [Theory]
-        [MemberData(nameof(GetUnderRelatedEntitiesIncludingFksTestCases))]
-        public void GetUnderRelatedEntities_Should_Return_Under_Related_When_IncludingFks(UnderRelatedData underRelatedData)
-        {
-            var iEntityType = GetIEntityType(underRelatedData.Type);
-            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByIEntityTypeIncludingFks));
-
-            var entitiesIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesIncludingFks));
-
-            var entitiesByAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByAnonymousTypeIncludingFks));
-
-            var entitiesByNestedAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByNestedAnonymousTypeIncludingFks));
-
-            var entitiesByGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByGenericAnonymousTypeIncludingFks));
-
-            var entitiesByNestedGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByNestedGenericAnonymousTypeIncludingFks));
-
-            var entitiesByTupleLiteralTypeFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByTupleLiteralTypeFks));
-
-            var entitiesByGenericTupleLiteralTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByGenericTupleLiteralTypeIncludingFks));
-
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.ProxyType, true);
-            Assert.True(underRelatedData.Expected.SetEquals(entitiesByProxyType));
-        }
-
-
-
-        public static TheoryData<IEntityType, bool, HashSet<IEntityType>> GetUnderRelatedEntitiesGeneratedByEfTestCases()
-        {
-            var theoryData = new TheoryData<IEntityType, bool, HashSet<IEntityType>>
-            {
-                {
-                    GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    false,
-                    new HashSet<IEntityType>
-                    {
-                        GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    }
-                },
-                {
-                    GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    true,
-                    new HashSet<IEntityType>
-                    {
-                        GetIEntityType(typeof(EntityManyToManySkipNavigation)),
-                        GetIEntityType(typeof(OtherEntityManyToManySkipNavigation)),
-                        GetIEntityType(EntityManyToManySkipNavigationOtherEntityManyToManySkipNavigation.TableName),
-                    }
-                },
-            };
-
-            return theoryData;
-        }
-
-        [Theory]
-        [MemberData(nameof(GetUnderRelatedEntitiesGeneratedByEfTestCases))]
-        public void GetUnderRelatedEntities_Should_Return_Under_Related_Generated_By_EF(IEntityType iEntityType, bool includingRelatedInFks, HashSet<IEntityType> expected)
-        {
-            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, includingRelatedInFks);
-            Assert.True(expected.SetEquals(entitiesByIEntityTypeIncludingFks));
         }
     }
 }

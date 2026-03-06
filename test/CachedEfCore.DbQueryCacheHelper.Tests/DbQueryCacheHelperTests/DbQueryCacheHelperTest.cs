@@ -4,56 +4,58 @@ using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration;
 using CachedEfCore.KeyGeneration.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.SqlAnalysis;
+using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using Xunit;
 
 namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
 {
-    public class DbQueryCacheHelperTest
+    public class DbQueryCacheHelperTest : IClassFixture<ServiceProviderFixture>
     {
-        private static readonly PrintabilityChecker _defaultPrintabilityChecker = new PrintabilityChecker();
+        private readonly ServiceProviderFixture _serviceProviderFixture;
 
-        private static readonly KeyGeneratorVisitor _keyGeneratorVisitor = new KeyGeneratorVisitor
-        (
-            _defaultPrintabilityChecker,
-            new ExpressionEvalTypeCheckerVisitor(new TypeCompatibilityChecker([])),
-            CachedEfCoreOptions.DefaultKeyGeneratorJsonSerializerOptions
-        );
-
-        private static readonly DbQueryCacheHelper _dbQueryCacheHelper = new DbQueryCacheHelper(_keyGeneratorVisitor, _defaultPrintabilityChecker);
-
-        private static IMemoryCache CreateMemoryCache()
+        public DbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture)
         {
-            return new MemoryCache(new MemoryCacheOptions()
+            _serviceProviderFixture = serviceProviderFixture;
+        }
+
+        protected virtual IServiceProvider CreateProvider()
+            => _serviceProviderFixture.CreateProvider(services =>
             {
-                TrackStatistics = true,
+                services.AddDbContext<TestDbContext>((serviceProvider, options) =>
+                {
+                });
+
+                services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
+
+                services.Replace(ServiceDescriptor.Singleton<IMemoryCache>(x => new MemoryCache(new MemoryCacheOptions()
+                {
+                    TrackStatistics = true,
+                })));
             });
-        }
 
-        private static TestDbContext CreateDbContext(IMemoryCache memoryCache)
+        public static TheoryData<object, bool> GetGetOrAddToCacheData()
         {
-            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
-            var dbContext = new TestDbContext(dbQueryCacheStore);
-
-            return dbContext;
-        }
-
-        public static TheoryData<TestDbContext, object, bool> GetGetOrAddToCacheData()
-        {
-            var dbContext = CreateDbContext(CreateMemoryCache());
-
             return new()
             {
-                { dbContext, new LazyLoadEntity(), true },
-                { dbContext, new NonLazyLoadEntity(), false },
+                { new LazyLoadEntity(), true },
+                { new NonLazyLoadEntity(), false },
             };
         }
 
         [Theory]
         [MemberData(nameof(GetGetOrAddToCacheData))]
-        public void GetOrAdd_Adds_And_Gets_From_Cache(TestDbContext dbContext, object valueToCache, bool isDbContextDependent)
+        public void GetOrAdd_Adds_And_Gets_From_Cache(object valueToCache, bool isDbContextDependent)
         {
+            var serviceProvider = CreateProvider();
+
+            var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
+            var dbQueryCacheHelper = serviceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
             dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys.Clear();
             dbContext.TestDbQueryCacheStore.TestTypeKeys.Clear();
 
@@ -64,12 +66,12 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
 
             if (isDbContextDependent)
             {
-                result = _dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
+                result = dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
                 Assert.Single(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
             }
             else
             {
-                result = _dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
+                result = dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
                 Assert.Empty(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
             }
             Assert.Single(dbContext.TestDbQueryCacheStore.TestTypeKeys);
@@ -82,11 +84,11 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
 
             if (isDbContextDependent)
             {
-                cached = _dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
+                cached = dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
             }
             else
             {
-                cached = _dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
+                cached = dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
             }
 
             Assert.False(created);

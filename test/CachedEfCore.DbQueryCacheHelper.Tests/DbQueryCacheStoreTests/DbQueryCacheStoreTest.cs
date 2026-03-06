@@ -1,6 +1,10 @@
 ﻿using CachedEfCore.Cache.Tests.Common;
-using Microsoft.EntityFrameworkCore;
+using CachedEfCore.DependencyInjection;
+using CachedEfCore.SqlAnalysis;
+using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,52 +12,57 @@ using Xunit;
 
 namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 {
-    public class DbQueryCacheStoreTest
+    public class DbQueryCacheStoreTest : IClassFixture<ServiceProviderFixture>
     {
+        private readonly ServiceProviderFixture _serviceProviderFixture;
+
+        public DbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture)
+        {
+            _serviceProviderFixture = serviceProviderFixture;
+        }
+
         private record TestCacheKey : IDbQueryCacheKey
         {
             public object? Key { get; set; }
             public Guid? DependentDbContext { get; set; }
         }
 
-        private static IMemoryCache CreateMemoryCache()
+        protected virtual IServiceProvider CreateProvider()
+           => _serviceProviderFixture.CreateProvider(services =>
+               {
+                   services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
+
+                   services.Replace(ServiceDescriptor.Singleton<IMemoryCache>(x => new MemoryCache(new MemoryCacheOptions()
+                   {
+                       TrackStatistics = true,
+                   })));
+
+                   services.AddDbContext<TestDbContext>();
+               });
+
+        protected TestDbContext GetDbContext()
         {
-            return new MemoryCache(new MemoryCacheOptions()
-            {
-                TrackStatistics = true,
-            });
+            return CreateProvider().GetRequiredService<TestDbContext>();
         }
 
-        private static TestDbContext CreateDbContext(IMemoryCache memoryCache)
+        public static TheoryData<object?, bool> GetAddToCacheData()
         {
-            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
-            var dbContext = new TestDbContext(dbQueryCacheStore);
-
-            return dbContext;
-        }
-
-        public DbQueryCacheStoreTest()
-        {
-        }
-
-        public static TheoryData<TestDbContext, object?, bool> GetAddToCacheData()
-        {
-            var dbContext = CreateDbContext(CreateMemoryCache());
-
             return new()
             {
-                { dbContext, "someData", false },
-                { dbContext, new LazyLoadEntity(), true },
-                { dbContext, (LazyLoadEntity?)null, false },
-                { dbContext, new NonLazyLoadEntity(), false },
-                { dbContext, (NonLazyLoadEntity?)null, false },
+                { "someData", false },
+                { new LazyLoadEntity(), true },
+                { (LazyLoadEntity?)null, false },
+                { new NonLazyLoadEntity(), false },
+                { (NonLazyLoadEntity?)null, false },
             };
         }
 
         [Theory]
         [MemberData(nameof(GetAddToCacheData))]
-        public void AddToCache_Adds_To_Cache(TestDbContext dbContext, object? valueToCache, bool isDbContextDependent)
+        public void AddToCache_Adds_To_Cache(object? valueToCache, bool isDbContextDependent)
         {
+            var dbContext = GetDbContext();
+
             dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys.Clear();
             dbContext.TestDbQueryCacheStore.TestTypeKeys.Clear();
 
@@ -84,9 +93,12 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
         [Fact]
         public void DbContextDependent_Entry_Should_Not_Be_Returned_To_Other_DbContext()
         {
-            using var memoryCache = CreateMemoryCache();
+            var serviceProvider = CreateProvider();
 
-            using var dbContext = CreateDbContext(memoryCache);
+            using var scope = serviceProvider.CreateScope();
+
+            var memoryCache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
 
             var key = "cacheKeyAddToCache";
 
@@ -121,9 +133,14 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
         [Fact]
         public void AddToCache_Is_Thread_Safe()
         {
-            using var memoryCache = CreateMemoryCache();
-            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
-            var dbContext = new TestDbContext(dbQueryCacheStore);
+            var serviceProvider = CreateProvider();
+
+            using var scope = serviceProvider.CreateScope();
+
+            var memoryCache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+            var dbQueryCacheStore = (DbQueryCacheStore)dbContext.DbQueryCacheStore;
 
             var dataToCache = new LazyLoadEntity();
 
@@ -154,12 +171,16 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
         }
 
         [Fact]
-        public static void RemoveAll_Removes_All_Entries()
+        public void RemoveAll_Removes_All_Entries()
         {
-            using var memoryCache = CreateMemoryCache();
-            var dbQueryCacheStore = new Cache.DbQueryCacheStore(memoryCache);
+            var serviceProvider = CreateProvider();
 
-            var dbContext = new TestDbContext(dbQueryCacheStore);
+            using var scope = serviceProvider.CreateScope();
+
+            var memoryCache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+            var dbQueryCacheStore = (DbQueryCacheStore)dbContext.DbQueryCacheStore;
 
             var startEntryCount = GetEntryCount(memoryCache);
 
@@ -184,7 +205,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 
             Assert.Equal(startEntryCount + addingCount, GetEntryCount(memoryCache));
 
-            dbQueryCacheStore.RemoveAll();
+            dbContext.DbQueryCacheStore.RemoveAll();
 
             Assert.Empty(dbQueryCacheStore.TestDbContextDependentKeys);
             Assert.Empty(dbQueryCacheStore.TestTypeKeys);

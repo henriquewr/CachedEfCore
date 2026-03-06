@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
+    <ProjectReference Include="..\CachedEfCore.Tests.Common\CachedEfCore.Tests.Common.csproj" />
   </ItemGroup>
 
 </Project>

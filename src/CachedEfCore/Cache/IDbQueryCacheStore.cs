@@ -1,5 +1,5 @@
+using CachedEfCore.Cache.EventData;
 using CachedEfCore.Context;
-using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Generic;
@@ -9,12 +9,12 @@ namespace CachedEfCore.Cache
 {
     public interface IDbQueryCacheStore
     {
-        event Action<HashSet<IEntityType>, EntityDependency>? OnInvalidatingRootEntities;
-        event Action<HashSet<IEntityType>>? OnInvalidatingDependentEntities;
+        event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
+        event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
         void RemoveAllDbContextDependent(Guid contextId);
-        void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, EntityDependency dependencyManager, bool fireEvent = true);
-        void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
+        void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, ICachedDbContext cachedDbContext, bool fireEvent = true);
+        void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, ICachedDbContext cachedDbContext, bool fireEvent = true);
         void RemoveAll();
 
         void AddToCache(ICachedDbContext cachedDbContext, Type rootEntityType, IDbQueryCacheKey key, object? dataToCache);

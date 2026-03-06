@@ -6,7 +6,6 @@ using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -15,16 +14,16 @@ using System.IO;
 
 namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
-    public class EntityDependencyManagerTestBase
+    public abstract class EntityDependencyManagerTestBase
     {
-        protected static readonly TestDbContext _cachedDbContext = new TestDbContext(new DbQueryCacheStore(new MemoryCache(new MemoryCacheOptions())));
+        protected TestDbContext _cachedDbContext = null!;
 
-        protected static IEntityType GetIEntityType(Type entityType)
+        protected virtual IEntityType GetIEntityType(Type entityType)
         {
             return _cachedDbContext.Model.FindEntityType(entityType) ?? throw new InvalidDataException();
         }
 
-        protected static IEntityType GetIEntityType(string name)
+        protected virtual IEntityType GetIEntityType(string name)
         {
             return _cachedDbContext.Model.FindEntityType(name) ?? throw new InvalidDataException();
         }
@@ -39,7 +38,7 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
             {
                 optionsBuilder.UseLazyLoadingProxies();
 
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
+                optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
                 base.OnConfiguring(optionsBuilder);
             }
 

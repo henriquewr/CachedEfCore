@@ -1,7 +1,6 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
 using System.Linq;
@@ -18,7 +17,7 @@ namespace CachedEfCore.Interceptors
             _sqlQueryEntityExtractor = sqlQueryEntityExtractor;
         }
 
-        private void CommandExecuting(string command, ICachedDbContext context, ChangeTracker contextChangeTracker, CommandSource commandSource)
+        private void CommandExecuting(string command, ICachedDbContext context, CommandSource commandSource)
         {
             switch (commandSource)
             {
@@ -28,14 +27,14 @@ namespace CachedEfCore.Interceptors
                     return;
 
                 case CommandSource.SaveChanges:
-                    var modifiedEntities = contextChangeTracker.Entries().Where(x => x.State != EntityState.Unchanged);
+                    var modifiedEntities = context.DbContext.ChangeTracker.Entries().Where(x => x.State != EntityState.Unchanged);
                     var modifiedEntitiesTypes = modifiedEntities
                       .Select(e => e.Metadata)
                       .ToHashSet();
 
                     if (modifiedEntitiesTypes.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context.DependencyManager);
+                        context.DbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context);
                     }
                     return;
 
@@ -48,7 +47,7 @@ namespace CachedEfCore.Interceptors
 
                     if (stateChangingEntities.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context.DependencyManager);
+                        context.DbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context);
                     }
                 return;
             }
@@ -58,7 +57,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.ReaderExecuting(command, eventData, result);
@@ -68,7 +67,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.ScalarExecuting(command, eventData, result);
@@ -78,7 +77,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.NonQueryExecuting(command, eventData, result);
@@ -88,7 +87,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
@@ -98,7 +97,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
@@ -108,7 +107,7 @@ namespace CachedEfCore.Interceptors
         {
             if (eventData.Context is ICachedDbContext cachedDbContext)
             {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.Context.ChangeTracker, eventData.CommandSource);
+                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
             }
 
             return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);

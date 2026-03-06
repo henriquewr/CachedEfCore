@@ -1,4 +1,5 @@
-﻿using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.Configuration;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using System;

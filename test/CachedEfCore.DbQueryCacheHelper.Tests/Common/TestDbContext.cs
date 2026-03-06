@@ -2,6 +2,7 @@
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -9,7 +10,11 @@ namespace CachedEfCore.Cache.Tests.Common
 {
     public class TestDbContext : CachedDbContext
     {
-        public TestDbContext(Cache.DbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+        {
+        }
+
+        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore, DbContextOptions<TestDbContext> options) : base(options, dbQueryCacheStore)
         {
         }
 
@@ -19,7 +24,7 @@ namespace CachedEfCore.Cache.Tests.Common
         {
             optionsBuilder.UseLazyLoadingProxies();
 
-            optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
+            optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
             base.OnConfiguring(optionsBuilder);
         }
 
