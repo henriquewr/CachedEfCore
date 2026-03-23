@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.Cache
@@ -68,19 +69,23 @@ namespace CachedEfCore.Cache
             }
         }
 
-        public DbQueryCacheKey(Type entityType, ExpressionKey expression, string? additionalExpressionData, nint delegateFunctionPointer, Guid? dependentDbContext)
+        public DbQueryCacheKey(Type entityType, 
+            ExpressionKey expression,
+            string? additionalExpressionData, 
+            MethodInfo method, 
+            Guid? dependentDbContext)
         {
             EntityType = entityType;
             Expression = expression;
             AdditionalExpressionData = additionalExpressionData;
-            DelegateFunctionPointer = delegateFunctionPointer;
+            Method = method;
             DependentDbContext = dependentDbContext;
         }
 
         public readonly Type EntityType;
         public readonly ExpressionKey Expression;
         public readonly string? AdditionalExpressionData;
-        public readonly nint DelegateFunctionPointer;
+        public readonly MethodInfo Method;
         public readonly Guid? DependentDbContext { get; }
 
         public override bool Equals(object? obj)
@@ -93,13 +98,13 @@ namespace CachedEfCore.Cache
             return EntityType == other.EntityType &&
                    Expression == other.Expression &&
                    AdditionalExpressionData == other.AdditionalExpressionData &&
-                   DelegateFunctionPointer == other.DelegateFunctionPointer &&
+                   Method == other.Method &&
                    DependentDbContext == other.DependentDbContext;
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(EntityType, Expression, AdditionalExpressionData, DelegateFunctionPointer, DependentDbContext);
+            return HashCode.Combine(EntityType, Expression, AdditionalExpressionData, Method, DependentDbContext);
         }
 
         public static bool operator ==(DbQueryCacheKey left, DbQueryCacheKey right)
