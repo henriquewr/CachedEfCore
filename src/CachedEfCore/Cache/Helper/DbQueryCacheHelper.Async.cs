@@ -1,53 +1,27 @@
 ﻿using CachedEfCore.Context;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache.Helper
 {
     public partial class DbQueryCacheHelper : IDbQueryCacheHelper
     {
-        private static readonly AsyncLocal<ValuePrinter> _printerAsyncLocal = new();
-
-        private static void ResetAsyncLocalPrinter()
-        {
-            if (_printerAsyncLocal.Value is null || _printerAsyncLocal.Value.IsDisposed)
-            {
-                _printerAsyncLocal.Value = new();
-            }
-            else
-            {
-                _printerAsyncLocal.Value.ResetState();
-            }
-        }
-
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor;
-        private readonly IPrintabilityChecker _printabilityChecker;
-
-        public DbQueryCacheHelper(KeyGeneratorVisitor keyGeneratorVisitor,
-            IPrintabilityChecker printabilityChecker)
-        {
-            _keyGeneratorVisitor = keyGeneratorVisitor;
-            _printabilityChecker = printabilityChecker;
-        }
-
         [OverloadResolutionPriority(-1)]
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
-            ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
-            ReadOnlySpan<object?> query)
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+           ICachedDbContext dbContext,
+           Func<Task<ReturnType>> getDataFromDatabase,
+           object?[] query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
         [OverloadResolutionPriority(-1)]
-        public ReturnType GetOrAdd<ReturnType>(
-            Type rootEntity,
-            ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
-            ReadOnlySpan<object?> query)
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+           Type rootEntity,
+           ICachedDbContext dbContext,
+           Func<Task<ReturnType>> getDataFromDatabase,
+           object?[] query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
@@ -64,7 +38,7 @@ namespace CachedEfCore.Cache.Helper
                     var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
-                        return getDataFromDatabase();
+                        return await getDataFromDatabase();
                     }
 
                     expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
@@ -92,50 +66,50 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             Expression query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
-                return getDataFromDatabase();
+                return await getDataFromDatabase();
             }
 
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression.GetHashCode(), keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
-            ReadOnlySpan<Expression> query)
+            Func<Task<ReturnType>> getDataFromDatabase,
+            Expression[] query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
-            ReadOnlySpan<Expression> query)
+            Func<Task<ReturnType>> getDataFromDatabase,
+            Expression[] query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
@@ -148,7 +122,7 @@ namespace CachedEfCore.Cache.Helper
                 var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
-                    return getDataFromDatabase();
+                    return await getDataFromDatabase();
                 }
 
                 expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
@@ -161,37 +135,30 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             string key)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
+            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<Task<ReturnType>> getDataFromDatabase,
             string key)
         {
             var expressionKey = new DbQueryCacheKey.ExpressionKey(key.GetHashCode(), key);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method.MethodHandle.GetFunctionPointer(), DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
-        }
-
-        private static Guid? DependentDbContext(ICachedDbContext dbContext, Type returnType)
-        {
-            var isDependent = dbContext.DependencyManager.HasLazyLoad(returnType);
-
-            return isDependent ? dbContext.Id : null;
         }
     }
 }
