@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Microsoft.Extensions.ObjectPool;
+using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace CachedEfCore.Cache
 {
@@ -10,31 +12,42 @@ namespace CachedEfCore.Cache
         {
             public struct Builder()
             {
-                private readonly HashCode HashCode = new();
-                private string Expression = "";
+                private static readonly ObjectPool<StringBuilder> _stringBuilderPool = new DefaultObjectPoolProvider().CreateStringBuilderPool();
+
+                private StringBuilder _stringBuilder = _stringBuilderPool.Get();
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public void AddExpression(string? expression)
+                public readonly void AddExpression(string? expression)
                 {
-                    HashCode.Add(expression);
-
-                    Expression += expression;
+                    if (expression is null)
+                    {
+                        _stringBuilder.Append("-1:");
+                    }
+                    else
+                    {
+                        _stringBuilder.Append(expression.Length)
+                          .Append(':')
+                          .Append(expression);
+                    }
                 }
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public readonly ExpressionKey GetKey()
+                public ExpressionKey GetKey()
                 {
-                    return new ExpressionKey(HashCode.ToHashCode(), Expression);
+                    var expr = _stringBuilder.ToString();
+
+                    _stringBuilderPool.Return(_stringBuilder);
+                    _stringBuilder = null!;
+
+                    return new ExpressionKey(expr);
                 }
             }
 
-            public ExpressionKey(int hash, string expression)
+            public ExpressionKey(string expression)
             {
-                Hash = hash;
                 Expression = expression;
             }
 
-            public readonly int Hash;
             public readonly string Expression;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -46,14 +59,13 @@ namespace CachedEfCore.Cache
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool Equals(ExpressionKey other)
             {
-                return Hash == other.Hash &&
-                       Expression == other.Expression;
+                return Expression == other.Expression;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override int GetHashCode()
             {
-                return HashCode.Combine(Hash, Expression);
+                return Expression.GetHashCode();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

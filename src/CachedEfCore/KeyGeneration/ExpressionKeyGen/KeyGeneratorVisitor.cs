@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
@@ -289,41 +288,37 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         private sealed class GetParametersVisitor : ExpressionVisitor
         {
-            private readonly Dictionary<ParameterExpression, int> _parameterExpressions;
+            [ThreadStatic]
+            private static Dictionary<ParameterExpression, int> _parameterExpressions = null!;
 
-            private readonly Lock _dictionaryLock = new Lock();
-
-            public GetParametersVisitor()
+            private static void ResetState()
             {
-                _parameterExpressions = new Dictionary<ParameterExpression, int>();
+                if (_parameterExpressions is null)
+                {
+                    _parameterExpressions = new Dictionary<ParameterExpression, int>();
+                }
+                else
+                {
+                    _parameterExpressions.Clear();
+                }
             }
 
             public bool HasAllParamsScopes(Expression expression)
             {
-                lock (_dictionaryLock)
-                {
-                    var allParams = GetParametersNoLock(expression);
-                    var hasAllScopes = !allParams.Values.Any(x => x == 1);
-                    return hasAllScopes;
-                }
+                var allParams = GetParameters(expression);
+                var hasAllScopes = !allParams.Values.Any(x => x == 1);
+                return hasAllScopes;
             }
 
             public Dictionary<ParameterExpression, int> GetParameters(Expression expression)
             {
-                lock (_dictionaryLock)
-                {
-                    return GetParametersNoLock(expression);
-                }
-            }
+                ResetState();
 
-            private Dictionary<ParameterExpression, int> GetParametersNoLock(Expression expression)
-            {
-                _parameterExpressions.Clear();
                 Visit(expression);
                 return _parameterExpressions;
             }
 
-            private void ParamFound(ParameterExpression param)
+            private static void ParamFound(ParameterExpression param)
             {
                 ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_parameterExpressions, param, out _);
                 value++;

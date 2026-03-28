@@ -116,7 +116,7 @@ namespace CachedEfCore.Cache.Helper
                 return getDataFromDatabase();
             }
 
-            var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression.GetHashCode(), keyGenerated.Value.Expression);
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
@@ -179,7 +179,7 @@ namespace CachedEfCore.Cache.Helper
             Func<ReturnType> getDataFromDatabase,
             string key)
         {
-            var expressionKey = new DbQueryCacheKey.ExpressionKey(key.GetHashCode(), key);
+            var expressionKey = new DbQueryCacheKey.ExpressionKey(key);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
