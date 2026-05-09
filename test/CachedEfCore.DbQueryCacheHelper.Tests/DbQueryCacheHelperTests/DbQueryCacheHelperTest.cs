@@ -5,6 +5,7 @@ using CachedEfCore.KeyGeneration;
 using CachedEfCore.KeyGeneration.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;

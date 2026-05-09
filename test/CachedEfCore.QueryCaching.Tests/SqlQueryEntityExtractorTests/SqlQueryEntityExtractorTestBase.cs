@@ -1,14 +1,14 @@
 ﻿using CachedEfCore.Cache;
 using CachedEfCore.Context;
 using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CachedEfCore.SqlQueryEntityExtractor.Tests
+namespace CachedEfCore.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
 {
     public class SqlQueryEntityExtractorTestBase
     {

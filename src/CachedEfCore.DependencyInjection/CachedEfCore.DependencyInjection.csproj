@@ -7,8 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CachedEfCore.DependencyInjection\CachedEfCore.DependencyInjection.csproj" />
-    <ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CachedEfCore\CachedEfCore.csproj" />
   </ItemGroup>
 
 </Project>

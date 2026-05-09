@@ -3,6 +3,7 @@ using CachedEfCore.Context;
 using CachedEfCore.DependencyManager.Attributes;
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
