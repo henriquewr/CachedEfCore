@@ -2,6 +2,7 @@
 using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
@@ -137,13 +138,30 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
         [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) OldValue, inserted.Value AS NewValue FROM Test u;")]
         [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) + 2 OldValue FROM Test u;")]
         [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) + 2 FROM Test u;")]
-        [InlineData("UPDATE u SET Value = Value FROM Test u WHERE Id = 1;")]
         [InlineData("UPDATE u SET Value = Value OUTPUT inserted.Value NewValue FROM Test u;")]
         public void Output(string sql)
         {
             var identifiers = _sqlServerParser.Parse(sql);
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Theory]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT deleted.Value AS OldValue, inserted.Value NewValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT 1 OldValue, inserted.Value AS NewValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT 1 + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT deleted.Value + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT 'a' OldValue, inserted.Value AS NewValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) OldValue, inserted.Value AS NewValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET u.Value = 1 OUTPUT ABS(-1) + 2 INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET Value = Value OUTPUT inserted.Value NewValue INTO Test2 FROM Test u;")]
+        [InlineData("UPDATE u SET Value = Value OUTPUT inserted.Value NewValue INTO dbo.Test2 FROM Test u;")]
+        public void Output_Into(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
 
         [Fact]

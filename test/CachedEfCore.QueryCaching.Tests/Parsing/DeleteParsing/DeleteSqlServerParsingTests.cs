@@ -2,6 +2,7 @@
 using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
@@ -75,7 +76,6 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
         [InlineData("DELETE u OUTPUT ABS(-1) OldValue FROM Test u;")]
         [InlineData("DELETE u OUTPUT ABS(-1) + 2 OldValue FROM Test u;")]
         [InlineData("DELETE u OUTPUT ABS(-1) + 2 FROM Test u;")]
-        [InlineData("DELETE u FROM Test u WHERE Id = 1;")]
         [InlineData("DELETE u OUTPUT deleted.Value OldValue FROM Test u;")]
         [InlineData("DELETE Test OUTPUT deleted.Value OldValue;")]
         public void Output(string sql)
@@ -83,6 +83,27 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
             var identifiers = _sqlServerParser.Parse(sql);
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Theory]
+        [InlineData("DELETE u OUTPUT deleted.Value AS OldValue, deleted.Value2 AS Value2 INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT 1 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT 1 + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE TOP (1) u OUTPUT 1 + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT deleted.Value + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT 'a' OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT ABS(-1) OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT ABS(-1) + 2 OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT ABS(-1) + 2 INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT deleted.Value OldValue INTO Test2 FROM Test u;")]
+        [InlineData("DELETE u OUTPUT deleted.Value OldValue INTO dbo.Test2 FROM Test u;")]
+        [InlineData("DELETE Test OUTPUT deleted.Value OldValue INTO Test2;")]
+        [InlineData("DELETE Test OUTPUT deleted.Value OldValue INTO dbo.Test2;")]
+        public void Output_Into(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
     }
 }

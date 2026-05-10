@@ -2,6 +2,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace CachedEfCore.SqlAnalysis.SqlServer
@@ -60,33 +61,69 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             AdvanceSeparators();
 
-            var current = _sqlSourceCode.Current;
-
-            switch (current)
+            while (_sqlSourceCode.HasCurrent())
             {
-                case 'u':
-                case 'U':
-                    ParseUpdate();
-                    break;
-                case 'd':
-                case 'D':
-                    ParseDelete();
-                    break;
-                case 'i':
-                case 'I':
-                    ParseInsert();
-                    break;
+                var current = _sqlSourceCode.Current;
+
+                switch (current)
+                {
+                    case 'u'
+                        when IsOnlyText("UPDATE"):
+                    case 'U'
+                        when IsOnlyText("UPDATE"):
+                        ParseUpdate();
+                        break;
+
+                    case 'd'
+                        when IsOnlyText("DELETE"):
+                    case 'D'
+                        when IsOnlyText("DELETE"):
+                        ParseDelete();
+                        break;
+
+                    case 'i'
+                        when IsOnlyText("INSERT"):
+                    case 'I'
+                        when IsOnlyText("INSERT"):
+                        ParseInsert();
+                        break;
+
+                    case '(':
+                        ParseParenthesisExpression();
+                        AdvanceSeparators();
+                        break;
+
+                    case '\'':
+                        ParseEnclosedExpression('\'');
+                        AdvanceSeparators();
+                        break;
+
+                    default:
+                        if (CanBeIdentifier())
+                        {
+                            ParseIdentifierOrMemberExpression(out _);
+                            AdvanceSeparators();
+                        }
+                        else
+                        {
+                            _sqlSourceCode.Advance();
+                        }
+                        break;
+                }
             }
 
             var result = GetResult().ToHashSet();
 
             return result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            bool IsOnlyText(scoped in ReadOnlySpan<char> text)
+                => _sqlSourceCode.TryAdvanceText(text) && IsIdentifierPartCharacter(_sqlSourceCode.Current) == false;
         }
 
         private void ParseInsert()
         {
             // https://learn.microsoft.com/en-us/sql/t-sql/statements/insert-transact-sql?view=sql-server-ver17
-            _sqlSourceCode.Expect("INSERT");
 
             AdvanceSeparators();
 
@@ -99,12 +136,53 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
             _tablesIdentifiers.Add(identifier);
+
+            AdvanceSeparators();
+
+            if (_sqlSourceCode.TryAdvanceText("WITH"))
+            {
+                AdvanceSeparators();
+            }
+
+            if (_sqlSourceCode.Current == '(')
+            {
+                ParseParenthesisExpression();
+                AdvanceSeparators();
+            }
+
+            if (_sqlSourceCode.TryAdvanceText("OUTPUT"))
+            {
+                AdvanceSeparators();
+                ParseOutputClause(static keyword => keyword.Equals("VALUES", StringComparison.OrdinalIgnoreCase)
+                    || keyword.Equals("SELECT", StringComparison.OrdinalIgnoreCase)
+                    || keyword.Equals("EXEC", StringComparison.OrdinalIgnoreCase)
+                    || keyword.Equals("DEFAULT", StringComparison.OrdinalIgnoreCase)
+                );
+            }
+
+            AdvanceSeparators();
+
+            if (_sqlSourceCode.TryAdvanceText("VALUES"))
+            {
+                do
+                {
+                    AdvanceSeparators();
+                    ParseParenthesisExpression();
+                } while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(','));
+
+                AdvanceSeparators();
+            }
+            else if (_sqlSourceCode.TryAdvanceText("DEFAULT"))
+            {
+                AdvanceSeparators();
+                _sqlSourceCode.TryAdvanceText("VALUES");
+                AdvanceSeparators();
+            }
         }
 
         private void ParseUpdate()
         {
             // https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql?view=sql-server-ver17
-            _sqlSourceCode.Expect("UPDATE");
 
             AdvanceSeparators();
 
@@ -181,6 +259,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                         {
                                             AdvanceSeparators();
                                             ParseOutputClause();
+                                            AdvanceSeparators();
 
                                             if (_sqlSourceCode.TryAdvanceText("FROM"))
                                             {
@@ -241,8 +320,6 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             // https://learn.microsoft.com/en-us/sql/t-sql/statements/delete-transact-sql?view=sql-server-ver17
 
-            _sqlSourceCode.Expect("DELETE");
-
             AdvanceSeparators();
 
             TryParseTopExpressionPercent();
@@ -259,6 +336,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             if (_sqlSourceCode.TryAdvanceText("OUTPUT"))
             {
                 ParseOutputClause();
+                AdvanceSeparators();
             }
 
             if (_sqlSourceCode.TryAdvanceText("FROM"))
@@ -431,7 +509,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             var lastIdentifier = ParseIdentifier(out lastIsEnclosed);
     
-            while (_sqlSourceCode.AdvanceIf('.'))
+            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf('.'))
             {
                 AdvanceSeparators();
                 lastIdentifier = ParseIdentifier(out lastIsEnclosed);
@@ -444,6 +522,16 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         /// Finds the exit of the output by keywords FROM WHERE OPTION
         /// </summary>
         private void ParseOutputClause()
+        {
+            ParseOutputClause(static keyword =>
+            {
+                return keyword.Equals("FROM", StringComparison.OrdinalIgnoreCase)
+                    || keyword.Equals("WHERE", StringComparison.OrdinalIgnoreCase)
+                    || keyword.Equals("OPTION", StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
+        private void ParseOutputClause(Func<ReadOnlySpan<char>, bool> isEnd)
         {
             while (_sqlSourceCode.HasCurrent())
             {
@@ -470,17 +558,13 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                                 if (SqlServerReservedKeywords.IsKeyword(lastIdentifier.Span))
                                 {
-                                    if (lastIdentifierSpan.Equals("FROM", StringComparison.OrdinalIgnoreCase))
+                                    if (lastIdentifierSpan.Equals("INTO", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        _sqlSourceCode.Index = lastIndex;
+                                        var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
+                                        _tablesIdentifiers.Add(identifier);
                                         return;
                                     }
-                                    else if (lastIdentifierSpan.Equals("WHERE", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        _sqlSourceCode.Index = lastIndex;
-                                        return;
-                                    }
-                                    else if (lastIdentifierSpan.Equals("OPTION", StringComparison.OrdinalIgnoreCase))
+                                    else if (isEnd(lastIdentifierSpan))
                                     {
                                         _sqlSourceCode.Index = lastIndex;
                                         return;
