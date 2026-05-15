@@ -25,7 +25,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
            });
 
         [Theory]
-        [InlineData("INSERT TOP (SELECT 1) INTO Test VALUES (1), ('2');")]
+        [InlineData("INSERT TOP (SELECT 1) INTO Test VALUES (1), (')');")]
         [InlineData("INSERT TOP(10) INTO Test (A, B) VALUES (1, '2');")]
         [InlineData("INSERT TOP(((10))) Test (A, B) VALUES (1, 'a');")]
         [InlineData("INSERT TOP (((10))) Test VALUES (1);")]
@@ -53,7 +53,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
         [InlineData("INSERT INTO Test VALUES (1), (2);")]
         [InlineData("INSERT INTO Test (Value) VALUES (1);")]
         [InlineData("INSERT INTO Test (Value) VALUES (1), (2);")]
-        [InlineData("INSERT INTO Test (Value), (Value2) VALUES (1, 1), (2, 1);")]
+        [InlineData("INSERT INTO Test (Value), (Value2) VALUES (1, ')'), (2, ')');")]
         [InlineData("INSERT dbo.Test VALUES (1);")]
         [InlineData("INSERT [Test] VALUES (1);")]
         public void Insert(string sql)

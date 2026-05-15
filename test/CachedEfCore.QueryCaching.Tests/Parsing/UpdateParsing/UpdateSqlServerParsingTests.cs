@@ -171,5 +171,21 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
+
+        [Theory]
+        [InlineData("UPDATE Test SET Value = 1 FROM UnusedTable u;")]
+        [InlineData("UPDATE Test SET Value = 1 FROM UnusedTable;")]
+
+        [InlineData("UPDATE Test SET u.Value = 1 OUTPUT 2 OldValue FROM UnusedTable u;")]
+        [InlineData("UPDATE Test SET u.Value = 1 OUTPUT 2 OldValue FROM UnusedTable;")]
+
+        [InlineData("UPDATE Test SET Value.WRITE('SQL ', 6, 0) FROM UnusedTable u;")]
+        [InlineData("UPDATE Test SET Value.WRITE('SQL ', 6, 0) FROM UnusedTable;")]
+        public void From_Non_Used_Table(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
     }
 }

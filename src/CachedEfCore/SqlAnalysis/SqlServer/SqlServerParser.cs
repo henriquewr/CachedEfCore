@@ -20,7 +20,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         private readonly Dictionary<ReadOnlyMemory<char>, List<ReadOnlyMemory<char>>> _tablesAliases = new(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
 
         private static bool IsSeparator(char c)
-            => char.IsSeparator(c) || c == '\t' || c == '\n' || c == '\r' || c == ';';
+            => char.IsWhiteSpace(c) || c == ';';
 
         private static bool IsIdentifierFirstCharacter(char c)
             => char.IsLetter(c) || c == '_' || c == '@' || c == '#';
@@ -28,9 +28,25 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         private static bool IsIdentifierPartCharacter(char c)
             => char.IsLetterOrDigit(c) || c == '@' || c == '$' || c == '#' || c == '_';
 
+        public static bool IsNewLine(char ch)
+        {
+            // new-line-character:
+            //   Carriage return character (U+000D)
+            //   Line feed character (U+000A)
+            //   Next line character (U+0085)
+            //   Line separator character (U+2028)
+            //   Paragraph separator character (U+2029)
+
+            return ch == '\r'
+                || ch == '\n'
+                || ch == '\u0085'
+                || ch == '\u2028'
+                || ch == '\u2029';
+        }
+
         private void AdvanceSeparators()
         {
-            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(IsSeparator))
+            while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
             {
             }
         }
@@ -51,6 +67,21 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                     yield return item;
                 }
             }
+        }
+
+        private readonly static string[] StateChangingKeywords = ["INSERT", "UPDATE", "DELETE"];
+
+        private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
+        {
+            foreach (var item in StateChangingKeywords)
+            {
+                if (item.Equals(value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public HashSet<ReadOnlyMemory<char>> Parse(string sql)
@@ -94,7 +125,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         break;
 
                     case '\'':
-                        ParseEnclosedExpression('\'');
+                        ParseStringLiteral();
                         AdvanceSeparators();
                         break;
 
@@ -192,16 +223,18 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             _tablesIdentifiers.Add(identifier);
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("WITH"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (sqlSourceCode.TryAdvanceText("WITH"))
             {
                 AdvanceSeparators();
                 ParseParenthesisExpression();
                 AdvanceSeparators();
             }
 
-            _sqlSourceCode.Expect("SET");
+            sqlSourceCode.Expect("SET");
 
-            while (_sqlSourceCode.HasCurrent())
+            while (sqlSourceCode.HasCurrent())
             {
                 AdvanceSeparators();
                 ParseIdentifierOrMemberExpression(out var isEnclosed);
@@ -213,35 +246,36 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                     AdvanceSeparators();
 
-                    if (_sqlSourceCode.TryAdvanceText("FROM"))
+                    if (sqlSourceCode.TryAdvanceText("FROM"))
                     {
                         // UPDATE u SET Value.WRITE('SQL ', 6, 0) FROM Test u WHERE Id = 1;
-                        ParseTableMemberExpressionOrTableMemberExpressionAsAlias();
+                        ParseTableMemberExpressionOrTableMemberExpressionAsAliasAddOnlyIfAliasEquals(identifier);
                         return;
                     }
                 }
 
-                _sqlSourceCode.AdvanceUntil('=');
-                _sqlSourceCode.Advance();
+                sqlSourceCode.AdvanceUntil('=');
+                sqlSourceCode.Advance();
 
                 AdvanceSeparators();
 
-                while (_sqlSourceCode.HasCurrent())
+                while (sqlSourceCode.HasCurrent())
                 {
-                    switch (_sqlSourceCode.Current)
+                    switch (sqlSourceCode.Current)
                     {
                         case '(':
                             ParseParenthesisExpression();
                             AdvanceSeparators();
                             break;
                         case '\'':
-                            ParseEnclosedExpression('\'');
+                            ParseStringLiteral();
                             AdvanceSeparators();
                             break;
 
                         default:
                             if (CanBeIdentifier())
                             {
+                                var savePos = sqlSourceCode.Index;
                                 var lastIdentifier = ParseIdentifierOrMemberExpression(out var cannotBeFunc);
 
                                 if (!cannotBeFunc)
@@ -252,7 +286,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                     {
                                         if (lastIdentifierSpan.Equals("FROM", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            ParseTableMemberExpressionOrTableMemberExpressionAsAlias();
+                                            ParseTableMemberExpressionOrTableMemberExpressionAsAliasAddOnlyIfAliasEquals(identifier);
                                             return;
                                         }
                                         else if (lastIdentifierSpan.Equals("OUTPUT", StringComparison.OrdinalIgnoreCase))
@@ -261,35 +295,43 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                             ParseOutputClause();
                                             AdvanceSeparators();
 
-                                            if (_sqlSourceCode.TryAdvanceText("FROM"))
+                                            if (sqlSourceCode.TryAdvanceText("FROM"))
                                             {
-                                                ParseTableMemberExpressionOrTableMemberExpressionAsAlias();
+                                                ParseTableMemberExpressionOrTableMemberExpressionAsAliasAddOnlyIfAliasEquals(identifier);
                                             }
 
                                             return;
                                         }
-
+                                        else if (IsAnyStateChangingKeyword(lastIdentifierSpan))
+                                        {
+                                            sqlSourceCode.Index = savePos;
+                                            return;
+                                        }
                                     }
 
                                     AdvanceSeparators();
-                                    TryAdvanceParenthesis();
+
+                                    if (sqlSourceCode.HasCurrent())
+                                    {
+                                        TryAdvanceParenthesis();
+                                    }
                                 }
                             }
                             else
                             {
-                                _sqlSourceCode.AdvanceUntil(static c => c == ',' || IsSeparator(c));
+                                sqlSourceCode.AdvanceUntil(static c => c == ',' || IsSeparator(c));
                             }
 
                             AdvanceSeparators();
                             break;
                     }
 
-                    if (!_sqlSourceCode.HasCurrent())
+                    if (!sqlSourceCode.HasCurrent())
                     {
                         return;
                     }
 
-                    if (_sqlSourceCode.AdvanceIf(','))
+                    if (sqlSourceCode.AdvanceIf(','))
                     {
                         break;
                     }
@@ -304,7 +346,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             bool TryAdvanceParenthesis()
             {
-                if (_sqlSourceCode.Current == '(')
+                if (sqlSourceCode.Current == '(')
                 {
                     ParseParenthesisExpression();
                     return true;
@@ -313,6 +355,21 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 AdvanceSeparators();
 
                 return false;
+            }
+
+            void ParseTableMemberExpressionOrTableMemberExpressionAsAliasAddOnlyIfAliasEquals(scoped in ReadOnlyMemory<char> updateIdentifier)
+            {
+                (var identifier, var alias) = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
+
+                if (identifier is null || alias is null 
+                    || !alias.Value.Span.Equals(updateIdentifier.Span, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                _tablesIdentifiers.Add(identifier.Value);
+
+                AddTableAlias(alias.Value, identifier.Value);
             }
         }
 
@@ -329,7 +386,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 AdvanceSeparators();
             }
 
-            var identifier = ParseIdentifier(out var enclosed);
+            var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
             _tablesIdentifiers.Add(identifier);
             AdvanceSeparators();
 
@@ -380,20 +437,46 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         // https://learn.microsoft.com/en-sg/sql/relational-databases/databases/database-identifiers?view=sql-server-ver17#bracket-delimited-identifiers
 
                         var identifier = ParseBracketEnclosedIdentifier();
-
                         enclosed = true;
 
-                        return identifier;
+                        if (!identifier.Escaped)
+                        {
+                            var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
+                            return enclosingIdentifier;
+                        }
+                        else
+                        {
+                            // [really]]bad]]identifier] is a valid identifier -> really]bad]identifier
+
+                            var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
+
+                            enclosingIdentifier = enclosingIdentifier.Replace(new string(']', 2), new string(']', 1));
+
+                            return enclosingIdentifier.AsMemory();
+                        }
                     }
                 case '"':
                     {
                         // https://learn.microsoft.com/en-sg/sql/relational-databases/databases/database-identifiers?view=sql-server-ver17#double-quote-delimited-identifiers
 
                         var identifier = ParseDoubleQuoteEnclosedIdentifier();
-
                         enclosed = true;
 
-                        return identifier;
+                        if (identifier.DoubleQuotesCount == 2)
+                        {
+                            var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
+                            return enclosingIdentifier;
+                        }
+                        else
+                        {
+                            // "really""bad""identifier" is a valid identifier -> really"bad"identifier
+
+                            var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
+
+                            enclosingIdentifier = enclosingIdentifier.Replace(new string('"', 2), new string('"', 1));
+
+                            return enclosingIdentifier.AsMemory();
+                        }
                     }
 
                 default:
@@ -412,96 +495,68 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         return identifier;
                     }
             }
+        }
 
-            ReadOnlyMemory<char> ParseBracketEnclosedIdentifier()
+        private (int Start, int Length, bool Escaped) ParseBracketEnclosedIdentifier()
+        {
+            const char closingCharacter = ']';
+
+            var startIndex = _sqlSourceCode.Index;
+
+            _sqlSourceCode.Expect('[');
+
+            var hasEscaped = false;
+
+            while (_sqlSourceCode.HasCurrent())
             {
-                const char closingCharacter = ']';
+                _sqlSourceCode.AdvanceUntil(closingCharacter);
+                _sqlSourceCode.Advance();
 
-                var startIndex = _sqlSourceCode.Index;
-
-                _sqlSourceCode.Expect('[');
-
-                var hasEscaped = false;
-
-                while (_sqlSourceCode.HasCurrent())
+                if (_sqlSourceCode.AdvanceIf(closingCharacter))
                 {
-                    _sqlSourceCode.AdvanceUntil(closingCharacter);
-                    _sqlSourceCode.Advance();
-
-                    if (_sqlSourceCode.AdvanceIf(closingCharacter))
-                    {
-                        hasEscaped = true;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                var finalStartIndex = startIndex + 1;
-                var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
-
-                if (!hasEscaped)
-                {
-                    var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(finalStartIndex, endIndex);
-                    return enclosingIdentifier;
+                    hasEscaped = true;
                 }
                 else
                 {
-                    // [really]]bad]]identifier] is a valid identifier -> really]bad]identifier
-
-                    var enclosingIdentifier = _sqlSourceCode.Sql.Substring(finalStartIndex, endIndex);
-
-                    enclosingIdentifier = enclosingIdentifier.Replace(new string(closingCharacter, 2), new string(closingCharacter, 1));
-
-                    return enclosingIdentifier.AsMemory();
+                    break;
                 }
             }
 
-            ReadOnlyMemory<char> ParseDoubleQuoteEnclosedIdentifier()
+            var finalStartIndex = startIndex + 1;
+            var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
+
+            return (finalStartIndex, endIndex, hasEscaped);
+        }
+
+        private (int Start, int Length, int DoubleQuotesCount) ParseDoubleQuoteEnclosedIdentifier()
+        {
+            const char closingCharacter = '"';
+
+            var startIndex = _sqlSourceCode.Index;
+
+            var doubleQuotesCount = 1;
+            _sqlSourceCode.Expect(closingCharacter);
+
+            while (_sqlSourceCode.HasCurrent())
             {
-                const char closingCharacter = '"';
+                _sqlSourceCode.AdvanceUntil(closingCharacter);
+                _sqlSourceCode.Advance();
+                ++doubleQuotesCount;
 
-                var startIndex = _sqlSourceCode.Index;
-
-                var doubleQuotesCount = 1;
-                _sqlSourceCode.Expect(closingCharacter);
-
-                while (_sqlSourceCode.HasCurrent())
+                if (_sqlSourceCode.AdvanceIf(closingCharacter))
                 {
-                    _sqlSourceCode.AdvanceUntil(closingCharacter);
-                    _sqlSourceCode.Advance();
                     ++doubleQuotesCount;
-
-                    if (_sqlSourceCode.AdvanceIf(closingCharacter))
-                    {
-                        ++doubleQuotesCount;
-                    }
-                    else if ((doubleQuotesCount & 1) == 0)
-                    {
-                        break;
-                    }
                 }
-
-                var finalStartIndex = startIndex + 1;
-                var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
-
-                if (doubleQuotesCount == 2)
+                else if ((doubleQuotesCount & 1) == 0)
                 {
-                    var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(finalStartIndex, endIndex);
-                    return enclosingIdentifier;
-                }
-                else
-                {
-                    // "really""bad""identifier" is a valid identifier -> really"bad"identifier
-
-                    var enclosingIdentifier = _sqlSourceCode.Sql.Substring(finalStartIndex, endIndex);
-
-                    enclosingIdentifier = enclosingIdentifier.Replace(new string(closingCharacter, 2), new string(closingCharacter, 1));
-
-                    return enclosingIdentifier.AsMemory();
+                    break;
                 }
             }
+
+            var finalStartIndex = startIndex + 1;
+            var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
+
+            return (finalStartIndex, endIndex, doubleQuotesCount);
         }
 
         /// <returns>Last identifier</returns>
@@ -543,7 +598,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         ParseParenthesisExpression();
                         break;
                     case '\'':
-                        ParseEnclosedExpression('\'');
+                        ParseStringLiteral();
                         break;
 
                     default:
@@ -560,6 +615,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                 {
                                     if (lastIdentifierSpan.Equals("INTO", StringComparison.OrdinalIgnoreCase))
                                     {
+                                        AdvanceSeparators();
                                         var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
                                         _tablesIdentifiers.Add(identifier);
                                         return;
@@ -612,49 +668,120 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             }
         }
 
-        private void ParseParenthesisExpression()
-            => ParseEnclosedExpression('(', ')');
-
-        private void ParseEnclosedExpression(char open, char close)
+        private bool TryParseSingleLineComment()
         {
-            _sqlSourceCode.Expect(open);
-
-            var openingCount = 1;
-            while (_sqlSourceCode.HasCurrent() && openingCount > 0)
+            if (!_sqlSourceCode.TryAdvanceText("--"))
             {
-                if (_sqlSourceCode.AdvanceIf(open))
-                {
-                    ++openingCount;
-                }
-                else if (_sqlSourceCode.AdvanceIf(close))
-                {
-                    --openingCount;
-                }
-                else
-                {
-                    _sqlSourceCode.Advance();
-                }
+                return false;
             }
+
+            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(static c => !IsNewLine(c)))
+            {
+            }
+
+            return true;
         }
 
-        private void ParseEnclosedExpression(char character)
+        private bool TryParseMultiLineComment()
         {
-            _sqlSourceCode.Expect(character);
-
-            var characterCount = 1;
+            if (!_sqlSourceCode.TryAdvanceText("/*"))
+            {
+                return false;
+            }
 
             while (_sqlSourceCode.HasCurrent())
             {
-                _sqlSourceCode.AdvanceUntil(character);
+                if (_sqlSourceCode.TryAdvanceText("*/"))
+                {
+                    return true;
+                }
+
                 _sqlSourceCode.Advance();
+            }
+
+            return true;
+        }
+
+        private void ParseParenthesisExpression()
+        {
+            var sqlSourceCode = _sqlSourceCode;
+
+            sqlSourceCode.Expect('(');
+
+            var openingCount = 1;
+            while (sqlSourceCode.HasCurrent() && openingCount > 0)
+            {
+                switch (sqlSourceCode.Current)
+                {
+                    case '\'':
+                        ParseStringLiteral();
+                        break;
+
+                    case '[':
+                        ParseBracketEnclosedIdentifier();
+                        break;
+
+                    case '"':
+                        ParseDoubleQuoteEnclosedIdentifier();
+                        break;
+
+                    case '-':
+                        if (TryParseSingleLineComment())
+                        {
+                            break;
+                        }
+
+                        sqlSourceCode.Advance();
+                        break;
+
+                    case '/':
+                        if (TryParseMultiLineComment())
+                        {
+                            break;
+                        }
+
+                        sqlSourceCode.Advance();
+                        break;
+
+                    case '(':
+                        ++openingCount;
+                        sqlSourceCode.Advance();
+                        break;
+
+                    case ')':
+                        --openingCount;
+                        sqlSourceCode.Advance();
+                        break;
+
+                    default:
+                        sqlSourceCode.Advance();
+                        break;
+                }
+
+                AdvanceSeparators();
+            }
+        }
+
+        private void ParseStringLiteral()
+        {
+            var sqlSourceCode = _sqlSourceCode;
+
+            sqlSourceCode.Expect('\'');
+
+            var characterCount = 1;
+
+            while (sqlSourceCode.HasCurrent())
+            {
+                sqlSourceCode.AdvanceUntil('\'');
+                sqlSourceCode.Advance();
                 ++characterCount;
 
-                if (!_sqlSourceCode.HasCurrent())
+                if (!sqlSourceCode.HasCurrent())
                 {
                     return;
                 }
 
-                if (_sqlSourceCode.AdvanceIf(character))
+                if (sqlSourceCode.AdvanceIf('\''))
                 {
                     ++characterCount;
                 }
@@ -667,23 +794,36 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
         private void ParseTableMemberExpressionOrTableMemberExpressionAsAlias()
         {
+            (var identifier, var alias) = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
+
+            if (identifier is null)
+            {
+                return;
+            }
+
+            _tablesIdentifiers.Add(identifier.Value);
+
+            if (alias is not null)
+            {
+                AddTableAlias(alias.Value, identifier.Value);
+            }
+        }
+
+        private (ReadOnlyMemory<char>? Identifier, ReadOnlyMemory<char>? Alias) ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias()
+        {
             var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
             AdvanceSeparators();
 
-            if (enclosed || !SqlServerReservedKeywords.IsKeyword(identifier.Span))
+            if (!enclosed && SqlServerReservedKeywords.IsKeyword(identifier.Span))
             {
-                _tablesIdentifiers.Add(identifier);
-            }
-            else
-            {
-                return;
+                return (null, null);
             }
 
             _sqlSourceCode.TryAdvanceText("AS", StringComparison.OrdinalIgnoreCase);
 
             if (!_sqlSourceCode.HasCurrent())
             {
-                return;
+                return (identifier, null);
             }
 
             AdvanceSeparators();
@@ -693,11 +833,13 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 var alias = ParseIdentifier(out var _);
                 AdvanceSeparators();
 
-                AddTableAlias(ref alias, ref identifier);
+                return (identifier, alias);
             }
+
+            return (identifier, null);
         }
 
-        private void AddTableAlias(ref ReadOnlyMemory<char> alias, ref ReadOnlyMemory<char> identifier)
+        private void AddTableAlias(scoped in ReadOnlyMemory<char> alias, scoped in ReadOnlyMemory<char> identifier)
         {
             ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(_tablesAliases, alias, out var exists);
             if (!exists)
@@ -711,8 +853,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
         private sealed class ReadOnlyMemoryCharComparer : IEqualityComparer<ReadOnlyMemory<char>>
         {
-            public static readonly ReadOnlyMemoryCharComparer OrdinalIgnoreCase =
-                new(StringComparison.OrdinalIgnoreCase);
+            public static readonly ReadOnlyMemoryCharComparer OrdinalIgnoreCase = new(StringComparison.OrdinalIgnoreCase);
 
             private readonly StringComparison _comparison;
 
@@ -721,9 +862,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 _comparison = comparison;
             }
 
-            public bool Equals(
-                ReadOnlyMemory<char> x,
-                ReadOnlyMemory<char> y)
+            public bool Equals(ReadOnlyMemory<char> x, ReadOnlyMemory<char> y)
             {
                 return x.Span.Equals(y.Span, _comparison);
             }

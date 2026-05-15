@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Helpers.Perf;
-using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using System.Collections.Generic;
 using System.Linq;
@@ -155,6 +154,26 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
             var hashSet = identifiers.Select(x => x.ToString()).ToHashSet();
 
             Assert.True(testCase.Identifiers.SetEquals(hashSet));
+        }
+
+        [Theory]
+        [InlineData("INSERT INTO Test (Value), (Value2) VALUES (1, '))))'), (2, ')))');")]
+        [InlineData("""
+            UPDATE Test
+            SET Value = Func(
+                -- ))))))
+                '))',
+                [abc(def)],
+                /* )))) */
+                "(("
+            )
+            FROM OtherTable;
+            """)]
+        public void Parenthesis_Inside(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
     }
 }

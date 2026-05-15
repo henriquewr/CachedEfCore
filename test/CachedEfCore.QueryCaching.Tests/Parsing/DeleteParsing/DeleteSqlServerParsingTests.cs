@@ -25,7 +25,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
            });
 
         [Theory]
-        [InlineData("DELETE TOP (SELECT 1) FROM Test;")]
+        [InlineData("DELETE TOP (SELECT 1) FROM dbo.Test;")]
         [InlineData("DELETE TOP(10) FROM Test;")]
         [InlineData("DELETE TOP(((10))) FROM Test;")]
         [InlineData("DELETE TOP (((10))) FROM Test;")]
@@ -50,6 +50,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
 
         [Theory]
         [InlineData("DELETE u FROM Test u;")]
+        [InlineData("DELETE FROM u FROM Test u;")]
         [InlineData("DELETE TOP (1) u FROM Test u;")]
         public void Delete_Alias(string sql)
         {
