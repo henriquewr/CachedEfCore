@@ -103,12 +103,20 @@ namespace CachedEfCore.SqlAnalysis
         {
             int startIndex = _index;
 
-            while (HasCurrent() && character != Sql[_index])
+            int indexOfChar = Remaining.IndexOf(character);
+
+            if (indexOfChar >= 0)
             {
-                _index++;
+                _index += indexOfChar;
+            }
+            else
+            {
+                _index = Sql.Length;
             }
 
-            return Sql.AsSpan(startIndex, _index - startIndex);
+            var result = Sql.AsSpan(startIndex, _index - startIndex);
+
+            return result;
         }
 
         public ReadOnlySpan<char> AdvanceUntil(Func<char, bool> predicate)

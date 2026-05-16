@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace CachedEfCore.SqlAnalysis.SqlServer
 {
-    public partial class SqlServerQueryEntityExtractor : ISqlQueryEntityExtractor
+    public class SqlServerQueryEntityExtractor : ISqlQueryEntityExtractor
     {
         [ThreadStatic]
         private static SqlServerParser _sqlServerParser = null!;

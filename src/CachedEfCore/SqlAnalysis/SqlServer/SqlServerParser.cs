@@ -18,16 +18,20 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         private SqlSourceCode _sqlSourceCode = null!;
         private readonly List<ReadOnlyMemory<char>> _tablesIdentifiers = new();
         private readonly Dictionary<ReadOnlyMemory<char>, List<ReadOnlyMemory<char>>> _tablesAliases = new(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsSeparator(char c)
             => char.IsWhiteSpace(c) || c == ';';
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsIdentifierFirstCharacter(char c)
             => char.IsLetter(c) || c == '_' || c == '@' || c == '#';
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsIdentifierPartCharacter(char c)
             => char.IsLetterOrDigit(c) || c == '@' || c == '$' || c == '#' || c == '_';
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsNewLine(char ch)
         {
             // new-line-character:
@@ -43,7 +47,8 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 || ch == '\u2028'
                 || ch == '\u2029';
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AdvanceSeparators()
         {
             while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
@@ -450,7 +455,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                             var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
 
-                            enclosingIdentifier = enclosingIdentifier.Replace(new string(']', 2), new string(']', 1));
+                            enclosingIdentifier = enclosingIdentifier.Replace("]]", "]");
 
                             return enclosingIdentifier.AsMemory();
                         }
@@ -473,7 +478,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                             var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
 
-                            enclosingIdentifier = enclosingIdentifier.Replace(new string('"', 2), new string('"', 1));
+                            enclosingIdentifier = enclosingIdentifier.Replace("\"\"", "\"");
 
                             return enclosingIdentifier.AsMemory();
                         }
