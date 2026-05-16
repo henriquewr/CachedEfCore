@@ -689,9 +689,16 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 return false;
             }
 
+            var commentsDepth = 1;
+
             while (_sqlSourceCode.HasCurrent())
             {
-                if (_sqlSourceCode.TryAdvanceText("*/"))
+                if (_sqlSourceCode.TryAdvanceText("/*"))
+                {
+                    ++commentsDepth;
+                }
+
+                if (_sqlSourceCode.TryAdvanceText("*/") && --commentsDepth == 0)
                 {
                     return true;
                 }

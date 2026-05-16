@@ -164,7 +164,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
                 -- ))))))
                 '))',
                 [abc(def)],
-                /* )))) */
+                /* )))) /*commented*/commented/*commented*/*/
                 "(("
             )
             FROM OtherTable;
