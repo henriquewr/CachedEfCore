@@ -10,7 +10,7 @@ namespace CachedEfCore.SqlAnalysis
     {
         public readonly string Sql;
 
-        private int _index = 0;
+        private int _index;
         public SqlSourceCode(string sql)
         {
             Sql = sql;

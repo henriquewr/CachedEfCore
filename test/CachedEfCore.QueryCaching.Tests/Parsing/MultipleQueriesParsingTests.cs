@@ -136,6 +136,34 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
 
         END CATCH
         """, "Test")]
+        [InlineData("""
+        BEGIN TRY
+
+            BEGIN TRANSACTION;
+
+            EXEC dbo.ProcessOrders @BatchId = 100;
+
+            INSERT INTO Test(Message, CreatedAt)
+            VALUES ('Processed batch', GETDATE());
+
+            MERGE TestMerge AS target
+            USING Source AS source
+            ON target.Id = source.Id
+            WHEN MATCHED THEN
+                UPDATE SET Value.WRITE('SQL ', 6, 0), Value2.WRITE('test', NULL, 0)
+
+            COMMIT TRANSACTION;
+
+        END TRY
+        BEGIN CATCH
+
+            IF XACT_STATE() <> 0
+                ROLLBACK TRANSACTION;
+
+            THROW;
+
+        END CATCH
+        """, "Test,TestMerge")]
         public void Parse_Multiple_Queries_SqlServer(string sql, string tables)
         {
             var identifiers = _sqlServerParser.Parse(sql).Select(x => x.ToString()).Order().ToArray();

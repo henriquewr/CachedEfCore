@@ -108,10 +108,12 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
 
-        [Fact]
-        public void Set_Write()
+        [Theory]
+        [InlineData("UPDATE u SET Value.WRITE('SQL ', 6, 0) FROM Test u WHERE Id = 1;")]
+        [InlineData("UPDATE u SET Value.WRITE('SQL ', 6, 0), Value2.WRITE('test', NULL, 0) FROM Test u WHERE Id = 1;")]
+        public void Set_Write(string sql)
         {
-            var identifiers = _sqlServerParser.Parse("UPDATE u SET Value.WRITE('SQL ', 6, 0) FROM Test u WHERE Id = 1;");
+            var identifiers = _sqlServerParser.Parse(sql);
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
@@ -182,6 +184,43 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
         [InlineData("UPDATE Test SET Value.WRITE('SQL ', 6, 0) FROM UnusedTable u;")]
         [InlineData("UPDATE Test SET Value.WRITE('SQL ', 6, 0) FROM UnusedTable;")]
         public void From_Non_Used_Table(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Theory]
+        [InlineData("""
+            UPDATE u 
+                SET u.Value = 
+                    CASE
+                        WHEN A = 1 THEN 'test'
+                        WHEN A = 2 THEN 'test2'
+                        ELSE u.Value
+                    END 
+            FROM Test AS u
+            WHERE u.Id = 1;
+            """)]
+        [InlineData("""
+            UPDATE u 
+                SET u.Value = 
+                    CASE
+                        WHEN A = 1 THEN 'test'
+                    END 
+            FROM Test AS u
+            WHERE u.Id = 1;
+            """)]
+        public void Set_Case_Expression(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Theory]
+        [InlineData("UPDATE u SET Value = Value FROM Test u JOIN Test2 test2 ON u.Id = test2.Id WHERE Id = 1;")]
+        public void Join(string sql)
         {
             var identifiers = _sqlServerParser.Parse(sql);
 

@@ -17,6 +17,8 @@
 	<Authors>henriquewr</Authors>
 	<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
 	<Description>A Caching library for Entity Framework Core with automatic cache invalidation</Description>
+	<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+	<AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
@@ -29,5 +31,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='TestRelease'">
 	<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|AnyCPU'">
+    <Optimize>True</Optimize>
   </PropertyGroup>
 </Project>
