@@ -9,7 +9,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
     public class SqlServerQueryEntityExtractor : ISqlQueryEntityExtractor
     {
         [ThreadStatic]
-        private static SqlServerParser _sqlServerParser = null!;
+        private static SqlServerParser? _sqlServerParser;
 
         public IEnumerable<IEntityType> GetStateChangingEntityTypesFromSql(TableEntityMapping tableEntities, string sql)
         {
@@ -27,8 +27,8 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 // Its better to incorrectly invalidate everything than throwing an exception
                 return tableEntities.Mapping.SelectMany(static x => x.Value);
             }
-           
-            static IEnumerable<IEntityType> GetTables(TableEntityMapping tableEntities, HashSet< ReadOnlyMemory<char>> tables)
+
+            static IEnumerable<IEntityType> GetTables(TableEntityMapping tableEntities, HashSet<ReadOnlyMemory<char>> tables)
             {
                 var spanLookup = tableEntities.Mapping.GetAlternateLookup<ReadOnlySpan<char>>();
 

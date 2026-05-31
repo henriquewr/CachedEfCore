@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,40 +21,11 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         private SqlSourceCode _sqlSourceCode = null!;
         private readonly List<ReadOnlyMemory<char>> _tablesIdentifiers = new();
         private readonly Dictionary<ReadOnlyMemory<char>, List<ReadOnlyMemory<char>>> _tablesAliases = new(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
-       
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsSeparator(char c)
-            => char.IsWhiteSpace(c) || c == ';';
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsIdentifierFirstCharacter(char c)
-            => char.IsLetter(c) || c == '_' || c == '@' || c == '#';
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsIdentifierPartCharacter(char c)
-            => char.IsLetterOrDigit(c) || c == '@' || c == '$' || c == '#' || c == '_';
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsNewLine(char ch)
-        {
-            // new-line-character:
-            //   Carriage return character (U+000D)
-            //   Line feed character (U+000A)
-            //   Next line character (U+0085)
-            //   Line separator character (U+2028)
-            //   Paragraph separator character (U+2029)
-
-            return ch == '\r'
-                || ch == '\n'
-                || ch == '\u0085'
-                || ch == '\u2028'
-                || ch == '\u2029';
-        }
-        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AdvanceSeparators()
         {
-            while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
+            while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(SqlServerSyntaxFacts.IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
             {
             }
         }
@@ -76,19 +48,11 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             }
         }
 
-        private readonly static string[] StateChangingKeywords = ["INSERT", "UPDATE", "DELETE", "MERGE"];
+        private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE"], StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
-            foreach (var item in StateChangingKeywords)
-            {
-                if (item.Equals(value, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return value.ContainsAny(StateChangingKeywords);
         }
 
         public HashSet<ReadOnlyMemory<char>> Parse(string sql)
@@ -167,7 +131,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool IsOnlyText(scoped in ReadOnlySpan<char> text)
-                => _sqlSourceCode.TryAdvanceText(text) && IsIdentifierPartCharacter(_sqlSourceCode.Current) == false;
+                => _sqlSourceCode.TryAdvanceText(text) && SqlServerSyntaxFacts.IsIdentifierPartCharacter(_sqlSourceCode.Current) == false;
         }
 
         private void ParseInsert()
@@ -305,7 +269,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                 {
                                     var lastIdentifierSpan = lastIdentifier.Span;
 
-                                    if (SqlServerReservedKeywords.IsKeyword(lastIdentifier.Span))
+                                    if (SqlServerSyntaxFacts.IsKeyword(lastIdentifier.Span))
                                     {
                                         if (lastIdentifierSpan.Equals("FROM", StringComparison.OrdinalIgnoreCase))
                                         {
@@ -346,7 +310,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                             }
                             else
                             {
-                                sqlSourceCode.AdvanceUntil(static c => c == ',' || IsSeparator(c));
+                                sqlSourceCode.AdvanceUntil(static c => c == ',' || SqlServerSyntaxFacts.IsSeparator(c));
                             }
 
                             AdvanceSeparators();
@@ -388,7 +352,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             {
                 (var identifier, var alias) = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
 
-                if (identifier is null || alias is null 
+                if (identifier is null || alias is null
                     || !alias.Value.Span.Equals(updateIdentifier.Span, StringComparison.OrdinalIgnoreCase))
                 {
                     return;
@@ -621,7 +585,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                             if (!sqlSourceCode.HasCurrent())
                             {
                                 return;
-                            }    
+                            }
 
                             AdvanceSeparators();
 
@@ -704,7 +668,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                                     }
                                     else
                                     {
-                                        sqlSourceCode.AdvanceUntil(static c => c == ',' || IsSeparator(c));
+                                        sqlSourceCode.AdvanceUntil(static c => c == ',' || SqlServerSyntaxFacts.IsSeparator(c));
                                     }
 
                                     AdvanceSeparators();
@@ -784,7 +748,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             {
                 '[' => true,
                 '"' => true,
-                _ => IsIdentifierFirstCharacter(current),
+                _ => SqlServerSyntaxFacts.IsIdentifierFirstCharacter(current),
             };
             return isIdentifier;
         }
@@ -849,8 +813,8 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         // https://learn.microsoft.com/en-sg/sql/relational-databases/databases/database-identifiers?view=sql-server-ver17#rules-for-regular-identifiers
 
                         var startIndex = _sqlSourceCode.Index;
-                        _sqlSourceCode.Expect(IsIdentifierFirstCharacter);
-                        _sqlSourceCode.AdvanceUntil(static c => !IsIdentifierPartCharacter(c));
+                        _sqlSourceCode.Expect(SqlServerSyntaxFacts.IsIdentifierFirstCharacter);
+                        _sqlSourceCode.AdvanceUntil(static c => !SqlServerSyntaxFacts.IsIdentifierPartCharacter(c));
 
                         var identifier = _sqlSourceCode.Sql.AsMemory(startIndex, _sqlSourceCode.Index - startIndex);
 
@@ -866,18 +830,20 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             const char closingCharacter = ']';
 
-            var startIndex = _sqlSourceCode.Index;
+            var sqlSourceCode = _sqlSourceCode;
 
-            _sqlSourceCode.Expect('[');
+            var startIndex = sqlSourceCode.Index;
+
+            sqlSourceCode.Expect('[');
 
             var hasEscaped = false;
 
-            while (_sqlSourceCode.HasCurrent())
+            while (sqlSourceCode.HasCurrent())
             {
-                _sqlSourceCode.AdvanceUntil(closingCharacter);
-                _sqlSourceCode.Advance();
+                sqlSourceCode.AdvanceUntil(closingCharacter);
+                sqlSourceCode.Advance();
 
-                if (_sqlSourceCode.AdvanceIf(closingCharacter))
+                if (sqlSourceCode.AdvanceIf(closingCharacter))
                 {
                     hasEscaped = true;
                 }
@@ -888,7 +854,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             }
 
             var finalStartIndex = startIndex + 1;
-            var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
+            var endIndex = sqlSourceCode.Index - finalStartIndex - 1;
 
             return (finalStartIndex, endIndex, hasEscaped);
         }
@@ -897,18 +863,20 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             const char closingCharacter = '"';
 
-            var startIndex = _sqlSourceCode.Index;
+            var sqlSourceCode = _sqlSourceCode;
+
+            var startIndex = sqlSourceCode.Index;
 
             var doubleQuotesCount = 1;
-            _sqlSourceCode.Expect(closingCharacter);
+            sqlSourceCode.Expect(closingCharacter);
 
-            while (_sqlSourceCode.HasCurrent())
+            while (sqlSourceCode.HasCurrent())
             {
-                _sqlSourceCode.AdvanceUntil(closingCharacter);
-                _sqlSourceCode.Advance();
+                sqlSourceCode.AdvanceUntil(closingCharacter);
+                sqlSourceCode.Advance();
                 ++doubleQuotesCount;
 
-                if (_sqlSourceCode.AdvanceIf(closingCharacter))
+                if (sqlSourceCode.AdvanceIf(closingCharacter))
                 {
                     ++doubleQuotesCount;
                 }
@@ -919,7 +887,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             }
 
             var finalStartIndex = startIndex + 1;
-            var endIndex = _sqlSourceCode.Index - finalStartIndex - 1;
+            var endIndex = sqlSourceCode.Index - finalStartIndex - 1;
 
             return (finalStartIndex, endIndex, doubleQuotesCount);
         }
@@ -988,7 +956,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                             {
                                 var lastIdentifierSpan = lastIdentifier.Span;
 
-                                if (SqlServerReservedKeywords.IsKeyword(lastIdentifier.Span))
+                                if (SqlServerSyntaxFacts.IsKeyword(lastIdentifier.Span))
                                 {
                                     var isEndResult = isEnd(lastIdentifierSpan);
 
@@ -1076,7 +1044,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 return false;
             }
 
-            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(static c => !IsNewLine(c)))
+            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(static c => !SqlServerSyntaxFacts.IsNewLine(c)))
             {
             }
 
@@ -1085,31 +1053,34 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
         private bool TryParseMultiLineComment()
         {
-            if (!_sqlSourceCode.TryAdvanceText("/*"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (!sqlSourceCode.TryAdvanceText("/*"))
             {
                 return false;
             }
 
             var commentsDepth = 1;
 
-            while (_sqlSourceCode.HasCurrent())
+            while (sqlSourceCode.HasCurrent())
             {
-                if (_sqlSourceCode.TryAdvanceText("/*"))
+                if (sqlSourceCode.TryAdvanceText("/*"))
                 {
                     ++commentsDepth;
                 }
 
-                if (_sqlSourceCode.TryAdvanceText("*/") && --commentsDepth == 0)
+                if (sqlSourceCode.TryAdvanceText("*/") && --commentsDepth == 0)
                 {
                     return true;
                 }
 
-                _sqlSourceCode.Advance();
+                sqlSourceCode.Advance();
             }
 
             return true;
         }
 
+        private readonly static SearchValues<char> ParseParenthesisExpressionSearchValues = SearchValues.Create(['\'', '[', '"', '-', '/', '(', ')']);
         private void ParseParenthesisExpression()
         {
             var sqlSourceCode = _sqlSourceCode;
@@ -1119,6 +1090,16 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             var openingCount = 1;
             while (sqlSourceCode.HasCurrent() && openingCount > 0)
             {
+                var index = sqlSourceCode.Remaining.IndexOfAny(ParseParenthesisExpressionSearchValues);
+
+                if (index == -1 || index == sqlSourceCode.Sql.Length)
+                {
+                    sqlSourceCode.Index = sqlSourceCode.Sql.Length;
+                    return;
+                }
+
+                sqlSourceCode.Index += index;
+
                 switch (sqlSourceCode.Current)
                 {
                     case '\'':
@@ -1222,7 +1203,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
             AdvanceSeparators();
 
-            if (!enclosed && SqlServerReservedKeywords.IsKeyword(identifier.Span))
+            if (!enclosed && SqlServerSyntaxFacts.IsKeyword(identifier.Span))
             {
                 return (null, null);
             }
@@ -1281,43 +1262,72 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             }
         }
 
-        private static class SqlServerReservedKeywords
+        private static class SqlServerSyntaxFacts
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool IsSeparator(char c)
+                => char.IsWhiteSpace(c) || c == ';';
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool IsIdentifierFirstCharacter(char c)
+                => char.IsLetter(c) || c == '_' || c == '@' || c == '#';
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool IsIdentifierPartCharacter(char c)
+                => char.IsLetterOrDigit(c) || c == '@' || c == '$' || c == '#' || c == '_';
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool IsNewLine(char ch)
+            {
+                // new-line-character:
+                //   Carriage return character (U+000D)
+                //   Line feed character (U+000A)
+                //   Next line character (U+0085)
+                //   Line separator character (U+2028)
+                //   Paragraph separator character (U+2029)
+
+                return ch == '\r'
+                    || ch == '\n'
+                    || ch == '\u0085'
+                    || ch == '\u2028'
+                    || ch == '\u2029';
+            }
+
             public static bool IsKeyword(scoped in ReadOnlySpan<char> identifier)
                 => KeywordsSpanLookup.Contains(identifier);
 
             public static readonly FrozenSet<string> Keywords = new[] {
-                "ABSOLUTE", "EXEC", "OVERLAPS", "ACTION", "EXECUTE", "PAD", "ADA", "EXISTS", "PARTIAL", "ADD", 
-                "EXTERNAL", "PASCAL", "ALL", "EXTRACT", "POSITION", "ALLOCATE", "FALSE", "PRECISION", 
-                "ALTER", "FETCH", "PREPARE", "AND", "FIRST", "PRESERVE", "ANY", "FLOAT", "PRIMARY", "ARE", 
-                "FOR", "PRIOR", "AS", "FOREIGN", "PRIVILEGES", "ASC", "FORTRAN", "PROCEDURE", "ASSERTION", 
-                "FOUND", "PUBLIC", "AT", "FROM", "READ", "AUTHORIZATION", "FULL", "REAL", "AVG", "GET", "REFERENCES", 
-                "BEGIN", "GLOBAL", "RELATIVE", "BETWEEN", "GO", "RESTRICT", "BIT", "GOTO", "REVOKE", "BIT_LENGTH", 
-                "GRANT", "RIGHT", "BOTH", "GROUP", "ROLLBACK", "BY", "HAVING", "ROWS", "CASCADE", "HOUR", "SCHEMA", 
-                "CASCADED", "IDENTITY", "SCROLL", "CASE", "IMMEDIATE", "SECOND", "CAST", "IN", "SECTION", "CATALOG", 
-                "INCLUDE", "SELECT", "CHAR", "INDEX", "SESSION", "CHAR_LENGTH", "INDICATOR", "SESSION_USER", "CHARACTER", 
-                "INITIALLY", "SET", "CHARACTER_LENGTH", "INNER", "SIZE", "CHECK", "INPUT", "SMALLINT", "CLOSE", 
-                "INSENSITIVE", "SOME", "COALESCE", "INSERT", "SPACE", "COLLATE", "INT", "SQL", "COLLATION", "INTEGER", 
-                "SQLCA", "COLUMN", "INTERSECT", "SQLCODE", "COMMIT", "INTERVAL", "SQLERROR", "CONNECT", "INTO", 
-                "SQLSTATE", "CONNECTION", "IS", "SQLWARNING", "CONSTRAINT", "ISOLATION", "SUBSTRING", "CONSTRAINTS", 
+                "ABSOLUTE", "EXEC", "OVERLAPS", "ACTION", "EXECUTE", "PAD", "ADA", "EXISTS", "PARTIAL", "ADD",
+                "EXTERNAL", "PASCAL", "ALL", "EXTRACT", "POSITION", "ALLOCATE", "FALSE", "PRECISION",
+                "ALTER", "FETCH", "PREPARE", "AND", "FIRST", "PRESERVE", "ANY", "FLOAT", "PRIMARY", "ARE",
+                "FOR", "PRIOR", "AS", "FOREIGN", "PRIVILEGES", "ASC", "FORTRAN", "PROCEDURE", "ASSERTION",
+                "FOUND", "PUBLIC", "AT", "FROM", "READ", "AUTHORIZATION", "FULL", "REAL", "AVG", "GET", "REFERENCES",
+                "BEGIN", "GLOBAL", "RELATIVE", "BETWEEN", "GO", "RESTRICT", "BIT", "GOTO", "REVOKE", "BIT_LENGTH",
+                "GRANT", "RIGHT", "BOTH", "GROUP", "ROLLBACK", "BY", "HAVING", "ROWS", "CASCADE", "HOUR", "SCHEMA",
+                "CASCADED", "IDENTITY", "SCROLL", "CASE", "IMMEDIATE", "SECOND", "CAST", "IN", "SECTION", "CATALOG",
+                "INCLUDE", "SELECT", "CHAR", "INDEX", "SESSION", "CHAR_LENGTH", "INDICATOR", "SESSION_USER", "CHARACTER",
+                "INITIALLY", "SET", "CHARACTER_LENGTH", "INNER", "SIZE", "CHECK", "INPUT", "SMALLINT", "CLOSE",
+                "INSENSITIVE", "SOME", "COALESCE", "INSERT", "SPACE", "COLLATE", "INT", "SQL", "COLLATION", "INTEGER",
+                "SQLCA", "COLUMN", "INTERSECT", "SQLCODE", "COMMIT", "INTERVAL", "SQLERROR", "CONNECT", "INTO",
+                "SQLSTATE", "CONNECTION", "IS", "SQLWARNING", "CONSTRAINT", "ISOLATION", "SUBSTRING", "CONSTRAINTS",
                 "JOIN", "SUM", "CONTINUE", "KEY", "SYSTEM_USER", "CONVERT", "LANGUAGE", "TABLE", "CORRESPONDING",
                 "LAST", "TEMPORARY", "COUNT", "LEADING", "THEN", "CREATE", "LEFT", "TIME", "CROSS", "LEVEL", "TIMESTAMP",
-                "CURRENT", "LIKE", "TIMEZONE_HOUR", "CURRENT_DATE", "LOCAL", "TIMEZONE_MINUTE", "CURRENT_TIME", 
-                "LOWER", "TO", "CURRENT_TIMESTAMP", "MATCH", "TRAILING", "CURRENT_USER", "MAX", "CURSOR", "MIN", 
-                "TRANSLATE", "DATE", "MINUTE", "TRANSLATION", "DAY", "MODULE", "TRIM", "DEALLOCATE", "MONTH", "TRUE", 
-                "DEC", "NAMES", "UNION", "DECIMAL", "NATIONAL", "UNIQUE", "DECLARE", "NATURAL", "UNKNOWN", "DEFAULT", 
-                "NCHAR", "UPDATE", "DEFERRABLE", "NEXT", "UPPER", "DEFERRED", "NO", "USAGE", "DELETE", "NONE", "USER", 
-                "DESC", "NOT", "USING", "DESCRIBE", "NULL", "VALUE", "DESCRIPTOR", "NULLIF", "VALUES", "DIAGNOSTICS", 
-                "NUMERIC", "VARCHAR", "DISCONNECT", "OCTET_LENGTH", "VARYING", "DISTINCT", "OF", "VIEW", "DOMAIN", 
-                "ON", "WHEN", "DOUBLE", "ONLY", "WHENEVER", "DROP", "OPEN", "WHERE", "ELSE", "WITH", "END", "OR", "WORK", 
-                "END-EXEC", "ORDER", "WRITE", "ESCAPE", "OUTER", "YEAR", "EXCEPT", "OUTPUT", "ZONE", "EXCEPTION", 
-                "FILE", "RAISERROR", "FILLFACTOR", "READTEXT", "RECONFIGURE", "FREETEXT", "FREETEXTTABLE", "REPLICATION", 
-                "BACKUP", "RESTORE", "FUNCTION", "RETURN", "BREAK", "REVERT", "BROWSE", "BULK", "HOLDLOCK", "ROWCOUNT", 
+                "CURRENT", "LIKE", "TIMEZONE_HOUR", "CURRENT_DATE", "LOCAL", "TIMEZONE_MINUTE", "CURRENT_TIME",
+                "LOWER", "TO", "CURRENT_TIMESTAMP", "MATCH", "TRAILING", "CURRENT_USER", "MAX", "CURSOR", "MIN",
+                "TRANSLATE", "DATE", "MINUTE", "TRANSLATION", "DAY", "MODULE", "TRIM", "DEALLOCATE", "MONTH", "TRUE",
+                "DEC", "NAMES", "UNION", "DECIMAL", "NATIONAL", "UNIQUE", "DECLARE", "NATURAL", "UNKNOWN", "DEFAULT",
+                "NCHAR", "UPDATE", "DEFERRABLE", "NEXT", "UPPER", "DEFERRED", "NO", "USAGE", "DELETE", "NONE", "USER",
+                "DESC", "NOT", "USING", "DESCRIBE", "NULL", "VALUE", "DESCRIPTOR", "NULLIF", "VALUES", "DIAGNOSTICS",
+                "NUMERIC", "VARCHAR", "DISCONNECT", "OCTET_LENGTH", "VARYING", "DISTINCT", "OF", "VIEW", "DOMAIN",
+                "ON", "WHEN", "DOUBLE", "ONLY", "WHENEVER", "DROP", "OPEN", "WHERE", "ELSE", "WITH", "END", "OR", "WORK",
+                "END-EXEC", "ORDER", "WRITE", "ESCAPE", "OUTER", "YEAR", "EXCEPT", "OUTPUT", "ZONE", "EXCEPTION",
+                "FILE", "RAISERROR", "FILLFACTOR", "READTEXT", "RECONFIGURE", "FREETEXT", "FREETEXTTABLE", "REPLICATION",
+                "BACKUP", "RESTORE", "FUNCTION", "RETURN", "BREAK", "REVERT", "BROWSE", "BULK", "HOLDLOCK", "ROWCOUNT",
                 "ROWGUIDCOL", "IDENTITY_INSERT", "RULE", "CHECKPOINT", "IDENTITYCOL", "SAVE", "IF", "CLUSTERED",
                 "SECURITYAUDIT", "SEMANTICKEYPHRASETABLE", "SEMANTICSIMILARITYDETAILSTABLE", "SEMANTICSIMILARITYTABLE",
                 "COMPUTE", "CONTAINS", "SETUSER", "CONTAINSTABLE", "SHUTDOWN", "KILL", "STATISTICS", "LINENO", "LOAD",
                 "TABLESAMPLE", "MERGE", "TEXTSIZE", "NOCHECK", "NONCLUSTERED", "TOP", "TRAN", "DATABASE", "TRANSACTION",
-                "DBCC", "TRIGGER", "TRUNCATE", "OFF", "TRY_CONVERT", "OFFSETS", "TSEQUAL", "DENY", "OPENDATASOURCE", 
+                "DBCC", "TRIGGER", "TRUNCATE", "OFF", "TRY_CONVERT", "OFFSETS", "TSEQUAL", "DENY", "OPENDATASOURCE",
                 "UNPIVOT", "DISK", "OPENQUERY", "OPENROWSET", "UPDATETEXT", "DISTRIBUTED", "OPENXML", "USE", "OPTION",
                 "DUMP", "OVER", "WAITFOR", "ERRLVL", "PERCENT", "PIVOT", "PLAN", "WHILE", "WITHIN GROUP", "PRINT",
                 "WRITETEXT", "EXIT", "PROC" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
