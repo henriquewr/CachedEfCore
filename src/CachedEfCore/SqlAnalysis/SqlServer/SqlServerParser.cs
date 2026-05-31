@@ -25,27 +25,33 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AdvanceSeparators()
         {
+            var sqlSourceCode = _sqlSourceCode;
+
             while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(SqlServerSyntaxFacts.IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
             {
             }
         }
 
-        private IEnumerable<ReadOnlyMemory<char>> GetResult()
+        private HashSet<ReadOnlyMemory<char>> GetResult()
         {
+            var result = new HashSet<ReadOnlyMemory<char>>(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
+
             foreach (var item in _tablesIdentifiers)
             {
                 if (_tablesAliases.TryGetValue(item, out var aliases))
                 {
                     foreach (var alias in aliases)
                     {
-                        yield return alias;
+                        result.Add(alias);
                     }
                 }
                 else
                 {
-                    yield return item;
+                    result.Add(item);
                 }
             }
+
+            return result;
         }
 
         private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE"], StringComparison.OrdinalIgnoreCase);
@@ -59,75 +65,80 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             _sqlSourceCode = new SqlSourceCode(sql);
 
-            AdvanceSeparators();
-
-            while (_sqlSourceCode.HasCurrent())
+            try
             {
-                var current = _sqlSourceCode.Current;
+                AdvanceSeparators();
 
-                switch (current)
+                while (_sqlSourceCode.HasCurrent())
                 {
-                    case 'u'
-                        when IsOnlyText("UPDATE"):
-                    case 'U'
-                        when IsOnlyText("UPDATE"):
-                        ParseUpdate();
-                        break;
+                    var current = _sqlSourceCode.Current;
 
-                    case 'd'
-                        when IsOnlyText("DELETE"):
-                    case 'D'
-                        when IsOnlyText("DELETE"):
-                        ParseDelete();
-                        break;
+                    switch (current)
+                    {
+                        case 'u'
+                            when IsOnlyText("UPDATE"):
+                        case 'U'
+                            when IsOnlyText("UPDATE"):
+                            ParseUpdate();
+                            break;
 
-                    case 'i'
-                        when IsOnlyText("INSERT"):
-                    case 'I'
-                        when IsOnlyText("INSERT"):
-                        ParseInsert();
-                        break;
+                        case 'd'
+                            when IsOnlyText("DELETE"):
+                        case 'D'
+                            when IsOnlyText("DELETE"):
+                            ParseDelete();
+                            break;
 
-                    case 'm'
-                        when IsOnlyText("MERGE"):
-                    case 'M'
-                        when IsOnlyText("MERGE"):
-                        ParseMerge();
-                        break;
+                        case 'i'
+                            when IsOnlyText("INSERT"):
+                        case 'I'
+                            when IsOnlyText("INSERT"):
+                            ParseInsert();
+                            break;
 
-                    case '(':
-                        ParseParenthesisExpression();
-                        AdvanceSeparators();
-                        break;
+                        case 'm'
+                            when IsOnlyText("MERGE"):
+                        case 'M'
+                            when IsOnlyText("MERGE"):
+                            ParseMerge();
+                            break;
 
-                    case '\'':
-                        ParseStringLiteral();
-                        AdvanceSeparators();
-                        break;
-
-                    default:
-                        if (CanBeIdentifier())
-                        {
-                            ParseIdentifierOrMemberExpression(out _);
+                        case '(':
+                            ParseParenthesisExpression();
                             AdvanceSeparators();
-                        }
-                        else
-                        {
-                            _sqlSourceCode.Advance();
-                        }
-                        break;
+                            break;
+
+                        case '\'':
+                            ParseStringLiteral();
+                            AdvanceSeparators();
+                            break;
+
+                        default:
+                            if (CanBeIdentifier())
+                            {
+                                ParseIdentifierOrMemberExpression(out _);
+                                AdvanceSeparators();
+                            }
+                            else
+                            {
+                                _sqlSourceCode.Advance();
+                            }
+                            break;
+                    }
                 }
+
+                var result = GetResult().ToHashSet();
+
+                return result;
             }
+            finally
+            {
+                _sqlSourceCode.Dispose();
+                _sqlSourceCode = null!;
 
-            var result = GetResult().ToHashSet();
-
-            _sqlSourceCode.Dispose();
-            _sqlSourceCode = null!;
-
-            _tablesIdentifiers.Clear();
-            _tablesAliases.Clear();
-
-            return result;
+                _tablesIdentifiers.Clear();
+                _tablesAliases.Clear();
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool IsOnlyText(scoped in ReadOnlySpan<char> text)
