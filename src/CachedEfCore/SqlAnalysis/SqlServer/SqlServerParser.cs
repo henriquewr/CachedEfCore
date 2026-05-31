@@ -54,7 +54,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             return result;
         }
 
-        private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE"], StringComparison.OrdinalIgnoreCase);
+        private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE"], StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
@@ -101,6 +101,13 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         case 'M'
                             when IsOnlyText("MERGE"):
                             ParseMerge();
+                            break;
+
+                        case 't'
+                            when IsOnlyText("TRUNCATE"):
+                        case 'T'
+                            when IsOnlyText("TRUNCATE"):
+                            ParseTruncate();
                             break;
 
                         case '(':
@@ -748,6 +755,34 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                     sqlSourceCode.TryAdvanceText("VALUES");
                 }
 
+                AdvanceSeparators();
+            }
+        }
+
+        private void ParseTruncate()
+        {
+            // https://learn.microsoft.com/en-us/sql/t-sql/statements/truncate-table-transact-sql?view=sql-server-ver17
+
+            AdvanceSeparators();
+
+            var sqlSourceCode = _sqlSourceCode;
+
+            sqlSourceCode.TryAdvanceText("TABLE");
+            AdvanceSeparators();
+
+            var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
+            _tablesIdentifiers.Add(identifier);
+            AdvanceSeparators();
+
+            if (sqlSourceCode.HasCurrent())
+            {
+                return;
+            }
+
+            if (sqlSourceCode.TryAdvanceText("WITH"))
+            {
+                AdvanceSeparators();
+                ParseParenthesisExpression();
                 AdvanceSeparators();
             }
         }
