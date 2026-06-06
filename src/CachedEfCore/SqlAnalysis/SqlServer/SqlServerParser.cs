@@ -151,7 +151,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             bool IsOnlyText(scoped in ReadOnlySpan<char> text)
                 => _sqlSourceCode.TryAdvanceText(text) && SqlServerSyntaxFacts.IsIdentifierPartCharacter(_sqlSourceCode.Current) == false;
         }
-
+                
         private void ParseInsert()
         {
             // https://learn.microsoft.com/en-us/sql/t-sql/statements/insert-transact-sql?view=sql-server-ver17
@@ -861,7 +861,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         var startIndex = _sqlSourceCode.Index;
                         _sqlSourceCode.Expect(SqlServerSyntaxFacts.IsIdentifierFirstCharacter);
                         _sqlSourceCode.AdvanceUntil(static c => !SqlServerSyntaxFacts.IsIdentifierPartCharacter(c));
-
+                    
                         var identifier = _sqlSourceCode.Sql.AsMemory(startIndex, _sqlSourceCode.Index - startIndex);
 
                         // may be a reserved Keyword
@@ -973,8 +973,33 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
         private void AdvanceUntilNonExpressionKeyword(Func<ReadOnlySpan<char>, (bool IsEnd, bool ReturnToLastIndexWhenIsEnd)> isEnd)
         {
-            // TODO do not stop on CASE expr
-            AdvanceUntilKeyword(keyword => isEnd(keyword));
+            AdvanceUntilKeyword(keyword => 
+            {
+                if (keyword.Equals("CASE", StringComparison.OrdinalIgnoreCase))
+                {
+                    ParseCase();
+                    return (false, false);
+                }
+                return isEnd(keyword);
+            });
+        }
+
+        private void ParseCase()
+        {
+            var caseCount = 1;
+            AdvanceUntilKeyword(keyword =>
+            {
+                if (keyword.Equals("CASE", StringComparison.OrdinalIgnoreCase))
+                {
+                    caseCount++;
+                }
+                else if (keyword.Equals("END", StringComparison.OrdinalIgnoreCase))
+                {
+                    caseCount--;
+                    return (caseCount == 0, false);
+                }
+                return (false, false);
+            });
         }
 
         private void AdvanceUntilKeyword(Func<ReadOnlySpan<char>, (bool IsEnd, bool ReturnToLastIndexWhenIsEnd)> isEnd)
