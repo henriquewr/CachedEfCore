@@ -655,5 +655,115 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.MergeParsing
 
             Assert.Equal(["Audit", "Test"], identifiers.Select(x => x.ToString()).Order());
         }
+
+        [Theory]
+        [InlineData("""
+            MERGE Test AS target
+            USING Source AS source
+            ON CASE
+                   WHEN source.Id > 0
+                       THEN CASE WHEN target.Id = source.Id THEN 1 ELSE 0 END
+                   ELSE 0
+               END = 1
+            WHEN NOT MATCHED THEN
+                INSERT (Id, Value)
+                VALUES (source.Id, source.Value)
+            OUTPUT $action, inserted.Id
+            INTO Audit
+            OPTION (HASH JOIN);
+            """)]
+        public void Merge_On_Case(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Audit", "Test"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
+            MERGE Test AS target
+            USING Source AS source
+            ON target.Id = source.Id
+            WHEN NOT MATCHED AND
+               CASE
+                   WHEN source.Value IS NOT NULL THEN 1
+                   ELSE 0
+               END = 1
+            THEN
+                INSERT (Id, Value)
+                VALUES (source.Id, source.Value)
+            OUTPUT $action, inserted.Id
+            INTO Audit
+            OPTION (HASH JOIN);
+            """)]
+
+        [InlineData("""
+            MERGE Test AS target
+            USING Source AS source
+            ON target.Id = source.Id
+            WHEN NOT MATCHED BY TARGET AND
+               CASE
+                   WHEN source.Value IS NOT NULL THEN 1
+                   ELSE 0
+               END = 1
+            THEN
+                INSERT (Id, Value)
+                VALUES (source.Id, source.Value)
+            OUTPUT $action, inserted.Id
+            INTO Audit
+            OPTION (HASH JOIN);
+            """)]
+        public void Merge_Not_Matched_By_Target_And_Case(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Audit", "Test"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
+            MERGE Test AS target
+            USING Source AS source
+            ON target.Id = source.Id
+            WHEN NOT MATCHED BY SOURCE AND
+                CASE
+                    WHEN source.Value IS NOT NULL THEN 1
+                    ELSE 0
+                END = 1
+            THEN
+                UPDATE SET target.Value = source.Value
+            OUTPUT $action, inserted.Id
+            INTO Audit
+            OPTION (HASH JOIN);
+            """)]
+        public void Merge_Not_Matched_By_Source_And_Case(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Audit", "Test"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
+            MERGE Test AS target
+            USING Source AS source
+            ON target.Id = source.Id
+            WHEN MATCHED AND
+                CASE
+                    WHEN source.Value IS NOT NULL THEN 1
+                    ELSE 0
+                END = 1
+            THEN
+                UPDATE SET target.Value = source.Value
+            OUTPUT $action, inserted.Id
+            INTO Audit
+            OPTION (HASH JOIN);
+            """)]
+        public void Merge_Matched_And_Case(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Audit", "Test"], identifiers.Select(x => x.ToString()).Order());
+        }
     }
 }
