@@ -54,7 +54,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             return result;
         }
 
-        private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE"], StringComparison.OrdinalIgnoreCase);
+        private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "BULK"], StringComparison.OrdinalIgnoreCase);
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
             return value.ContainsAny(StateChangingKeywords);
@@ -107,6 +107,13 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                         case 'T'
                             when IsOnlyText("TRUNCATE"):
                             ParseTruncate();
+                            break;
+
+                        case 'b'
+                            when IsOnlyText("BULK"):
+                        case 'B'
+                            when IsOnlyText("BULK"):
+                            ParseBulkInsert();
                             break;
 
                         case '(':
@@ -777,6 +784,34 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             {
                 return;
             }
+
+            if (sqlSourceCode.TryAdvanceText("WITH"))
+            {
+                AdvanceSeparators();
+                ParseParenthesisExpression();
+                AdvanceSeparators();
+            }
+        }
+
+        private void ParseBulkInsert()
+        {
+            // https://learn.microsoft.com/en-us/sql/t-sql/statements/bulk-insert-transact-sql?view=sql-server-ver17
+
+            AdvanceSeparators();
+
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (!sqlSourceCode.TryAdvanceText("INSERT"))
+            {
+                return;
+            }
+
+            var identifier = ParseIdentifierOrMemberExpression(out var enclosed, out var _);
+            _tablesIdentifiers.Add(identifier);
+            AdvanceSeparators();
+
+            sqlSourceCode.TryAdvanceText("FROM");
+            AdvanceSeparators();
 
             if (sqlSourceCode.TryAdvanceText("WITH"))
             {
