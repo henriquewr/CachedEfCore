@@ -27,7 +27,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             var sqlSourceCode = _sqlSourceCode;
 
-            while (_sqlSourceCode.HasCurrent() && (_sqlSourceCode.AdvanceIf(SqlServerSyntaxFacts.IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
+            while (sqlSourceCode.HasCurrent() && (sqlSourceCode.AdvanceIf(SqlServerSyntaxFacts.IsSeparator) || TryParseMultiLineComment() || TryParseSingleLineComment()))
             {
             }
         }
@@ -55,7 +55,6 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         }
 
         private readonly static SearchValues<string> StateChangingKeywords = SearchValues.Create(["INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE"], StringComparison.OrdinalIgnoreCase);
-
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
             return value.ContainsAny(StateChangingKeywords);
