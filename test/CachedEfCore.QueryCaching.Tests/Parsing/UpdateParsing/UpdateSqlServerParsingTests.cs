@@ -226,5 +226,107 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
+
+        [Theory]
+        [InlineData("""
+        WITH Cte AS
+        (
+            SELECT *
+            FROM Test
+        )
+        UPDATE u
+        SET u.Value = u.Value + 1
+        OUTPUT inserted.Value AS NewValue,
+               deleted.Value AS OldValue,
+               inserted.Value2 AS Value2
+        INTO Test2
+        FROM Cte u;
+        """)]
+        [InlineData("""
+        WITH Cte AS
+        (
+            SELECT *
+            FROM Test
+        )
+        UPDATE Cte
+        SET Value = Value + 1
+        OUTPUT inserted.Value AS NewValue,
+               deleted.Value AS OldValue,
+               inserted.Value2 AS Value2
+        INTO Test2
+        FROM Test3 u;
+        """)]
+        public void Cte(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Fact]
+        public void Unused_Cte()
+        {
+            var identifiers = _sqlServerParser.Parse("""
+            WITH Cte AS
+            (
+                SELECT *
+                FROM Test
+            )
+            UPDATE u
+            SET Value = Value + 1
+            OUTPUT inserted.Value AS NewValue,
+                   deleted.Value AS OldValue,
+                   inserted.Value2 AS Value2
+            INTO Test2
+            FROM Test3 u;
+            """);
+
+            Assert.Equal(["Test2", "Test3"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
+        WITH Filtered AS
+        (
+            SELECT *
+            FROM Test
+            WHERE IsActive = 0
+        ),
+        Target AS
+        (
+            SELECT *
+            FROM Filtered
+            WHERE Value2 IS NOT NULL
+        )
+        UPDATE Target
+        SET Value = Value + 1
+        OUTPUT inserted.Id
+        INTO Test2;
+        """)]
+        [InlineData("""
+        WITH Filtered AS
+        (
+            SELECT *
+            FROM Test
+            WHERE IsActive = 0
+        ),
+        Target AS
+        (
+            SELECT *
+            FROM Filtered
+            WHERE Value2 IS NOT NULL
+        )
+        UPDATE u
+        SET u.Value = u.Value + 1
+        OUTPUT inserted.Id
+        INTO Test2
+        FROM Target u;
+        """)]
+        public void Multiple_Ctes(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
     }
 }

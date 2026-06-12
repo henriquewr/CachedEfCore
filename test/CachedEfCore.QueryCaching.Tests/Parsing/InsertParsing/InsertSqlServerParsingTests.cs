@@ -142,5 +142,24 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
 
             Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
+
+
+        [Theory]
+        [InlineData("""
+        WITH Cte AS
+        (
+            SELECT *
+            FROM Test2
+        )
+        INSERT INTO Test (Value, Value2)
+        SELECT Value, Value2
+        FROM Cte;
+        """)]
+        public void Cte(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
     }
 }
