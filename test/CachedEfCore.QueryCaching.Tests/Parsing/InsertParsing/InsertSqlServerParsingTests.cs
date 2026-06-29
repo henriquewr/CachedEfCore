@@ -122,8 +122,8 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
             Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
 
-        [Fact(Skip = "Currently unsupported")]
-        public void Dml_Table_Source()
+        [Fact]
+        public void Dml_Table_Source_Merge()
         {
             var sql = """
             INSERT INTO Test (Value)
@@ -143,6 +143,138 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
             Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
 
+        [Fact]
+        public void Dml_Table_Source_Delete()
+        {
+            var sql = """
+            INSERT INTO Test (Value)
+            SELECT Value
+            FROM
+            (
+                DELETE FROM Test2
+                OUTPUT deleted.Value
+            ) AS x(Value);
+            """;
+
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Fact]
+        public void Dml_Table_Source_Update()
+        {
+            var sql = """
+            INSERT INTO Test (Value)
+            SELECT Value
+            FROM
+            (
+                UPDATE Test2
+                SET Value = 'Updated'
+                OUTPUT inserted.Value
+            ) AS x(Value);
+            """;
+
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Fact]
+        public void Dml_Table_Source_Insert()
+        {
+            var sql = """
+            INSERT INTO Test (Value)
+            SELECT Value
+            FROM
+            (
+                INSERT INTO Test2 (Value)
+                OUTPUT inserted.Value
+                VALUES ('Inserted')
+            ) AS x(Value);
+            """;
+
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT Value
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Value
+            VALUES ('Inserted')
+        ) table1 
+        WHERE 1 = 1 
+        OPTION (RECOMPILE);
+        """)]
+
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT Value
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Value
+            VALUES ('Inserted')
+        ) table1
+        OPTION (RECOMPILE);
+        """)]
+
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT Value
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Value
+            VALUES ('Inserted')
+        ) table1
+        WHERE 1 = 1;
+        """)]
+
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT Value
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Value
+            VALUES ('Inserted')
+        ) table1;
+        """)]
+
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT AliasValue
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Id, inserted.Value
+            VALUES ('Inserted')
+        ) table1 (AliasId, AliasValue);
+        """)]
+
+        [InlineData("""
+        INSERT INTO Test (Value)
+        SELECT table1.AliasId
+        FROM
+        (
+            INSERT INTO Test2 (Value)
+            OUTPUT inserted.Id
+            VALUES ('Inserted')
+        ) table1 (AliasId);
+        """)]
+        public void Dml_Table_Source(string sql)
+        {
+            var identifiers = _sqlServerParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
 
         [Theory]
         [InlineData("""

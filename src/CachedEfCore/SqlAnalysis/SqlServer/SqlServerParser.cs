@@ -175,7 +175,9 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             TryParseTopExpressionPercent();
 
-            if (_sqlSourceCode.TryAdvanceText("INTO"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (sqlSourceCode.TryAdvanceText("INTO"))
             {
                 AdvanceSeparators();
             }
@@ -185,18 +187,18 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("WITH"))
+            if (sqlSourceCode.TryAdvanceText("WITH"))
             {
                 AdvanceSeparators();
             }
 
-            if (_sqlSourceCode.Current == '(')
+            if (sqlSourceCode.Current == '(')
             {
                 ParseParenthesisExpression();
                 AdvanceSeparators();
             }
 
-            if (_sqlSourceCode.TryAdvanceText("OUTPUT"))
+            if (sqlSourceCode.TryAdvanceText("OUTPUT"))
             {
                 AdvanceSeparators();
                 ParseOutputClause(static keyword => keyword.Equals("VALUES", StringComparison.OrdinalIgnoreCase)
@@ -208,20 +210,24 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("VALUES"))
+            if (sqlSourceCode.TryAdvanceText("VALUES"))
             {
                 do
                 {
                     AdvanceSeparators();
                     ParseParenthesisExpression();
-                } while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(','));
+                } while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf(','));
 
                 AdvanceSeparators();
             }
-            else if (_sqlSourceCode.TryAdvanceText("DEFAULT"))
+            else if (sqlSourceCode.TryAdvanceText("SELECT"))
+            {
+                ParseSelect();
+            }
+            else if (sqlSourceCode.TryAdvanceText("DEFAULT"))
             {
                 AdvanceSeparators();
-                _sqlSourceCode.TryAdvanceText("VALUES");
+                sqlSourceCode.TryAdvanceText("VALUES");
                 AdvanceSeparators();
             }
         }
@@ -977,7 +983,30 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                 {
                     // FROM
                     case 1:
-                        fromTable = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
+                        if (sqlSourceCode.Current == '(')
+                        {
+                            ParseParenthesisExpressionWithDmlStatementWithOutputClause();
+                            AdvanceSeparators();
+                            if (sqlSourceCode.TryAdvanceText("AS"))
+                            {
+                                AdvanceSeparators();
+                            }
+
+                            var alias = ParseIdentifier(out var aliasEnclosed);
+                            AdvanceSeparators();
+                            if (!sqlSourceCode.HasCurrent())
+                            {
+                                return fromTable;
+                            }
+                            if (sqlSourceCode.Current == '(')
+                            {
+                                ParseParenthesisExpression();
+                            }
+                        }
+                        else
+                        {
+                            fromTable = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
+                        }
                         break;
 
                     // WHERE
@@ -1414,6 +1443,39 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             });
         }
 
+        private static readonly SearchValues<char> ParseParenthesisExpressionWithDmlStatementWithOutputClauseSearchValues = SearchValues.Create([.. ParseParenthesisExpressionSearchChars, 'D', 'd', 'I', 'i', 'U', 'u', 'M', 'm']);
+        private void ParseParenthesisExpressionWithDmlStatementWithOutputClause()
+        {
+            ParseParenthesisExpression(ParseParenthesisExpressionWithDmlStatementWithOutputClauseSearchValues, static sqlServerParser =>
+            {
+                switch (sqlServerParser._sqlSourceCode.Current)
+                {
+                    case 'D' or 'd'
+                        when sqlServerParser.IsOnlyText("DELETE"):
+                        sqlServerParser.ParseDelete();
+                        break;
+
+                    case 'I' or 'i'
+                        when sqlServerParser.IsOnlyText("INSERT"):
+                        sqlServerParser.ParseInsert();
+                        break;
+
+                    case 'U' or 'u'
+                        when sqlServerParser.IsOnlyText("UPDATE"):
+                        sqlServerParser.ParseUpdate();
+                        break;
+
+                    case 'M' or 'm'
+                        when sqlServerParser.IsOnlyText("MERGE"):
+                        sqlServerParser.ParseMerge();  
+                        break;
+
+                    default:
+                        sqlServerParser._sqlSourceCode.Advance();
+                        break;
+                }
+            });
+        }
         private void ParseParenthesisExpression(SearchValues<char> searchValues, Action<SqlServerParser> onDefault)
         {
             var sqlSourceCode = _sqlSourceCode;
