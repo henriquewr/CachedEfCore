@@ -175,7 +175,9 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             TryParseTopExpressionPercent();
 
-            if (_sqlSourceCode.TryAdvanceText("INTO"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (sqlSourceCode.TryAdvanceText("INTO"))
             {
                 AdvanceSeparators();
             }
@@ -185,18 +187,18 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("WITH"))
+            if (sqlSourceCode.TryAdvanceText("WITH"))
             {
                 AdvanceSeparators();
             }
 
-            if (_sqlSourceCode.Current == '(')
+            if (sqlSourceCode.Current == '(')
             {
                 ParseParenthesisExpression();
                 AdvanceSeparators();
             }
 
-            if (_sqlSourceCode.TryAdvanceText("OUTPUT"))
+            if (sqlSourceCode.TryAdvanceText("OUTPUT"))
             {
                 AdvanceSeparators();
                 ParseOutputClause(static keyword => keyword.Equals("VALUES", StringComparison.OrdinalIgnoreCase)
@@ -208,24 +210,24 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("VALUES"))
+            if (sqlSourceCode.TryAdvanceText("VALUES"))
             {
                 do
                 {
                     AdvanceSeparators();
                     ParseParenthesisExpression();
-                } while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(','));
+                } while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf(','));
 
                 AdvanceSeparators();
             }
-            else if (_sqlSourceCode.TryAdvanceText("SELECT"))
+            else if (sqlSourceCode.TryAdvanceText("SELECT"))
             {
                 ParseSelect();
             }
-            else if (_sqlSourceCode.TryAdvanceText("DEFAULT"))
+            else if (sqlSourceCode.TryAdvanceText("DEFAULT"))
             {
                 AdvanceSeparators();
-                _sqlSourceCode.TryAdvanceText("VALUES");
+                sqlSourceCode.TryAdvanceText("VALUES");
                 AdvanceSeparators();
             }
         }
