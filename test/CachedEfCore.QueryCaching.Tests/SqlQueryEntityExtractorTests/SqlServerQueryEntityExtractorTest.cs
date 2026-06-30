@@ -1,6 +1,7 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -8,18 +9,21 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
-namespace CachedEfCore.SqlQueryEntityExtractor.Tests
+namespace CachedEfCore.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
 {
-    public class QueryCaching : SqlQueryEntityExtractorTestBase, IClassFixture<ServiceProviderFixture>
+    public class SqlServerQueryEntityExtractorTest : SqlQueryEntityExtractorTestBase, IClassFixture<ServiceProviderFixture>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly CachedDbContext _dbContext;
-        public QueryCaching(ServiceProviderFixture serviceProviderFixture)
+        private readonly Dictionary<Type, IEntityType> _entityTypeMapping;
+        public SqlServerQueryEntityExtractorTest(ServiceProviderFixture serviceProviderFixture)
         {
             _serviceProviderFixture = serviceProviderFixture;
             _dbContext = CreateProvider().CreateScope().ServiceProvider.GetRequiredService<TestDbContext>();
+            _entityTypeMapping = _dbContext.Model.GetEntityTypes().ToDictionary(k => k.ClrType);
         }
 
         protected virtual IServiceProvider CreateProvider()
@@ -47,7 +51,7 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
 
         private IEntityType GetIEntityType(Type entityType)
         {
-            return _dbContext.Model.GetEntityTypes().First(x => x.ClrType == entityType);
+            return _entityTypeMapping[entityType];
         }
 
         private string GetTableName(Type entityType)
@@ -250,6 +254,26 @@ namespace CachedEfCore.SqlQueryEntityExtractor.Tests
         public void Extract_Entities_From_Insert_Query(TestCase testCase)
         {
             Test(testCase);
+        }
+
+        [Fact]
+        public void Extract_Entities_Should_Be_Thread_Safe()
+        {
+            var testCases = new List<TestCase>();
+
+            testCases.AddRange(GetInsertTestCasesData());
+            testCases.AddRange(GetUpdateTestCasesData());
+            testCases.AddRange(GetDeleteTestCasesData());
+
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 10
+            };
+
+            Parallel.For(0, 5000, parallelOptions, i =>
+            {
+                Parallel.ForEach(testCases, parallelOptions, Test);
+            });
         }
 
         private void Test(TestCase testCase)

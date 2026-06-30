@@ -1,9 +1,8 @@
-﻿using CachedEfCore.Configuration;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 
-namespace CachedEfCore.DependencyInjection
+namespace CachedEfCore.Configuration
 {
     public partial class CachedEfCoreOptionsBuilder
     {

@@ -1,6 +1,7 @@
 ﻿using CachedEfCore.Cache.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;

@@ -6,6 +6,7 @@ using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlAnalysis;
+using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;

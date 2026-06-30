@@ -8,7 +8,6 @@ using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using System;
 using System.Text.Json;
 
 namespace CachedEfCore.DependencyInjection
