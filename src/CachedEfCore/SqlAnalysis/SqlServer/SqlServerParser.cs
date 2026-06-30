@@ -40,9 +40,11 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
         {
             var result = new HashSet<ReadOnlyMemory<char>>(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
 
+            var tablesAliases = _tablesAliases;
+
             foreach (var item in _tablesIdentifiers)
             {
-                if (_tablesAliases.TryGetValue(item, out var aliases))
+                if (tablesAliases.TryGetValue(item, out var aliases))
                 {
                     PopulateTables(aliases);
                 }
@@ -58,7 +60,7 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             {
                 foreach (var alias in aliases)
                 {
-                    if (_tablesAliases.TryGetValue(alias, out var nestedAliases))
+                    if (tablesAliases.TryGetValue(alias, out var nestedAliases))
                     {
                         PopulateTables(nestedAliases);
                     }
@@ -410,7 +412,9 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
             TryParseTopExpressionPercent();
 
-            if (_sqlSourceCode.TryAdvanceText("FROM"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (sqlSourceCode.TryAdvanceText("FROM"))
             {
                 AdvanceSeparators();
             }
@@ -419,23 +423,23 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             AddTableIdentifier(identifier);
             AdvanceSeparators();
 
-            if (_sqlSourceCode.TryAdvanceText("OUTPUT"))
+            if (sqlSourceCode.TryAdvanceText("OUTPUT"))
             {
                 ParseOutputClause();
                 AdvanceSeparators();
             }
 
-            if (_sqlSourceCode.TryAdvanceText("FROM"))
+            if (sqlSourceCode.TryAdvanceText("FROM"))
             {
                 AdvanceSeparators();
             }
-            else if (_sqlSourceCode.TryAdvanceText("OPTION"))
+            else if (sqlSourceCode.TryAdvanceText("OPTION"))
             {
                 ParseOptionClause();
                 AdvanceSeparators();
             }
 
-            if (!_sqlSourceCode.HasCurrent())
+            if (!sqlSourceCode.HasCurrent())
             {
                 return;
             }
@@ -1062,7 +1066,9 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             // update[identifier]
             AdvanceSeparators();
 
-            switch (_sqlSourceCode.Current)
+            var sqlSourceCode = _sqlSourceCode;
+
+            switch (sqlSourceCode.Current)
             {
                 case '[':
                     {
@@ -1073,14 +1079,14 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                         if (!identifier.Escaped)
                         {
-                            var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
+                            var enclosingIdentifier = sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
                             return enclosingIdentifier;
                         }
                         else
                         {
                             // [really]]bad]]identifier] is a valid identifier -> really]bad]identifier
 
-                            var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
+                            var enclosingIdentifier = sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
 
                             enclosingIdentifier = enclosingIdentifier.Replace("]]", "]");
 
@@ -1096,14 +1102,14 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
                         if (identifier.DoubleQuotesCount == 2)
                         {
-                            var enclosingIdentifier = _sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
+                            var enclosingIdentifier = sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
                             return enclosingIdentifier;
                         }
                         else
                         {
                             // "really""bad""identifier" is a valid identifier -> really"bad"identifier
 
-                            var enclosingIdentifier = _sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
+                            var enclosingIdentifier = sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
 
                             enclosingIdentifier = enclosingIdentifier.Replace("\"\"", "\"");
 
@@ -1115,11 +1121,11 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
                     {
                         // https://learn.microsoft.com/en-sg/sql/relational-databases/databases/database-identifiers?view=sql-server-ver17#rules-for-regular-identifiers
 
-                        var startIndex = _sqlSourceCode.Index;
-                        _sqlSourceCode.Expect(SqlServerSyntaxFacts.IsIdentifierFirstCharacter);
-                        _sqlSourceCode.AdvanceUntil(static c => !SqlServerSyntaxFacts.IsIdentifierPartCharacter(c));
+                        var startIndex = sqlSourceCode.Index;
+                        sqlSourceCode.Expect(SqlServerSyntaxFacts.IsIdentifierFirstCharacter);
+                        sqlSourceCode.AdvanceUntil(static c => !SqlServerSyntaxFacts.IsIdentifierPartCharacter(c));
                     
-                        var identifier = _sqlSourceCode.Sql.AsMemory(startIndex, _sqlSourceCode.Index - startIndex);
+                        var identifier = sqlSourceCode.Sql.AsMemory(startIndex, sqlSourceCode.Index - startIndex);
 
                         // may be a reserved Keyword
                         enclosed = false;
@@ -1205,7 +1211,9 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
             var lastIdentifier = ParseIdentifier(out lastIsEnclosed);
             isMemberExpression = false;
 
-            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf('.'))
+            var sqlSourceCode = _sqlSourceCode;
+
+            while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf('.'))
             {
                 isMemberExpression = true;
                 AdvanceSeparators();
@@ -1392,12 +1400,14 @@ namespace CachedEfCore.SqlAnalysis.SqlServer
 
         private bool TryParseSingleLineComment()
         {
-            if (!_sqlSourceCode.TryAdvanceText("--"))
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (!sqlSourceCode.TryAdvanceText("--"))
             {
                 return false;
             }
 
-            while (_sqlSourceCode.HasCurrent() && _sqlSourceCode.AdvanceIf(static c => !SqlServerSyntaxFacts.IsNewLine(c)))
+            while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf(static c => !SqlServerSyntaxFacts.IsNewLine(c)))
             {
             }
 
