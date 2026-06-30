@@ -8,7 +8,7 @@ namespace CachedEfCore.DependencyManager
 {
     public partial class EntityDependency
     {
-        private record class AllEntitiesAllRelatedCacheKey(Type Type, bool UnderRelatedIncludingFks);
+        private sealed record class AllEntitiesAllRelatedCacheKey(Type Type, bool UnderRelatedIncludingFks);
 
         private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _allRelatedCache = new();
         private readonly ConcurrentDictionary<AllEntitiesAllRelatedCacheKey, FrozenSet<IEntityType>> _allEntitiesAllRelatedCache = new();

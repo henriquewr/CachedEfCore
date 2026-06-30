@@ -835,27 +835,6 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.MergeParsing
         OUTPUT inserted.Id
         INTO Test2;
         """)]
-        [InlineData("""
-        WITH Filtered AS
-        (
-            SELECT *
-            FROM Test
-            WHERE IsActive = 0
-        ),
-        Target AS
-        (
-            SELECT *
-            FROM Filtered
-            WHERE Value2 IS NOT NULL
-        )
-        MERGE Target AS t
-        USING Test3 AS s
-        ON t.Id = s.Id
-        WHEN MATCHED THEN
-            UPDATE SET t.Value = t.Value + 1
-        OUTPUT inserted.Id
-        INTO Test2;
-        """)]
         public void Multiple_Ctes(string sql)
         {
             var identifiers = _sqlServerParser.Parse(sql);

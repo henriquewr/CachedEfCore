@@ -261,9 +261,9 @@ namespace CachedEfCore.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
         {
             var testCases = new List<TestCase>();
 
-            testCases.AddRange(GetInsertTestCasesData());
-            testCases.AddRange(GetUpdateTestCasesData());
-            testCases.AddRange(GetDeleteTestCasesData());
+            testCases.AddRange(GetInsertTestCasesData().Select(x => x.Data));
+            testCases.AddRange(GetUpdateTestCasesData().Select(x => x.Data));
+            testCases.AddRange(GetDeleteTestCasesData().Select(x => x.Data));
 
             var parallelOptions = new ParallelOptions
             {

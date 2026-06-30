@@ -54,11 +54,16 @@ namespace CachedEfCore.KeyGeneration
         {
             IsDisposed = true;
             _memoryStream.Dispose();
+
+            GC.SuppressFinalize(this);
         }
 
         public ValueTask DisposeAsync()
         {
             IsDisposed = true;
+
+            GC.SuppressFinalize(this);
+
             return _memoryStream.DisposeAsync();
         }
     }

@@ -274,6 +274,8 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         public void Dispose()
         {
             _valuePrinter?.Dispose();
+
+            GC.SuppressFinalize(this);
         }
 
         public ValueTask DisposeAsync()
@@ -282,6 +284,8 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             {
                 return ValueTask.CompletedTask;
             }
+
+            GC.SuppressFinalize(this);
 
             return _valuePrinter.DisposeAsync();
         }

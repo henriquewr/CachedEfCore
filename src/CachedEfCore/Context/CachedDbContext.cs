@@ -40,11 +40,15 @@ namespace CachedEfCore.Context
         {
             DbQueryCacheStore.RemoveAllDbContextDependent(Id);
 
+            GC.SuppressFinalize(this);
+
             base.Dispose();
         }
         public override ValueTask DisposeAsync()
         {
             DbQueryCacheStore.RemoveAllDbContextDependent(Id);
+
+            GC.SuppressFinalize(this);
 
             return base.DisposeAsync();
         }
