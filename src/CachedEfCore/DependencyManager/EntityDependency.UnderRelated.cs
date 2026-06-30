@@ -5,13 +5,12 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
 namespace CachedEfCore.DependencyManager
 {
     public partial class EntityDependency
     {
-        private record class AllEntitiesUnderRelatedCacheKey(Type Type, bool RelatedInFks, bool IgnoreDependentOnEntityAttribute);
+        private sealed record class AllEntitiesUnderRelatedCacheKey(Type Type, bool RelatedInFks, bool IgnoreDependentOnEntityAttribute);
 
         private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _underRelatedCache = new();
         private readonly ConcurrentDictionary<AllEntitiesUnderRelatedCacheKey, FrozenSet<IEntityType>> _allEntitiesUnderRelatedCache = new();

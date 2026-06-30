@@ -1,5 +1,4 @@
 ﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Xunit;
-using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
@@ -393,8 +392,8 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 
             public void Deserialize(IXunitSerializationInfo info)
             {
-                var type = Type.GetType(info.GetValue<string>(nameof(Type)), throwOnError: true)!;
-                var expectedJson = info.GetValue<string>(nameof(Expected));
+                var type = Type.GetType(info.GetValue<string>(nameof(Type))!, throwOnError: true)!;
+                var expectedJson = info.GetValue<string>(nameof(Expected))!;
 
                 var expected = System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(expectedJson)!;
 
