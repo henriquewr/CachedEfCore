@@ -24,7 +24,7 @@ namespace CachedEfCore.DependencyManager
         {
             if (type is null)
             {
-                return [];
+                return new HashSet<Type>(0);
             }
 
             var visited = new HashSet<Type>();
