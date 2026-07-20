@@ -4,11 +4,11 @@ using System.Collections.Immutable;
 namespace CachedEfCore.DependencyManager.Attributes
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-    public class DependentOnEntity : Attribute
+    public class DependentOnEntityAttribute : Attribute
     {
-        public readonly ImmutableHashSet<Type> DependentEntities;
+        public ImmutableHashSet<Type> DependentEntities { get; }
 
-        public DependentOnEntity(params Type[] dependentEntities)
+        public DependentOnEntityAttribute(params Type[] dependentEntities)
         {
             DependentEntities = dependentEntities.ToImmutableHashSet();
         }

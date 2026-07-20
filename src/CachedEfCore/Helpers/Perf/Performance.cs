@@ -10,7 +10,7 @@ namespace CachedEfCore.Helpers.Perf
 #else
     internal
 #endif
-        class Performance
+        sealed class Performance
     {
         private static void ForceGC()
         {

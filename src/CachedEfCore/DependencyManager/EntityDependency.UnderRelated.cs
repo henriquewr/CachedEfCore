@@ -133,10 +133,11 @@ namespace CachedEfCore.DependencyManager
 
         private IEnumerable<IEntityType> GetEntitiesDependentOnEntityAttribute(Type type)
         {
-            var dependentOnEntity = type.GetCustomAttribute<DependentOnEntity>();
+            var dependentOnEntity = type.GetCustomAttribute<DependentOnEntityAttribute>();
 
-            if (dependentOnEntity != null)
+            if (dependentOnEntity is not null)
             {
+                //var typeEntity = _typeEntity;
                 foreach (var item in dependentOnEntity.DependentEntities)
                 {
                     if (_typeEntity.TryGetValue(item, out var entityType))

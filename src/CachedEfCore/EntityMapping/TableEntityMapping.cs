@@ -17,7 +17,7 @@ namespace CachedEfCore.EntityMapping
             return _tableEntityCache.GetOrAdd(dbContext.GetType(), key => new(dbContext.Model));
         }
 
-        public readonly FrozenDictionary<string, ImmutableArray<IEntityType>> Mapping;
+        public FrozenDictionary<string, ImmutableArray<IEntityType>> Mapping { get; }
 
         public TableEntityMapping(IModel dbModel)
         {

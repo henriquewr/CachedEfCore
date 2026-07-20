@@ -8,7 +8,7 @@ namespace CachedEfCore.KeyGeneration.EvalTypeChecker
 {
     public class TypeCompatibilityChecker : ITypeCompatibilityChecker
     {
-        public readonly ImmutableArray<Type> CompatibleTypes;
+        public ImmutableArray<Type> CompatibleTypes { get; }
         private readonly ConcurrentDictionary<Type, bool> _assignalableToAnyType;
 
         public TypeCompatibilityChecker(IEnumerable<Type> types)

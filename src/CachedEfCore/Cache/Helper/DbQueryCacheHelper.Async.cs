@@ -9,18 +9,18 @@ namespace CachedEfCore.Cache.Helper
     public partial class DbQueryCacheHelper : IDbQueryCacheHelper
     {
         [OverloadResolutionPriority(-1)]
-        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
            ICachedDbContext dbContext,
-           Func<Task<ReturnType>> getDataFromDatabase,
+           Func<Task<TReturnType>> getDataFromDatabase,
            object?[] query)
         {
-            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
         [OverloadResolutionPriority(-1)]
-        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
            Type rootEntity,
            ICachedDbContext dbContext,
-           Func<Task<ReturnType>> getDataFromDatabase,
+           Func<Task<TReturnType>> getDataFromDatabase,
            object?[] query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
@@ -71,17 +71,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
-            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
@@ -98,17 +98,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query)
         {
-            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAddAsync<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public async ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
@@ -140,17 +140,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             string key)
         {
-            return GetOrAddAsync<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
+            return GetOrAddAsync<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
         }
-        public ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        public ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             string key)
         {
             var expressionKey = new DbQueryCacheKey.ExpressionKey(key);

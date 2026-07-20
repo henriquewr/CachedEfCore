@@ -48,7 +48,7 @@ namespace CachedEfCore.Cache
                 Expression = expression;
             }
 
-            public readonly string Expression;
+            public readonly string Expression { get; }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override bool Equals(object? obj)
@@ -94,10 +94,10 @@ namespace CachedEfCore.Cache
             DependentDbContext = dependentDbContext;
         }
 
-        public readonly Type EntityType;
-        public readonly ExpressionKey Expression;
-        public readonly string? AdditionalExpressionData;
-        public readonly MethodInfo Method;
+        public readonly Type EntityType { get; }
+        public readonly ExpressionKey Expression { get; }
+        public readonly string? AdditionalExpressionData { get; }
+        public readonly MethodInfo Method { get; }
         public readonly Guid? DependentDbContext { get; }
 
         public override bool Equals(object? obj)
