@@ -156,7 +156,7 @@ namespace CachedEfCore.DependencyManager
 
         private IEnumerable<IEntityType> GetEntitiesReferencingTypeInDependentOnEntityAttribute(Type typeInAttribute)
         {
-            var typesWithAttr = _typeEntity.Where(x => x.Key.GetCustomAttribute<DependentOnEntity>()?.DependentEntities.Contains(typeInAttribute) == true).Select(x => x.Value);
+            var typesWithAttr = _typeEntity.Where(x => x.Key.GetCustomAttribute<DependentOnEntityAttribute>()?.DependentEntities.Contains(typeInAttribute) == true).Select(x => x.Value);
 
             return typesWithAttr;
         }

@@ -19,8 +19,8 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             AdditionalJson = json;
         }
 
-        public readonly T Expression;
-        public readonly string? AdditionalJson;
+        public readonly T Expression { get; }
+        public readonly string? AdditionalJson { get; }
     }
 
     public class KeyGeneratorVisitor : ExpressionVisitor, IDisposable, IAsyncDisposable
@@ -293,7 +293,9 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         private sealed class GetParametersVisitor : ExpressionVisitor
         {
             [ThreadStatic]
-            private static Dictionary<ParameterExpression, int> _parameterExpressions = null!;
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+            private static Dictionary<ParameterExpression, int> _parameterExpressions;
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
             private static void ResetState()
             {

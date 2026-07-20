@@ -7,44 +7,44 @@ namespace CachedEfCore.Cache.Helper
 {
     public partial interface IDbQueryCacheHelper
     {
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             object[] query);
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             object[] query);
 
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression query);
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression query);
 
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query);
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query);
 
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType, TEntity>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             string key);
-        ValueTask<ReturnType> GetOrAddAsync<ReturnType>(
+        ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<Task<ReturnType>> getDataFromDatabase,
+            Func<Task<TReturnType>> getDataFromDatabase,
             string key);
     }
 }

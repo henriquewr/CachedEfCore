@@ -35,18 +35,18 @@ namespace CachedEfCore.Cache.Helper
         }
 
         [OverloadResolutionPriority(-1)]
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object?> query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAdd<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
         [OverloadResolutionPriority(-1)]
-        public ReturnType GetOrAdd<ReturnType>(
+        public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object?> query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
@@ -97,17 +97,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             Expression query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAdd<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             Expression query)
         {
             var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
@@ -124,17 +124,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
+            return GetOrAdd<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
@@ -166,17 +166,17 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        public ReturnType GetOrAdd<ReturnType, TEntity>(
+        public TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             string key)
         {
-            return GetOrAdd<ReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
+            return GetOrAdd<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, key);
         }
-        public ReturnType GetOrAdd<ReturnType>(
+        public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             string key)
         {
             var expressionKey = new DbQueryCacheKey.ExpressionKey(key);

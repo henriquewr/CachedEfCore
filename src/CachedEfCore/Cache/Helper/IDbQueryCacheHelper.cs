@@ -6,44 +6,44 @@ namespace CachedEfCore.Cache.Helper
 {
     public partial interface IDbQueryCacheHelper
     {
-        ReturnType GetOrAdd<ReturnType, TEntity>(
+        TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object> query);
-        ReturnType GetOrAdd<ReturnType>(
+        TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object> query);
 
-        ReturnType GetOrAdd<ReturnType, TEntity>(
+        TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             Expression query);
-        ReturnType GetOrAdd<ReturnType>(
+        TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             Expression query);
 
-        ReturnType GetOrAdd<ReturnType, TEntity>(
+        TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query);
-        ReturnType GetOrAdd<ReturnType>(
+        TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query);
 
-        ReturnType GetOrAdd<ReturnType, TEntity>(
+        TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             string key);
-        ReturnType GetOrAdd<ReturnType>(
+        TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
             ICachedDbContext dbContext,
-            Func<ReturnType> getDataFromDatabase,
+            Func<TReturnType> getDataFromDatabase,
             string key);
     }
 }
