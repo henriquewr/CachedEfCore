@@ -224,48 +224,78 @@ namespace CachedEfCore.KeyGeneration.Tests
         }
 
         private interface INonEvaluable;
-        private class NonEvaluableTestClass : INonEvaluable
+        public class NonEvaluableTestClass : INonEvaluable
         {
+            public bool Evaluated { get; set; } = false;
+
             public int AnyMethod()
             {
+                Evaluated = true;
+
                 throw new InvalidOperationException($"{nameof(AnyMethod)} Called");
             }
 
-            public int Anything { get { throw new InvalidOperationException($"Tried to get the value from prop: {nameof(Anything)}"); } }
+            public int Anything 
+            { 
+                get 
+                {
+                    Evaluated = true; 
+                    throw new InvalidOperationException($"Tried to get the value from prop: {nameof(Anything)}"); 
+                } 
+            }
         }
 
-        public static TheoryData<Expression, KeyGeneratorVisitor> GetNonEvaluableTypesTestCases()
+        public static TheoryData<Expression, KeyGeneratorVisitor, NonEvaluableTestClass> GetNonEvaluableTypesTestCases()
         {
             var variable = new NonEvaluableTestClass();
             Expression<Func<int>> test1 = () => variable.AnyMethod();
             Expression<Func<int>> test2 = () => variable.Anything;
+            Expression<Func<int>> test3 = () => variable.Anything + variable.Anything;
             return new()
             {
                 {
                     test1,
-                    CreateVisitor(typeof(INonEvaluable))
+                    CreateVisitor(typeof(INonEvaluable)),
+                    variable
                 },
                 {
                     test1,
-                    CreateVisitor(typeof(NonEvaluableTestClass))
+                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    variable
                 },
 
                 {
                     test2,
-                    CreateVisitor(typeof(INonEvaluable))
+                    CreateVisitor(typeof(INonEvaluable)),
+                    variable
                 },
                 {
                     test2,
-                    CreateVisitor(typeof(NonEvaluableTestClass))
+                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    variable
+                },
+
+                {
+                    test3,
+                    CreateVisitor(typeof(INonEvaluable)),
+                    variable
+                },
+                {
+                    test3,
+                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    variable
                 },
             };
         }
         [Theory]
         [MemberData(nameof(GetNonEvaluableTypesTestCases))]
-        public void KeyGeneratorVisitor_Should_Not_Eval_Non_Evaluable_Types(Expression expression, KeyGeneratorVisitor keyGeneratorVisitor)
+        public void KeyGeneratorVisitor_Should_Not_Eval_Non_Evaluable_Types(Expression expression, KeyGeneratorVisitor keyGeneratorVisitor, NonEvaluableTestClass instance)
         {
-            //Expected to not throw
+            instance.Evaluated = false;
+
             var result = keyGeneratorVisitor.ExpressionToString(expression);
+
+            Assert.False(instance.Evaluated);
         }
 
         [Fact]

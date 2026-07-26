@@ -5,7 +5,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -155,7 +154,14 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             catch (Exception ex)
 #pragma warning restore CS0168 // Variable is declared but never used
             {
+
+#if TEST_BUILD
+                throw;
+#endif
+
+#pragma warning disable CS0162 // Unreachable code detected
                 return base.VisitMethodCall(node);
+#pragma warning restore CS0162 // Unreachable code detected
             }
         }
 
@@ -280,12 +286,13 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         public ValueTask DisposeAsync()
         {
+            GC.SuppressFinalize(this);
+
             if (_valuePrinter is null)
             {
                 return ValueTask.CompletedTask;
             }
 
-            GC.SuppressFinalize(this);
 
             return _valuePrinter.DisposeAsync();
         }
@@ -294,14 +301,14 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         {
             [ThreadStatic]
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
-            private static Dictionary<ParameterExpression, int> _parameterExpressions;
+            private static Dictionary<ParameterExpression, bool> _parameterExpressions;
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
             private static void ResetState()
             {
                 if (_parameterExpressions is null)
                 {
-                    _parameterExpressions = new Dictionary<ParameterExpression, int>();
+                    _parameterExpressions = new Dictionary<ParameterExpression, bool>();
                 }
                 else
                 {
@@ -312,11 +319,11 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             public bool HasAllParamsScopes(Expression expression)
             {
                 var allParams = GetParameters(expression);
-                var hasAllScopes = !allParams.Values.Any(x => x == 1);
+                var hasAllScopes = allParams.Values.All(x => x);
                 return hasAllScopes;
             }
 
-            public Dictionary<ParameterExpression, int> GetParameters(Expression expression)
+            private Dictionary<ParameterExpression, bool> GetParameters(Expression expression)
             {
                 ResetState();
 
@@ -324,17 +331,13 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
                 return _parameterExpressions;
             }
 
-            private static void ParamFound(ParameterExpression param)
-            {
-                ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_parameterExpressions, param, out _);
-                value++;
-            }
-
             protected override Expression VisitLambda<T>(Expression<T> node)
             {
+                var parameterExpressions = _parameterExpressions;
+
                 foreach (var param in node.Parameters)
                 {
-                    ParamFound(param);
+                    parameterExpressions[param] = true;
                 }
 
                 return base.VisitLambda(node);
@@ -342,7 +345,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
             protected override Expression VisitParameter(ParameterExpression node)
             {
-                ParamFound(node);
+                _parameterExpressions.TryAdd(node, false);
 
                 return base.VisitParameter(node);
             }

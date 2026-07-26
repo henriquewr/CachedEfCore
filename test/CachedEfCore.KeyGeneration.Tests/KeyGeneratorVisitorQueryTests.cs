@@ -46,6 +46,10 @@ namespace CachedEfCore.KeyGeneration.Tests
                     context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Expression,
                     CreateVisitor(CachedEfCoreOptions.DefaultNonEvaluableTypes)
                 },
+                {
+                    context.LazyLoadEntity.Select(x => x.StringData!.Where(s => ThrowMethod(x.Id) && ThrowMethod(x.Id))).Expression,
+                    CreateVisitor(CachedEfCoreOptions.DefaultNonEvaluableTypes)
+                },
             };
 
         }
