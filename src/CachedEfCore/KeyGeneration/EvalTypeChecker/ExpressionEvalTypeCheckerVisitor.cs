@@ -145,5 +145,20 @@ namespace CachedEfCore.KeyGeneration.EvalTypeChecker
 
             return node;
         }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Object is not null)
+            {
+                _willEvalAnyType |= WillEvalType(node.Object.Type);
+            }
+
+            foreach (var item in node.Arguments)
+            {
+                _willEvalAnyType |= WillEvalType(item.Type);
+            }
+
+            return base.VisitMethodCall(node);
+        }
     }
 }
