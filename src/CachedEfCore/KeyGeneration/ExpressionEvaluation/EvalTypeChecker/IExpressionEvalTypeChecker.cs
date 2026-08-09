@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 
-namespace CachedEfCore.KeyGeneration.EvalTypeChecker
+namespace CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker
 {
     public interface IExpressionEvalTypeChecker
     {

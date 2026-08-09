@@ -1,11 +1,9 @@
 ﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
 using CachedEfCore.Configuration;
 using CachedEfCore.Context;
-using CachedEfCore.DependencyInjection;
 using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
-using CachedEfCore.SqlAnalysis;
+using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using System;

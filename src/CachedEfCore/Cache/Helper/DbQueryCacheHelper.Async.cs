@@ -35,7 +35,7 @@ namespace CachedEfCore.Cache.Helper
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
+                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr, dbContext.DbContext.Model);
                     if (keyGenerated is null)
                     {
                         return await getDataFromDatabase().ConfigureAwait(false);
@@ -84,7 +84,7 @@ namespace CachedEfCore.Cache.Helper
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
+            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query, dbContext.DbContext.Model);
             if (keyGenerated is null)
             {
                 return await getDataFromDatabase().ConfigureAwait(false);
@@ -119,7 +119,7 @@ namespace CachedEfCore.Cache.Helper
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
+                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem, dbContext.DbContext.Model);
                 if (keyGenerated is null)
                 {
                     return await getDataFromDatabase().ConfigureAwait(false);

@@ -33,8 +33,7 @@ namespace CachedEfCore.Configuration
     #pragma warning disable EF1001 
                 typeof(EntityQueryable<>), // DbContext.SomeEntity.Where(x => true).GetType(),
     #pragma warning restore EF1001
-                typeof(EntityQueryRootExpression),
-
+                typeof(QueryRootExpression),
             };
             public static JsonSerializerOptions DefaultKeyGeneratorJsonSerializerOptions => new JsonSerializerOptions { IncludeFields = true };
         }

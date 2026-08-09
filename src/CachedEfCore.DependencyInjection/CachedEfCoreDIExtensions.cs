@@ -3,8 +3,10 @@ using CachedEfCore.Cache.Helper;
 using CachedEfCore.Configuration;
 using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
+using CachedEfCore.KeyGeneration.ExpressionEvaluation;
+using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -24,6 +26,7 @@ namespace CachedEfCore.DependencyInjection
 
             services.TryAddSingleton<IPrintabilityChecker, PrintabilityChecker>();
             services.TryAddSingleton<IExpressionEvalTypeChecker, ExpressionEvalTypeCheckerVisitor>();
+            services.TryAddSingleton<ICachedEfCoreEvalutableExpressionChecker, CachedEfCoreEvalutableExpressionChecker>();
 
             services.TryAddSingleton<KeyGeneratorVisitor>();
             services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();

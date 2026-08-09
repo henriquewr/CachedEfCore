@@ -2,8 +2,10 @@
 using CachedEfCore.Cache.Helper;
 using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
+using CachedEfCore.KeyGeneration.ExpressionEvaluation;
+using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +36,7 @@ namespace CachedEfCore.DependencyInjection.Tests
             var keyGeneratorVisitor = serviceProvider.GetRequiredService<KeyGeneratorVisitor>();
             var dbQueryCacheHelper = serviceProvider.GetRequiredService<IDbQueryCacheHelper>();
             var dbQueryCacheStore = serviceProvider.GetRequiredService<IDbQueryCacheStore>();
+            var cachedEfCoreEvalutableExpressionChecker = serviceProvider.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
             var sqlQueryEntityExtractor = serviceProvider.GetRequiredService<ISqlQueryEntityExtractor>();
             Assert.IsType<SqlServerQueryEntityExtractor>(sqlQueryEntityExtractor);
 

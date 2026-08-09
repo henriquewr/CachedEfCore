@@ -1,4 +1,4 @@
-﻿using CachedEfCore.KeyGeneration.EvalTypeChecker;
+﻿using CachedEfCore.KeyGeneration.TypeCompatibility;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using System;
