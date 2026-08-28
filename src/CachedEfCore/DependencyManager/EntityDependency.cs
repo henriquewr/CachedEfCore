@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
+﻿using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
@@ -12,11 +11,11 @@ namespace CachedEfCore.DependencyManager
 {
     public partial class EntityDependency
     {
-        private static readonly ConcurrentDictionary<Type, EntityDependency> _entityDependencyCache = new();
+        private static readonly ConcurrentDictionary<IModel, EntityDependency> _entityDependencyCache = new();
 
-        public static EntityDependency GetOrAdd(DbContext dbContext)
+        public static EntityDependency GetOrAdd(IModel model)
         {
-            return _entityDependencyCache.GetOrAdd(dbContext.GetType(), key => new(dbContext.Model));
+            return _entityDependencyCache.GetOrAdd(model, key => new(model));
         }
 
         private readonly FrozenDictionary<Type, IEntityType> _typeEntity;

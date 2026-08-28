@@ -1,5 +1,4 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using System;
 using System.Collections.Generic;
@@ -10,19 +9,11 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
 {
     public class EnclosedNonEnclosedSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly SqlServerParser _sqlServerParser;
-        public EnclosedNonEnclosedSqlServerParsingTests(ServiceProviderFixture serviceProviderFixture)
+        public EnclosedNonEnclosedSqlServerParsingTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _sqlServerParser = new SqlServerParser();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-           => _serviceProviderFixture.CreateProvider(services =>
-           {
-               services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-           });
 
         protected static IEnumerable<Func<string, string>> GetSqlVariantsTransformFunc()
         {

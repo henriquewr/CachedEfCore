@@ -1,7 +1,5 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
-using System;
 using System.Linq;
 using Xunit;
 
@@ -9,20 +7,12 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing.UpdateParsing
 {
     public class UpdateSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly SqlServerParser _sqlServerParser;
 
-        public UpdateSqlServerParsingTests(ServiceProviderFixture serviceProviderFixture)
+        public UpdateSqlServerParsingTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _sqlServerParser = new SqlServerParser();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-           => _serviceProviderFixture.CreateProvider(services =>
-           {
-               services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-           });
 
         [Theory]
         [InlineData("UPDATE TOP (SELECT 1) Test SET Status = 1;")]

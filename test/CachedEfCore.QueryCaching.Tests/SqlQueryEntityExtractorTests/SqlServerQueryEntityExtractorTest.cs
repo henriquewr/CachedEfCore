@@ -1,9 +1,11 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
+using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -27,12 +29,19 @@ namespace CachedEfCore.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
         }
 
         protected virtual IServiceProvider CreateProvider()
-           => _serviceProviderFixture.CreateProvider(services =>
-           {
-               services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
+            => _serviceProviderFixture.CreateProvider(services =>
+            {
+                services.AddDbContext<TestDbContext>((sp, options) =>
+                {
+                    options.UseSqlServer();
 
-               services.AddDbContext<TestDbContext>();
-           });
+                    options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
+                    options.UseCachedEfCore(cachedEfCoreOptions =>
+                    {
+                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                    });
+                });
+            });
 
         private static IEnumerable<ISqlQueryEntityExtractor> SqlQueryEntityExtractorImplementations =>
            new ISqlQueryEntityExtractor[]

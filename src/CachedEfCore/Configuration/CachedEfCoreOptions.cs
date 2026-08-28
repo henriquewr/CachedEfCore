@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CachedEfCore.SqlAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using System;
@@ -11,6 +12,7 @@ namespace CachedEfCore.Configuration
     {
         public required JsonSerializerOptions KeyGeneratorJsonSerializerOptions { get; set; }
         public required List<Type> NonEvaluableTypes { get; set; }
+        public required Type SqlQueryEntityExtractorType { get; set; }
     }
 
     public static class CachedEfCoreOptionsExtensions
@@ -21,6 +23,7 @@ namespace CachedEfCore.Configuration
             {
                 return new CachedEfCoreOptions
                 {
+                    SqlQueryEntityExtractorType = typeof(GenericSqlQueryEntityExtractor),
                     KeyGeneratorJsonSerializerOptions = CachedEfCoreOptions.DefaultKeyGeneratorJsonSerializerOptions,
                     NonEvaluableTypes = CachedEfCoreOptions.DefaultNonEvaluableTypes,
                 };

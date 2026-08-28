@@ -1,6 +1,7 @@
 ﻿using CachedEfCore.Cache;
 using CachedEfCore.Configuration;
 using CachedEfCore.Context;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.TypeCompatibility;
@@ -30,7 +31,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
         public static TheoryData<Expression, IExpressionEvalTypeChecker> GetNonEvalQueriesTestCases()
         {
-            var dbContext = new TestDbContext(null!);
+            var dbContext = new TestDbContext();
 
             var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreOptions.DefaultNonEvaluableTypes);
 
@@ -62,13 +63,15 @@ namespace CachedEfCore.KeyGeneration.Tests
 
         private class TestDbContext : CachedDbContext
         {
-            public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
-            {
-            }
-
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
+                optionsBuilder.UseSqlServer();
+
+                optionsBuilder.UseCachedEfCore(options =>
+                {
+                    options.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                });
+
                 base.OnConfiguring(optionsBuilder);
             }
 

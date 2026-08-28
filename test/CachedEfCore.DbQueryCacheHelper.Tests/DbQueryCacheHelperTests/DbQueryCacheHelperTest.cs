@@ -23,16 +23,15 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
         protected virtual IServiceProvider CreateProvider()
             => _serviceProviderFixture.CreateProvider(services =>
             {
+                services.AddCachedEfCore();
+
                 services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                 {
+                    options.UseCachedEfCore(cachedEfCoreOptions =>
+                    {
+                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                    });
                 });
-
-                services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-
-                services.Replace(ServiceDescriptor.Singleton<IMemoryCache>(x => new MemoryCache(new MemoryCacheOptions()
-                {
-                    TrackStatistics = true,
-                })));
             });
 
         public static TheoryData<object, bool> GetGetOrAddToCacheData()

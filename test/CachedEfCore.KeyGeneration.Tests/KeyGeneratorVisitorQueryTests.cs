@@ -7,6 +7,8 @@ using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -34,43 +36,37 @@ namespace CachedEfCore.KeyGeneration.Tests
         protected virtual IServiceProvider CreateProvider(params IEnumerable<Type> nonEvaluableTypes)
            => _serviceProviderFixture.CreateProvider(services =>
            {
-               services.AddDbContext<TestDbContext>();
-
-               services.AddCachedEfCore<SqlServerQueryEntityExtractor>((sp, options) =>
+               services.AddDbContext<TestDbContext>(options =>
                {
-                   options.ConfigureNonEvaluableTypes(configuration =>
-                   {
-                       configuration.Clear();
-                       configuration.AddRange(nonEvaluableTypes);
-                   });
+                    options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
+                    options.UseCachedEfCore(cachedEfCoreOptions =>
+                    {
+                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+
+                        cachedEfCoreOptions.ConfigureNonEvaluableTypes(configuration =>
+                        {
+                            configuration.Clear();
+                            configuration.AddRange(nonEvaluableTypes);
+                        });
+                    });
                });
            });
-
-        private KeyGeneratorVisitor CreateVisitor(params IEnumerable<Type> nonEvaluableTypes)
+        
+        public static TheoryData<Func<TestDbContext, Expression>, Type[]> GetNonEvaluableQueryTestCases()
         {
-            return CreateProvider(nonEvaluableTypes).CreateScope().ServiceProvider.GetRequiredService<KeyGeneratorVisitor>();
-        }
-     
-        public static TheoryData<Expression, Type[], IModel> GetNonEvaluableQueryTestCases()
-        {
-            var context = new TestDbContext(null!);
-
             return new()
             {
                 {
-                    context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Select(x => x.LazyLoadPropId).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray(),
-                    context.Model
+                    context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Select(x => x.LazyLoadPropId).Expression,
+                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
-                    context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray(),
-                    context.Model
+                    context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Expression,
+                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
-                    context.LazyLoadEntity.Select(x => x.StringData!.Where(s => ThrowMethod(x.Id) && ThrowMethod(x.Id))).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray(),
-                    context.Model
+                    context => context.LazyLoadEntity.Select(x => x.StringData!.Where(s => ThrowMethod(x.Id) && ThrowMethod(x.Id))).Expression,
+                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
                 },
             };
 
@@ -87,51 +83,68 @@ namespace CachedEfCore.KeyGeneration.Tests
 
         [Theory]
         [MemberData(nameof(GetNonEvaluableQueryTestCases))]
-        public void KeyGeneratorVisitor_Should_Not_Eval_Query(Expression expression, Type[] nonEvaluableTypes, IModel model)
+        public void KeyGeneratorVisitor_Should_Not_Eval_Query(Func<TestDbContext, Expression> getExpression, Type[] nonEvaluableTypes)
         {
+            var serviceProvider = CreateProvider(nonEvaluableTypes);
+
+            using var scope = serviceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+            var expression = getExpression(dbContext);
+
             ThrowMethodCalled = false;
 
-            var keyGeneratorVisitor = CreateVisitor(nonEvaluableTypes);
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
 
-            var result = keyGeneratorVisitor.ExpressionToString(expression, model);
+            var result = keyGeneratorVisitor.ExpressionToString(expression);
 
             Assert.False(ThrowMethodCalled);
         }
 
 
-        public static TheoryData<Expression, Type[], IModel> GetEfFunctionsTestCases()
+        public static TheoryData<Func<TestDbContext, Expression>, Type[]> GetEfFunctionsTestCases()
         {
-            var context = new TestDbContext(null!);
-
             return new()
             {
                 {
-                    context.LazyLoadEntity.Where(x => TestDbContext.CustomDbFunctionPlus(1, 2) < 1).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray(),
-                    context.Model
+                    context => context.LazyLoadEntity.Where(x => TestDbContext.CustomDbFunctionPlus(1, 2) < 1).Expression,
+                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
-                    context.LazyLoadEntity.Where(x => EF.Functions.Random() < 1).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray(),
-                    context.Model
+                    context => context.LazyLoadEntity.Where(x => EF.Functions.Random() < 1).Expression,
+                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
                 },
             };
         }
         [Theory]
         [MemberData(nameof(GetEfFunctionsTestCases))]
-        public void KeyGeneratorVisitor_Should_Not_Eval_EF_Functions_Query(Expression expression, Type[] nonEvaluableTypes, IModel model)
+        public void KeyGeneratorVisitor_Should_Not_Eval_EF_Functions_Query(Func<TestDbContext, Expression> getExpression, Type[] nonEvaluableTypes)
         {
             // Expected to throw
-            var keyGeneratorVisitor = CreateVisitor(nonEvaluableTypes);
-            keyGeneratorVisitor.ExpressionToString(expression, model);
+            var serviceProvider = CreateProvider(nonEvaluableTypes);
+
+            using var scope = serviceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+            var expression = getExpression(dbContext);
+
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+
+            var result = keyGeneratorVisitor.ExpressionToString(expression);
         }
 
-        private class TestDbContext : CachedDbContext
+        public class TestDbContext : CachedDbContext
         {
             public static int CustomDbFunctionPlus(int value, int value2)
                 => throw new NotSupportedException("Custom database function should not be evaluated");
 
-            public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+            public TestDbContext(DbContextOptions options) : base(options)
+            {
+            }
+
+            public TestDbContext() : base()
             {
             }
 
@@ -152,7 +165,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseNpgsql(Guid.NewGuid().ToString()).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
+                optionsBuilder.UseSqlServer();
                 base.OnConfiguring(optionsBuilder);
             }
 
@@ -161,7 +174,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             public DbSet<AnotherLazyLoadEntity> AnotherLazyLoadEntity { get; set; }
         }
 
-        private class AnotherLazyLoadEntity
+        public class AnotherLazyLoadEntity
         {
             [Key]
             public int Id { get; set; }
@@ -174,7 +187,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             public virtual LazyLoadEntity? LazyLoadProp { get; set; }
         }
 
-        private class LazyLoadEntity
+        public class LazyLoadEntity
         {
             [Key]
             public int Id { get; set; }
@@ -187,7 +200,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             public virtual NonLazyLoadEntity? LazyLoadProp { get; set; }
         }
 
-        private class NonLazyLoadEntity
+        public class NonLazyLoadEntity
         {
             [Key]
             public int Id { get; set; }

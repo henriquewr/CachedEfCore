@@ -10,11 +10,11 @@ namespace CachedEfCore.Cache.Tests.Common
 {
     public class TestDbContext : CachedDbContext
     {
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+        public TestDbContext() : base()
         {
         }
 
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore, DbContextOptions<TestDbContext> options) : base(options, dbQueryCacheStore)
+        public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
         {
         }
 

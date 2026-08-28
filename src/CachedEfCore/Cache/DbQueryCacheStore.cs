@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Context;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
@@ -18,17 +19,20 @@ namespace CachedEfCore.Cache
         private readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
 
         private readonly IMemoryCache _cache;
+        private readonly IDbQueryCacheMetrics _metrics;
         private readonly MemoryCacheEntryOptions _cacheOptions;
 
-        public DbQueryCacheStore(IMemoryCache cache, MemoryCacheEntryOptions cacheOptions)
+        public DbQueryCacheStore(IMemoryCache cache, IDbQueryCacheMetrics metrics, MemoryCacheEntryOptions cacheOptions)
         {
             _cache = cache;
+            _metrics = metrics;
             _cacheOptions = cacheOptions;
         }
 
-        public DbQueryCacheStore(IMemoryCache cache)
+        public DbQueryCacheStore(IMemoryCache cache, IDbQueryCacheMetrics metrics)
         {
             _cache = cache;
+            _metrics = metrics;
 
             _cacheOptions = new() 
             { 
@@ -115,9 +119,15 @@ namespace CachedEfCore.Cache
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
         {
-            var cached = _cache.Get<T>(key);
+            if (_cache.TryGetValue<T>(key, out var cached))
+            {
+                ReportCacheHit();
+                return cached;
+            }
+            
+            ReportCacheMiss();
 
-            return cached;
+            return default;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -163,11 +173,12 @@ namespace CachedEfCore.Cache
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
+                ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = create();
-
+            ReportCacheMiss();
             InternalAddToCache(cachedDbContext, rootEntityType, key, createdValue);
 
             return createdValue;
@@ -178,14 +189,28 @@ namespace CachedEfCore.Cache
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
+                ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = await create().ConfigureAwait(false);
-
+            ReportCacheMiss();
             InternalAddToCache(cachedDbContext, rootEntityType, key, createdValue);
 
             return createdValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ReportCacheHit()
+        {
+            DbQueryCacheMetrics.GlobalInstance.ReportCacheHit();
+            _metrics.ReportCacheHit();
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ReportCacheMiss()
+        {
+            DbQueryCacheMetrics.GlobalInstance.ReportCacheMiss();
+            _metrics.ReportCacheMiss();
         }
     }
 }

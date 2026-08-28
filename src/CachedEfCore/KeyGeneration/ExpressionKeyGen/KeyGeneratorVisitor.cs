@@ -26,37 +26,33 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         private readonly IPrintabilityChecker _printableHelper;
+        private readonly IModel? _model;
         private readonly ICachedEfCoreEvalutableExpressionChecker _cachedEfCoreEvalutableExpressionChecker;
 
         private class KeyGeneratorState : IDisposable, IAsyncDisposable
         {
             public required ValuePrinter ValuePrinter { get; set; }
-            public required IModel? Model { get; set; }
 
             public static KeyGeneratorState CreateNew(KeyGeneratorVisitor instance)
             {
                 return new KeyGeneratorState
                 {
                     ValuePrinter = new(instance._jsonSerializerOptions),
-                    Model = null,
                 };
             }
 
             public void Dispose()
             {
-                Model = null;
                 ValuePrinter.Dispose();
             }
 
             public ValueTask DisposeAsync()
             {
-                Model = null;
                 return ValuePrinter.DisposeAsync();
             }
 
             public void ResetState()
             {
-                Model = null;
                 ValuePrinter.ResetState();
             }
 
@@ -70,7 +66,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         private static KeyGeneratorState? _state;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResetState(IModel? model)
+        private void ResetState()
         {
             if (_state is null)
             {
@@ -85,17 +81,17 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             {
                 _state.ResetState();
             }
-
-            _state.Model = model;
         }
 
         public KeyGeneratorVisitor(
             IPrintabilityChecker printableHelper,
+            IModel? model,
             ICachedEfCoreEvalutableExpressionChecker cachedEfCoreEvalutableExpressionChecker,
             JsonSerializerOptions jsonSerializerOptions
         )
         {
             _printableHelper = printableHelper;
+            _model = model;
             _jsonSerializerOptions = jsonSerializerOptions;
             _cachedEfCoreEvalutableExpressionChecker = cachedEfCoreEvalutableExpressionChecker;
         }
@@ -108,11 +104,11 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         /// "</returns>
         /// <param name="node">The expression to convert</param>
         /// <param name="model">The EF Core model associated with the query, if the expression is part of an EF Core-generated query.</param>
-        public KeyGeneratorResult<string>? SafeExpressionToString(Expression node, IModel? model)
+        public KeyGeneratorResult<string>? SafeExpressionToString(Expression node)
         {
             try
             {
-                return ExpressionToString(node, model);
+                return ExpressionToString(node);
             }
 #pragma warning disable CS0168 // Variable is declared but never used (for debug view)
             catch (Exception ex)
@@ -129,8 +125,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         /// A string representation of the expression with the "real values
         /// "</returns>
         /// <param name="node">The expression to convert</param>
-        /// <param name="model">The EF Core model associated with the query, if the expression is part of an EF Core-generated query.</param>
-        public KeyGeneratorResult<string> ExpressionToString(Expression node, IModel? model)
+        public KeyGeneratorResult<string> ExpressionToString(Expression node)
         {
             // The Visit method returns the expression with the 'real values'
             // ex: 
@@ -150,7 +145,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             // list.Contains(variable) is evaluated and returned true
             // and the method call is exchanged for the result
 
-            var visited = VisitWithState(node, model);
+            var visited = VisitWithState(node);
             var result = new KeyGeneratorResult<string>
             (
                 visited.Expression.ToString(),
@@ -160,9 +155,9 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             return result;
         }
 
-        public KeyGeneratorResult<T> VisitExpr<T>(T expression, IModel? model) where T : Expression
+        public KeyGeneratorResult<T> VisitExpr<T>(T expression) where T : Expression
         {
-            var visited = VisitWithState(expression, model);
+            var visited = VisitWithState(expression);
 
             var result = new KeyGeneratorResult<T>
             (
@@ -173,9 +168,9 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             return result;
         }
 
-        private KeyGeneratorResult<Expression> VisitWithState(Expression node, IModel? model)
+        private KeyGeneratorResult<Expression> VisitWithState(Expression node)
         {
-            ResetState(model);
+            ResetState();
             var expression = base.Visit(node);
 
             var additionalJson = _state!.ValuePrinter.GetResult();
@@ -193,7 +188,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         {
             try
             {
-                var canEval = _cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMethodCall(node, _state!.Model);
+                var canEval = _cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMethodCall(node, _model);
 
                 if (!canEval)
                 {
@@ -252,7 +247,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         protected override Expression VisitMember(MemberExpression node)
         {
-            if (_cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMemberExpression(node, _state!.Model))
+            if (_cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMemberExpression(node, _model))
             {
                 var value = Evaluate(node);
 

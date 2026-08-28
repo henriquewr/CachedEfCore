@@ -705,7 +705,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test");
+                optionsBuilder.UseSqlServer();
                 base.OnConfiguring(optionsBuilder);
             }
 

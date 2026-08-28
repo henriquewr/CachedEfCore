@@ -1,4 +1,7 @@
 ﻿using CachedEfCore.Context;
+using CachedEfCore.KeyGeneration;
+using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -25,6 +28,9 @@ namespace CachedEfCore.Cache.Helper
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+            var printabilityChecker = dbContext.DbContext.GetService<IPrintabilityChecker>();
+
             var additionalJson = "";
 
             ResetAsyncLocalPrinter();
@@ -35,7 +41,7 @@ namespace CachedEfCore.Cache.Helper
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr, dbContext.DbContext.Model);
+                    var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
                         return await getDataFromDatabase().ConfigureAwait(false);
@@ -47,7 +53,7 @@ namespace CachedEfCore.Cache.Helper
                         additionalJson += keyGenerated.Value.AdditionalJson;
                     }
                 }
-                else if (_printabilityChecker.IsPrintable(queryItem))
+                else if (printabilityChecker.IsPrintable(queryItem))
                 {
                     expressionKeyBuilder.AddExpression(queryItem?.ToString());
                 }
@@ -84,7 +90,9 @@ namespace CachedEfCore.Cache.Helper
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query, dbContext.DbContext.Model);
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+
+            var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
                 return await getDataFromDatabase().ConfigureAwait(false);
@@ -111,6 +119,8 @@ namespace CachedEfCore.Cache.Helper
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query)
         {
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
             var additionalJson = "";
@@ -119,7 +129,7 @@ namespace CachedEfCore.Cache.Helper
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem, dbContext.DbContext.Model);
+                var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
                     return await getDataFromDatabase().ConfigureAwait(false);

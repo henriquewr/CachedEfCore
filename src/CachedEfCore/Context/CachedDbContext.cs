@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using System;
 using CachedEfCore.EntityMapping;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace CachedEfCore.Context
 {
@@ -15,25 +16,18 @@ namespace CachedEfCore.Context
         public DbContext DbContext => this;
         public Guid Id => this.ContextId.InstanceId;
 
-        public CachedDbContext(IDbQueryCacheStore dbQueryCacheStore) : base()
+        public CachedDbContext() : base()
         {
-            DbQueryCacheStore = dbQueryCacheStore;
-            DependencyManager = EntityDependency.GetOrAdd(this);
-            TableEntity = TableEntityMapping.GetOrAdd(this);
+            DbQueryCacheStore = this.GetService<IDbQueryCacheStore>();
+            DependencyManager = this.GetService<EntityDependency>();
+            TableEntity = this.GetService<TableEntityMapping>();
         }
 
-        public CachedDbContext(DbContextOptions options, IDbQueryCacheStore dbQueryCacheStore) : base(options)
+        public CachedDbContext(DbContextOptions options) : base(options)
         {
-            DbQueryCacheStore = dbQueryCacheStore;
-            DependencyManager = EntityDependency.GetOrAdd(this);
-            TableEntity = TableEntityMapping.GetOrAdd(this);
-        }
-
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-            //optionsBuilder.AddInterceptors(new DbStateInterceptor());
-
-            base.OnConfiguring(optionsBuilder);
+            DbQueryCacheStore = this.GetService<IDbQueryCacheStore>();
+            DependencyManager = this.GetService<EntityDependency>();
+            TableEntity = this.GetService<TableEntityMapping>();
         }
 
         public override void Dispose()

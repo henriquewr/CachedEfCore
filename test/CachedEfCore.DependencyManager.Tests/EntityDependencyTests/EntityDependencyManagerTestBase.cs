@@ -1,12 +1,13 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Context;
+﻿using CachedEfCore.Context;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.DependencyManager.Attributes;
-using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -17,7 +18,30 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public abstract class EntityDependencyManagerTestBase
     {
+        protected readonly ServiceProviderFixture _serviceProviderFixture;
+
+        protected EntityDependencyManagerTestBase(ServiceProviderFixture serviceProviderFixture)
+        {
+            _serviceProviderFixture = serviceProviderFixture;
+        }
+
         protected TestDbContext _cachedDbContext = null!;
+
+        protected virtual IServiceProvider CreateProvider()
+             => _serviceProviderFixture.CreateProvider(services =>
+             {
+
+                 services.AddDbContext<TestDbContext>(options =>
+                 {
+                     options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
+                     options.UseLazyLoadingProxies();
+                     options.UseSqlServer();
+                     options.UseCachedEfCore(cachedEfCoreOptions =>
+                     {
+                         cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                     });
+                 });
+             });
 
         protected virtual IEntityType GetIEntityType(Type entityType)
         {
@@ -31,16 +55,14 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 
         public class TestDbContext : CachedDbContext
         {
-            public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+            public TestDbContext() : base()
             {
+                
             }
 
-            protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+            public TestDbContext(DbContextOptions options) : base(options)
             {
-                optionsBuilder.UseLazyLoadingProxies();
-
-                optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
-                base.OnConfiguring(optionsBuilder);
+                
             }
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
