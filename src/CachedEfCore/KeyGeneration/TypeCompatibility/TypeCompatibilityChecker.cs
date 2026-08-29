@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-namespace CachedEfCore.KeyGeneration.EvalTypeChecker
+namespace CachedEfCore.KeyGeneration.TypeCompatibility
 {
     public class TypeCompatibilityChecker : ITypeCompatibilityChecker
     {

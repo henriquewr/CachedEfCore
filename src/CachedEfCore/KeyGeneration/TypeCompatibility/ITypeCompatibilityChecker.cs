@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CachedEfCore.KeyGeneration.EvalTypeChecker
+namespace CachedEfCore.KeyGeneration.TypeCompatibility
 {
     public interface ITypeCompatibilityChecker
     {

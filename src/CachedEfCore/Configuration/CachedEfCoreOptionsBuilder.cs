@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CachedEfCore.SqlAnalysis;
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 
@@ -11,6 +12,21 @@ namespace CachedEfCore.Configuration
         public virtual CachedEfCoreOptionsBuilder ConfigureNonEvaluableTypes(Action<List<Type>> configure)
         {
             configure(CachedEfCoreOptions.NonEvaluableTypes);
+
+            return this;
+        }
+
+        public virtual CachedEfCoreOptionsBuilder WithSqlQueryEntityExtractor<TSqlQueryEntityExtractor>() 
+            where TSqlQueryEntityExtractor : ISqlQueryEntityExtractor
+        {
+            CachedEfCoreOptions.SqlQueryEntityExtractorType = typeof(TSqlQueryEntityExtractor);
+
+            return this;
+        }
+
+        public virtual CachedEfCoreOptionsBuilder WithSqlQueryEntityExtractor(Type sqlQueryEntityExtractorType) 
+        {
+            CachedEfCoreOptions.SqlQueryEntityExtractorType = sqlQueryEntityExtractorType;
 
             return this;
         }

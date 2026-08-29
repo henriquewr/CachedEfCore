@@ -1,9 +1,10 @@
-﻿using System;
+﻿using CachedEfCore.KeyGeneration.TypeCompatibility;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
-namespace CachedEfCore.KeyGeneration.EvalTypeChecker
+namespace CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker
 {
     public class ExpressionEvalTypeCheckerVisitor : ExpressionVisitor, IExpressionEvalTypeChecker
     {

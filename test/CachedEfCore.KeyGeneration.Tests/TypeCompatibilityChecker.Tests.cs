@@ -1,4 +1,4 @@
-﻿using CachedEfCore.KeyGeneration.EvalTypeChecker;
+﻿using CachedEfCore.KeyGeneration.TypeCompatibility;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using System;
@@ -705,7 +705,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test");
+                optionsBuilder.UseSqlServer();
                 base.OnConfiguring(optionsBuilder);
             }
 

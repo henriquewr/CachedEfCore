@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CachedEfCore.DependencyInjection\CachedEfCore.DependencyInjection.csproj" />
     <ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
     <ProjectReference Include="..\CachedEfCore.Tests.Common\CachedEfCore.Tests.Common.csproj" />
   </ItemGroup>

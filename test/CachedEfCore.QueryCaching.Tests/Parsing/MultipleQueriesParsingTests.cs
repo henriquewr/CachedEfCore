@@ -7,11 +7,9 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
 {
     public class MultipleQueriesParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly SqlServerParser _sqlServerParser;
-        public MultipleQueriesParsingTests(ServiceProviderFixture serviceProviderFixture)
+        public MultipleQueriesParsingTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _sqlServerParser = new SqlServerParser();
         }
 

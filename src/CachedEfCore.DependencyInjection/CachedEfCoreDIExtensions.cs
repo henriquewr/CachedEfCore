@@ -1,68 +1,41 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
+﻿using CachedEfCore.Cache.Helper;
+using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Configuration;
-using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.SqlAnalysis;
+using CachedEfCore.DbContextOptionExtensions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.Text.Json;
 
 namespace CachedEfCore.DependencyInjection
 {
     public static class CachedEfCoreDIExtensions
     {
-        public static IServiceCollection AddCachedEfCore<TSqlQueryEntityExtractor>(
-            this IServiceCollection services,
-            Action<IServiceProvider, CachedEfCoreOptionsBuilder> configure
-        )
-            where TSqlQueryEntityExtractor : class, ISqlQueryEntityExtractor
+        extension(IServiceCollection services)
         {
-            services.AddMemoryCache();
-
-            services.TryAddSingleton<IPrintabilityChecker, PrintabilityChecker>();
-            services.TryAddSingleton<IExpressionEvalTypeChecker, ExpressionEvalTypeCheckerVisitor>();
-
-            services.TryAddSingleton<KeyGeneratorVisitor>();
-            services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
-            services.TryAddSingleton<IDbQueryCacheStore, DbQueryCacheStore>();
-
-            services.TryAddSingleton<ISqlQueryEntityExtractor, TSqlQueryEntityExtractor>();
-            services.TryAddSingleton<DbStateInterceptor>();
-
-            services.TryAddSingleton<ICachedEfCoreOptions>(sp =>
+            public IServiceCollection AddCachedEfCore()
             {
-                var options = new CachedEfCoreOptionsBuilder();
-                configure.Invoke(sp, options);
-                return options.Build();
-            });
+                services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
+                services.TryAddSingleton<IDbQueryCacheMetrics>(DbQueryCacheMetrics.GlobalInstance);
 
-            services.TryAddSingleton<ITypeCompatibilityChecker>(sp =>
-            {
-                var options = sp.GetRequiredService<ICachedEfCoreOptions>();
-                return new TypeCompatibilityChecker(options.NonEvaluableTypes);
-            });
-            services.TryAddSingleton<JsonSerializerOptions>(sp =>
-            {
-                var options = sp.GetRequiredService<ICachedEfCoreOptions>();
-                return options.KeyGeneratorJsonSerializerOptions;
-            });
-
-            return services;
+                return services;
+            }
         }
 
-        public static IServiceCollection AddCachedEfCore<TSqlQueryEntityExtractor>(
-            this IServiceCollection services,
-            Action<CachedEfCoreOptionsBuilder>? configure = null
-        )
-            where TSqlQueryEntityExtractor : class, ISqlQueryEntityExtractor
+        extension (DbContextOptionsBuilder builder)
         {
-            return services.AddCachedEfCore<TSqlQueryEntityExtractor>((serviceProvider, options) =>
+            public DbContextOptionsBuilder UseCachedEfCore(Action<CachedEfCoreOptionsBuilder>? configure = null)
             {
+                var options = new CachedEfCoreOptionsBuilder();
                 configure?.Invoke(options);
-            });
+                var builtOptions = options.Build();
+
+                var extension = new CachedEfCoreDbContextOptionExtension(builder.Options.ContextType, builtOptions);
+
+                ((IDbContextOptionsBuilderInfrastructure)builder).AddOrUpdateExtension(extension);
+
+                return builder;
+            }
         }
     }
 }

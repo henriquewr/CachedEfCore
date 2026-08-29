@@ -1,6 +1,4 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
-using CachedEfCore.Tests.Common.Fixtures;
+﻿using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -14,21 +12,10 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerUnderRelatedTests : EntityDependencyManagerTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
-
-        public EntityDependencyManagerUnderRelatedTests(ServiceProviderFixture serviceProviderFixture)
+        public EntityDependencyManagerUnderRelatedTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _cachedDbContext = GetDbContext();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-         => _serviceProviderFixture.CreateProvider(services =>
-         {
-             services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-
-             services.AddDbContext<TestDbContext>();
-         });
 
         protected virtual TestDbContext GetDbContext()
         {

@@ -1,4 +1,5 @@
-﻿using CachedEfCore.KeyGeneration.EvalTypeChecker;
+﻿using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+using CachedEfCore.KeyGeneration.TypeCompatibility;
 using System;
 using System.Collections.Generic;
 using System.Linq;

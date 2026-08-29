@@ -1,6 +1,7 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.KeyGeneration;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -24,16 +25,6 @@ namespace CachedEfCore.Cache.Helper
             }
         }
 
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor;
-        private readonly IPrintabilityChecker _printabilityChecker;
-
-        public DbQueryCacheHelper(KeyGeneratorVisitor keyGeneratorVisitor,
-            IPrintabilityChecker printabilityChecker)
-        {
-            _keyGeneratorVisitor = keyGeneratorVisitor;
-            _printabilityChecker = printabilityChecker;
-        }
-
         [OverloadResolutionPriority(-1)]
         public TReturnType GetOrAdd<TReturnType, TEntity>(
             ICachedDbContext dbContext,
@@ -55,13 +46,16 @@ namespace CachedEfCore.Cache.Helper
 
             ResetAsyncLocalPrinter();
 
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+            var printabilityChecker = dbContext.DbContext.GetService<IPrintabilityChecker>();
+
             for (var i = 0; i < query.Length; i++)
             {
                 var queryItem = query[i];
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
+                    var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
                         return getDataFromDatabase();
@@ -73,7 +67,7 @@ namespace CachedEfCore.Cache.Helper
                         additionalJson += keyGenerated.Value.AdditionalJson;
                     }
                 }
-                else if (_printabilityChecker.IsPrintable(queryItem))
+                else if (printabilityChecker.IsPrintable(queryItem))
                 {
                     expressionKeyBuilder.AddExpression(queryItem?.ToString());
                 }
@@ -110,7 +104,9 @@ namespace CachedEfCore.Cache.Helper
             Func<TReturnType> getDataFromDatabase,
             Expression query)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+
+            var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
                 return getDataFromDatabase();
@@ -137,6 +133,8 @@ namespace CachedEfCore.Cache.Helper
             Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
+            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
             var additionalJson = "";
@@ -145,7 +143,7 @@ namespace CachedEfCore.Cache.Helper
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
+                var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
                     return getDataFromDatabase();

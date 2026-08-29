@@ -14,21 +14,10 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerAllRelatedTests : EntityDependencyManagerTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
-
-        public EntityDependencyManagerAllRelatedTests(ServiceProviderFixture serviceProviderFixture)
+        public EntityDependencyManagerAllRelatedTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _cachedDbContext = GetDbContext();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-            => _serviceProviderFixture.CreateProvider(services =>
-            {
-                services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-
-                services.AddDbContext<TestDbContext>();
-            });
 
         protected TestDbContext GetDbContext()
         {

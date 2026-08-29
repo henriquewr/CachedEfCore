@@ -1,6 +1,5 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlAnalysis.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -11,11 +10,11 @@ namespace CachedEfCore.Cache.Tests.Common
 {
     public class TestDbContext : CachedDbContext
     {
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+        public TestDbContext() : base()
         {
         }
 
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore, DbContextOptions<TestDbContext> options) : base(options, dbQueryCacheStore)
+        public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
         {
         }
 

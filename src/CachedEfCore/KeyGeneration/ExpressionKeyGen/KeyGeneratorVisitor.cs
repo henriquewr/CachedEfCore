@@ -1,7 +1,6 @@
-﻿using CachedEfCore.KeyGeneration.EvalTypeChecker;
+﻿using CachedEfCore.KeyGeneration.ExpressionEvaluation;
+using Microsoft.EntityFrameworkCore.Metadata;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -24,40 +23,87 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
     public class KeyGeneratorVisitor : ExpressionVisitor, IDisposable, IAsyncDisposable
     {
-        private readonly GetParametersVisitor _getParametersVisitor;
         private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         private readonly IPrintabilityChecker _printableHelper;
-        private readonly IExpressionEvalTypeChecker _expressionEvalTypeChecker;
+        private readonly IModel? _model;
+        private readonly ICachedEfCoreEvalutableExpressionChecker _cachedEfCoreEvalutableExpressionChecker;
+
+        private class KeyGeneratorState : IDisposable, IAsyncDisposable
+        {
+            public required ValuePrinter ValuePrinter { get; set; }
+
+            public static KeyGeneratorState CreateNew(KeyGeneratorVisitor instance)
+            {
+                return new KeyGeneratorState
+                {
+                    ValuePrinter = new(instance._jsonSerializerOptions),
+                };
+            }
+
+            public void Dispose()
+            {
+                ValuePrinter.Dispose();
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                return ValuePrinter.DisposeAsync();
+            }
+
+            public void ResetState()
+            {
+                ValuePrinter.ResetState();
+            }
+
+            public bool ShouldCreateNew()
+            {
+                return ValuePrinter.IsDisposed;
+            }
+        }
 
         [ThreadStatic]
-        private static ValuePrinter? _valuePrinter;
-
-        public KeyGeneratorVisitor(
-            IPrintabilityChecker printableHelper,
-            IExpressionEvalTypeChecker expressionEvalTypeChecker,
-            JsonSerializerOptions jsonSerializerOptions
-        )
-        {
-            _printableHelper = printableHelper;
-            _jsonSerializerOptions = jsonSerializerOptions;
-            _expressionEvalTypeChecker = expressionEvalTypeChecker;
-            _getParametersVisitor = new GetParametersVisitor();
-        }
+        private static KeyGeneratorState? _state;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResetState()
         {
-            if (_valuePrinter is null || _valuePrinter.IsDisposed)
+            if (_state is null)
             {
-                _valuePrinter = new(_jsonSerializerOptions);
+                _state = KeyGeneratorState.CreateNew(this);
+            }
+            else if (_state.ShouldCreateNew())
+            {
+                _state.Dispose();
+                _state = KeyGeneratorState.CreateNew(this);
             }
             else
             {
-                _valuePrinter.ResetState();
+                _state.ResetState();
             }
         }
 
+        public KeyGeneratorVisitor(
+            IPrintabilityChecker printableHelper,
+            IModel? model,
+            ICachedEfCoreEvalutableExpressionChecker cachedEfCoreEvalutableExpressionChecker,
+            JsonSerializerOptions jsonSerializerOptions
+        )
+        {
+            _printableHelper = printableHelper;
+            _model = model;
+            _jsonSerializerOptions = jsonSerializerOptions;
+            _cachedEfCoreEvalutableExpressionChecker = cachedEfCoreEvalutableExpressionChecker;
+        }
+
+        /// <summary>
+        /// Replaces the variables in a expression with their "real values", this method never throws exceptions, if the expression cannot be evaluated it returns null
+        /// </summary>
+        /// <returns>
+        /// A string representation of the expression with the "real values
+        /// "</returns>
+        /// <param name="node">The expression to convert</param>
+        /// <param name="model">The EF Core model associated with the query, if the expression is part of an EF Core-generated query.</param>
         public KeyGeneratorResult<string>? SafeExpressionToString(Expression node)
         {
             try
@@ -75,7 +121,10 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         /// <summary>
         /// Replaces the variables in a expression with their "real values"
         /// </summary>
-        /// <returns>A string representation of the expression with the "real values"</returns>
+        /// <returns>
+        /// A string representation of the expression with the "real values
+        /// "</returns>
+        /// <param name="node">The expression to convert</param>
         public KeyGeneratorResult<string> ExpressionToString(Expression node)
         {
             // The Visit method returns the expression with the 'real values'
@@ -124,7 +173,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             ResetState();
             var expression = base.Visit(node);
 
-            var additionalJson = _valuePrinter?.GetResult();
+            var additionalJson = _state!.ValuePrinter.GetResult();
 
             var result = new KeyGeneratorResult<Expression>
             (
@@ -139,7 +188,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         {
             try
             {
-                var canEval = CanEvalMethodCall(node);
+                var canEval = _cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMethodCall(node, _model);
 
                 if (!canEval)
                 {
@@ -165,16 +214,6 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool CanEvalMethodCall(MethodCallExpression node)
-        {
-            var hasAllScopes = _getParametersVisitor.HasAllParamsScopes(node);
-
-            var canEval = hasAllScopes && !_expressionEvalTypeChecker.WillEvalTypes(node);
-
-            return canEval;
-        }
-
         private static (object? Result, Type ResultType) EvalMethodCall(MethodCallExpression node)
         {
             //TODO Maybe use preferInterpretation true in the Compile method, it was way faster in some tests, but it needs more thinking about that
@@ -194,12 +233,12 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            if (!_expressionEvalTypeChecker.WillEvalTypes(node))
+            if (!_cachedEfCoreEvalutableExpressionChecker.IsEvaluatableConstant(node))
             {
                 var isPrintable = _printableHelper.IsPrintable(node.Value, node.Type);
                 if (!isPrintable)
                 {
-                    _valuePrinter!.Print(node.Value);
+                    _state!.ValuePrinter.Print(node.Value);
                 }
             }
 
@@ -208,7 +247,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         protected override Expression VisitMember(MemberExpression node)
         {
-            if (CanBeEvaluated(node))
+            if (_cachedEfCoreEvalutableExpressionChecker.IsEvaluatableMemberExpression(node, _model))
             {
                 var value = Evaluate(node);
 
@@ -218,37 +257,6 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
             else
             {
                 return base.VisitMember(node);
-            }
-        }
-
-        private bool CanBeEvaluated(MemberExpression exp)
-        {
-            if (_expressionEvalTypeChecker.WillEvalTypes(exp))
-            {
-                return false;
-            }
-
-            while (exp.Expression != null && exp.Expression.NodeType == ExpressionType.MemberAccess)
-            {
-                exp = (MemberExpression)exp.Expression;
-            }
-
-            if (exp.Expression is null)
-            {
-                return false;
-            }
-
-            switch (exp.Expression.NodeType)
-            {
-                case ExpressionType.Constant:
-                    return true;
-
-                case ExpressionType.Call:
-                    var canEval = CanEvalMethodCall((MethodCallExpression)exp.Expression);
-                    return canEval;
-
-                default:
-                    return false;
             }
         }
 
@@ -279,7 +287,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
 
         public void Dispose()
         {
-            _valuePrinter?.Dispose();
+            _state?.Dispose();
 
             GC.SuppressFinalize(this);
         }
@@ -288,67 +296,12 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         {
             GC.SuppressFinalize(this);
 
-            if (_valuePrinter is null)
+            if (_state is null)
             {
                 return ValueTask.CompletedTask;
             }
 
-
-            return _valuePrinter.DisposeAsync();
-        }
-
-        private sealed class GetParametersVisitor : ExpressionVisitor
-        {
-            [ThreadStatic]
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
-            private static Dictionary<ParameterExpression, bool> _parameterExpressions;
-#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
-
-            private static void ResetState()
-            {
-                if (_parameterExpressions is null)
-                {
-                    _parameterExpressions = new Dictionary<ParameterExpression, bool>();
-                }
-                else
-                {
-                    _parameterExpressions.Clear();
-                }
-            }
-
-            public bool HasAllParamsScopes(Expression expression)
-            {
-                var allParams = GetParameters(expression);
-                var hasAllScopes = allParams.Values.All(x => x);
-                return hasAllScopes;
-            }
-
-            private Dictionary<ParameterExpression, bool> GetParameters(Expression expression)
-            {
-                ResetState();
-
-                Visit(expression);
-                return _parameterExpressions;
-            }
-
-            protected override Expression VisitLambda<T>(Expression<T> node)
-            {
-                var parameterExpressions = _parameterExpressions;
-
-                foreach (var param in node.Parameters)
-                {
-                    parameterExpressions[param] = true;
-                }
-
-                return base.VisitLambda(node);
-            }
-
-            protected override Expression VisitParameter(ParameterExpression node)
-            {
-                _parameterExpressions.TryAdd(node, false);
-
-                return base.VisitParameter(node);
-            }
+            return _state.DisposeAsync();
         }
     }
 }
