@@ -9,13 +9,15 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 ```
 public void ConfigureServices(IServiceCollection services)
 {
-    services.AddCachedEfCore<SqlServerQueryEntityExtractor>(); // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
+    services.AddCachedEfCore();
 
     // AddDbContextPool or AddDbContext
-    services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
+    services.AddDbContextPool<AppDbContext>(options => 
     {
-        options.UseLazyLoadingProxies();
-        options.UseSqlServer(connectionString).AddInterceptors(serviceProvider.GetRequiredService<DbStateInterceptor>());
+        options.UseCachedEfCore(cachedEfCoreOptions =>
+        {
+            cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();  // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
+        });
     });
 }
 ```
@@ -24,7 +26,11 @@ public void ConfigureServices(IServiceCollection services)
 ```
 public class YourDbContext : CachedDbContext
 {
-    public YourDbContext(DbContextOptions options, IDbQueryCacheStore dbQueryCacheStore) : base(options, dbQueryCacheStore)
+    public YourDbContext() : base()
+    {
+    }
+
+    public YourDbContext(DbContextOptions options) : base(options)
     {
     }
 }
