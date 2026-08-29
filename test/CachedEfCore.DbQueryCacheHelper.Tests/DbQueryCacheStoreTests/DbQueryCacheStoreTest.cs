@@ -210,25 +210,19 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             AssertDoesNotContainAnyKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
         }
 
-        [Fact]
-        public async Task GetCached_Reports_Cache_Metrics()
+        public static TheoryData<Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>> GetReportsCacheMetricsData()
         {
-            await Reports_Cache_Metrics_Impl(async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<object>(key)));
+            return new TheoryData<Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>>
+            {
+                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<object>(key)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(cachedDbContext, rootEntityType, key, () => default!)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<object>(cachedDbContext, rootEntityType, key, () => Task.FromResult<object>(default!)) },
+            };
         }
 
-        [Fact]
-        public async Task GetOrAdd_Reports_Cache_Metrics()
-        {
-            await Reports_Cache_Metrics_Impl(async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(cachedDbContext, rootEntityType, key, () => default!)));
-        }
-
-        [Fact]
-        public async Task GetOrAddAsync_Reports_Cache_Metrics()
-        {
-            await Reports_Cache_Metrics_Impl(async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<object>(cachedDbContext, rootEntityType, key, () => Task.FromResult<object>(default!)));
-        }
-
-        private async Task Reports_Cache_Metrics_Impl(Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)
+        [Theory]
+        [MemberData(nameof(GetReportsCacheMetricsData))]
+        public async Task Reports_Cache_Metrics(Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)
         {
             var serviceProvider = CreateProvider();
 
