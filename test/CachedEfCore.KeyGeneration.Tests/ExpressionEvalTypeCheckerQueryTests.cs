@@ -1,11 +1,9 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Configuration;
+﻿using CachedEfCore.Configuration;
 using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.TypeCompatibility;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -33,7 +31,7 @@ namespace CachedEfCore.KeyGeneration.Tests
         {
             var dbContext = new TestDbContext();
 
-            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreOptions.DefaultNonEvaluableTypes);
+            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes);
 
             return new()
             {
@@ -69,7 +67,7 @@ namespace CachedEfCore.KeyGeneration.Tests
 
                 optionsBuilder.UseCachedEfCore(options =>
                 {
-                    options.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                    options.UseSqlServer();
                 });
 
                 base.OnConfiguring(optionsBuilder);

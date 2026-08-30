@@ -1,20 +1,32 @@
 ﻿using CachedEfCore.SqlAnalysis;
 using System;
-using System.Collections.Generic;
-using System.Text.Json;
 
 namespace CachedEfCore.Configuration
 {
-    public partial class CachedEfCoreOptionsBuilder
+    public class CachedEfCoreOptionsBuilder
     {
-        protected CachedEfCoreOptions CachedEfCoreOptions { get; set; } = CachedEfCoreOptions.CreateDefault();
+        protected CachedEfCoreOptions CachedEfCoreOptions { get; }
 
-        public virtual CachedEfCoreOptionsBuilder ConfigureNonEvaluableTypes(Action<List<Type>> configure)
+        public CachedEfCoreOptionsBuilder(CachedEfCoreOptions cachedEfCoreOptions)
         {
-            configure(CachedEfCoreOptions.NonEvaluableTypes);
+            CachedEfCoreOptions = cachedEfCoreOptions;
+        }
+
+        public CachedEfCoreOptionsBuilder() : this(CachedEfCoreOptions.CreateDefault())
+        {
+        }
+
+        public virtual CachedEfCoreOptionsBuilder ConfigureKeyGeneration(Action<CachedEfCoreKeyGenerationOptionsBuilder> configure)
+        {
+            var builder = new CachedEfCoreKeyGenerationOptionsBuilder(CachedEfCoreOptions.KeyGenerationOptions);
+
+            configure(builder);
 
             return this;
         }
+
+        public CachedEfCoreOptionsBuilder UseGenericProvider()
+            => WithSqlQueryEntityExtractor<GenericSqlQueryEntityExtractor>();
 
         public virtual CachedEfCoreOptionsBuilder WithSqlQueryEntityExtractor<TSqlQueryEntityExtractor>() 
             where TSqlQueryEntityExtractor : ISqlQueryEntityExtractor
@@ -31,14 +43,7 @@ namespace CachedEfCore.Configuration
             return this;
         }
 
-        public virtual CachedEfCoreOptionsBuilder ConfigureKeyGeneratorJsonSerializer(Func<JsonSerializerOptions, JsonSerializerOptions> configure)
-        {
-            CachedEfCoreOptions.KeyGeneratorJsonSerializerOptions = configure(CachedEfCoreOptions.KeyGeneratorJsonSerializerOptions);
-
-            return this;
-        }
-
-        public ICachedEfCoreOptions Build()
+        public CachedEfCoreOptions Build()
         {
             return CachedEfCoreOptions;
         }

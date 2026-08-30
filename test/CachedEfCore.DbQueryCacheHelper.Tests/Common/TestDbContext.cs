@@ -1,6 +1,6 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.ComponentModel.DataAnnotations;

@@ -10,6 +10,10 @@
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
+    <Project Path="src/CachedEfCore.SqlServer/CachedEfCore.SqlServer.csproj" Id="bc67619f-d1be-4980-8456-7327e45d279c">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
     <Project Path="src/CachedEfCore/CachedEfCore.csproj" />
   </Folder>
   <Folder Name="/test/">
@@ -17,7 +21,7 @@
     <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
     <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />
-    <Project Path="test/CachedEfCore.QueryCaching.Tests/CachedEfCore.SqlAnalisys.Tests.csproj" />
+    <Project Path="test/CachedEfCore.QueryCaching.Tests/CachedEfCore.SqlServer.SqlAnalisys.Tests.csproj" />
     <Project Path="test/CachedEfCore.Tests.Common/CachedEfCore.Tests.Common.csproj">
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />

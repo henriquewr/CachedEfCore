@@ -1,7 +1,7 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -34,11 +34,17 @@ namespace CachedEfCore.KeyGeneration.Tests
 
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
-                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
-                        cachedEfCoreOptions.ConfigureNonEvaluableTypes(configuration =>
+                        cachedEfCoreOptions.UseSqlServer();
+
+                        cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
                         {
-                            configuration.Clear();
-                            configuration.AddRange(nonEvaluableTypes);
+                            keyGen.ConfigureNonEvaluableTypes(configuration =>
+                            {
+                                configuration.Clear();
+                                configuration.AddRange(nonEvaluableTypes);
+
+                                return configuration;
+                            });
                         });
                     });
                });

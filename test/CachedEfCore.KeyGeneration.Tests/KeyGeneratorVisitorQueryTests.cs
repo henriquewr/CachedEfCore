@@ -1,15 +1,12 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Configuration;
+﻿using CachedEfCore.Configuration;
 using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,12 +38,14 @@ namespace CachedEfCore.KeyGeneration.Tests
                     options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
-                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                        cachedEfCoreOptions.UseSqlServer();
 
-                        cachedEfCoreOptions.ConfigureNonEvaluableTypes(configuration =>
+                        cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
                         {
-                            configuration.Clear();
-                            configuration.AddRange(nonEvaluableTypes);
+                            keyGen.ConfigureNonEvaluableTypes(configuration =>
+                            {
+                                return nonEvaluableTypes.ToList();
+                            });
                         });
                     });
                });
@@ -58,15 +57,15 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 {
                     context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Select(x => x.LazyLoadPropId).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Select(x => x.StringData!.Where(s => ThrowMethod(x.Id) && ThrowMethod(x.Id))).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
                 },
             };
 
@@ -109,11 +108,11 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 {
                     context => context.LazyLoadEntity.Where(x => TestDbContext.CustomDbFunctionPlus(1, 2) < 1).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Where(x => EF.Functions.Random() < 1).Expression,
-                    CachedEfCoreOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
                 },
             };
         }

@@ -1,10 +1,8 @@
 ﻿using CachedEfCore.EntityMapping;
+using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore.Metadata;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
-namespace CachedEfCore.SqlAnalysis.SqlServer
+namespace CachedEfCore.SqlServer.SqlAnalysis
 {
     public class SqlServerQueryEntityExtractor : ISqlQueryEntityExtractor
     {

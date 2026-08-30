@@ -1,9 +1,9 @@
-﻿using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlAnalisys.Tests.Parsing.DeleteParsing
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.DeleteParsing
 {
     public class DeleteSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace CachedEfCore.SqlAnalysis
+namespace CachedEfCore.SqlServer.SqlAnalysis
 {
     [DebuggerDisplay("{Index} -> {Remaining}")]
     public class SqlSourceCode : IEnumerable<char>, IEnumerator<char>

@@ -1,12 +1,9 @@
-﻿using System;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace CachedEfCore.SqlAnalysis.SqlServer
+namespace CachedEfCore.SqlServer.SqlAnalysis
 {
     /// <summary>
     /// Simple sql server parser for detecting table identifiers that changes state

@@ -6,20 +6,60 @@ CachedEfCore is a caching library for entity framework core
 The cache of CachedEfCore is always the lastest version of the object cached, the library auto invalidates the cache when some entity related to the cached entity changes state, so is impossible to get an old cache
 
 ## **Configuration**
-```
-public void ConfigureServices(IServiceCollection services)
-{
-    services.AddCachedEfCore();
 
-    // AddDbContextPool or AddDbContext
-    services.AddDbContextPool<AppDbContext>(options => 
+```csharp
+    public void ConfigureServices(IServiceCollection services)
     {
-        options.UseCachedEfCore(cachedEfCoreOptions =>
+        services.AddCachedEfCore();
+
+        // AddDbContextPool or AddDbContext
+        services.AddDbContextPool<AppDbContext>(options =>
         {
-            cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();  // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
+            options.UseSqlServer();
+
+            options.UseCachedEfCore(cachedEfCoreOptions =>
+            {
+                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                cachedEfCoreOptions.UseSqlServer();
+            });
         });
-    });
-}
+    }
+```
+
+## **Full Configuration**
+```csharp
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddCachedEfCore();
+
+        // AddDbContextPool or AddDbContext
+        services.AddDbContextPool<AppDbContext>(options =>
+        {
+            options.UseSqlServer();
+
+            options.UseCachedEfCore(cachedEfCoreOptions =>
+            {
+                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                cachedEfCoreOptions.UseSqlServer();
+
+                cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
+                {
+                    keyGen.ConfigureNonEvaluableTypes(originals =>
+                    {
+                        originals.Add(typeof(SomeType));
+
+                        return originals;
+                    });
+
+                    keyGen.ConfigureJsonSerializer(original =>
+                    {
+                        var newOptions = new JsonSerializerOptions();
+                        return newOptions;
+                    });
+                });
+            });
+        });
+    }
 ```
 
 ## **DbContext**

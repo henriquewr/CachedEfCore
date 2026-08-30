@@ -1,9 +1,9 @@
-﻿using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlAnalisys.Tests.Parsing.InsertParsing
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.InsertParsing
 {
     public class InsertSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

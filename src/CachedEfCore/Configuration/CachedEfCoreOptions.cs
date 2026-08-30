@@ -1,18 +1,12 @@
 ﻿using CachedEfCore.SqlAnalysis;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using System;
-using System.Collections.Generic;
-using System.Text.Json;
 
 namespace CachedEfCore.Configuration
 {
-    public class CachedEfCoreOptions : ICachedEfCoreOptions
+    public class CachedEfCoreOptions
     {
-        public required JsonSerializerOptions KeyGeneratorJsonSerializerOptions { get; set; }
-        public required List<Type> NonEvaluableTypes { get; set; }
         public required Type SqlQueryEntityExtractorType { get; set; }
+        public required CachedEfCoreKeyGenerationOptions KeyGenerationOptions { get; set; }
     }
 
     public static class CachedEfCoreOptionsExtensions
@@ -24,21 +18,9 @@ namespace CachedEfCore.Configuration
                 return new CachedEfCoreOptions
                 {
                     SqlQueryEntityExtractorType = typeof(GenericSqlQueryEntityExtractor),
-                    KeyGeneratorJsonSerializerOptions = CachedEfCoreOptions.DefaultKeyGeneratorJsonSerializerOptions,
-                    NonEvaluableTypes = CachedEfCoreOptions.DefaultNonEvaluableTypes,
+                    KeyGenerationOptions = CachedEfCoreKeyGenerationOptions.CreateDefault(),
                 };
             }
-
-            public static List<Type> DefaultNonEvaluableTypes => new List<Type>
-            {
-                typeof(DbContext),
-                typeof(DbSet<>), // DbContext.SomeEntity
-    #pragma warning disable EF1001 
-                typeof(EntityQueryable<>), // DbContext.SomeEntity.Where(x => true).GetType(),
-    #pragma warning restore EF1001
-                typeof(QueryRootExpression),
-            };
-            public static JsonSerializerOptions DefaultKeyGeneratorJsonSerializerOptions => new JsonSerializerOptions { IncludeFields = true };
         }
     }
 }

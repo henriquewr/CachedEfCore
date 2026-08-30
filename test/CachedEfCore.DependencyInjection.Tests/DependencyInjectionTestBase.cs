@@ -9,19 +9,20 @@ using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using System;
+using System.Linq;
+using System.Text.Json;
 using Xunit;
 
 namespace CachedEfCore.DependencyInjection.Tests
 {
-    public class DependencyInjectionTests
+    public class DependencyInjectionTestBase
     {
         [Fact]
-        public void DependencyInjection_Should_Register_CachedEfCore()
+        public void Generic_DependencyInjection_Should_Register_CachedEfCore()
         {
             var services = new ServiceCollection();
 
@@ -33,19 +34,41 @@ namespace CachedEfCore.DependencyInjection.Tests
 
                 options.UseCachedEfCore(cachedEfCoreOptions =>
                 {
-                    cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                    cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
+                    {
+                        keyGen.ConfigureNonEvaluableTypes(originals =>
+                        {
+                            var cloned = originals.ToList();
+                            cloned.Add(typeof(object));
+
+                            return cloned;
+                        });
+
+                        keyGen.ConfigureJsonSerializer(original =>
+                        {
+                            var newOptions = new JsonSerializerOptions();
+                            return newOptions;
+                        });
+                    });
+
+                    cachedEfCoreOptions.WithSqlQueryEntityExtractor<GenericSqlQueryEntityExtractor>();
                 });
             });
 
             var builtServiceProvider = services.BuildServiceProvider();
 
-            AssertCachedEfCoreIsRegistred(builtServiceProvider);
+            using var scope = builtServiceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            var sqlQueryEntityExtractor = dbContext.GetService<ISqlQueryEntityExtractor>();
+
+            Assert.IsType<GenericSqlQueryEntityExtractor>(sqlQueryEntityExtractor);
+
+            AssertCachedEfCoreIsRegistred(scope);
         }
 
-        private static void AssertCachedEfCoreIsRegistred(IServiceProvider serviceProvider)
+        protected virtual void AssertCachedEfCoreIsRegistred(IServiceScope scope)
         {
-            using var scope = serviceProvider.CreateScope();
-
             var appDbQueryCacheMetrics = scope.ServiceProvider.GetRequiredService<IDbQueryCacheMetrics>();
             var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
 
@@ -59,7 +82,6 @@ namespace CachedEfCore.DependencyInjection.Tests
             var dbQueryCacheMetrics = dbContext.GetService<IDbQueryCacheMetrics>();
             var cachedEfCoreEvalutableExpressionChecker = dbContext.GetService<ICachedEfCoreEvalutableExpressionChecker>();
             var sqlQueryEntityExtractor = dbContext.GetService<ISqlQueryEntityExtractor>();
-            Assert.IsType<SqlServerQueryEntityExtractor>(sqlQueryEntityExtractor);
 
             var dbStateInterceptor = dbContext.GetService<DbStateInterceptor>();
         }

@@ -1,11 +1,9 @@
 ﻿using CachedEfCore.Cache.Helper;
 using CachedEfCore.Cache.Tests.Common;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using Xunit;
 
@@ -29,7 +27,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
                 {
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
-                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                        cachedEfCoreOptions.UseSqlServer();
                     });
                 });
             });
