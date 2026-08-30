@@ -1,11 +1,11 @@
-﻿using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlAnalisys.Tests.Parsing
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing
 {
     public class EnclosedNonEnclosedSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

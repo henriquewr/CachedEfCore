@@ -1,8 +1,7 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -14,7 +13,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace CachedEfCore.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
 {
     public class SqlServerQueryEntityExtractorTest : SqlQueryEntityExtractorTestBase, IClassFixture<ServiceProviderFixture>
     {

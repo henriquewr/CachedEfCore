@@ -29,7 +29,7 @@ namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
         private readonly IModel? _model;
         private readonly ICachedEfCoreEvalutableExpressionChecker _cachedEfCoreEvalutableExpressionChecker;
 
-        private class KeyGeneratorState : IDisposable, IAsyncDisposable
+        private sealed class KeyGeneratorState : IDisposable, IAsyncDisposable
         {
             public required ValuePrinter ValuePrinter { get; set; }
 

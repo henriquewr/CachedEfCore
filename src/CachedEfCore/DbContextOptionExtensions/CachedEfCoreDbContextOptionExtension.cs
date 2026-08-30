@@ -24,11 +24,11 @@ namespace CachedEfCore.DbContextOptionExtensions
     public class CachedEfCoreDbContextOptionExtension : IDbContextOptionsExtension
     {
         private readonly Type _contextType;
-        private readonly ICachedEfCoreOptions _options;
+        private readonly CachedEfCoreOptions _options;
 
         public DbContextOptionsExtensionInfo Info { get; }
 
-        public CachedEfCoreDbContextOptionExtension(Type contextType, ICachedEfCoreOptions options)
+        public CachedEfCoreDbContextOptionExtension(Type contextType, CachedEfCoreOptions options)
         {
             _contextType = contextType;
             _options = options;
@@ -71,7 +71,7 @@ namespace CachedEfCore.DbContextOptionExtensions
                     printabilityChecker,
                     model,
                     cachedEfCoreEvalutableExpressionChecker,
-                    _options.KeyGeneratorJsonSerializerOptions
+                    _options.KeyGenerationOptions.JsonSerializerOptions
                 );
             });
             services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
@@ -83,7 +83,7 @@ namespace CachedEfCore.DbContextOptionExtensions
 
             services.TryAddSingleton<ITypeCompatibilityChecker>(sp =>
             {
-                return new TypeCompatibilityChecker(_options.NonEvaluableTypes);
+                return new TypeCompatibilityChecker(_options.KeyGenerationOptions.NonEvaluableTypes);
             });
         }
 
@@ -110,7 +110,11 @@ namespace CachedEfCore.DbContextOptionExtensions
             {
                 var extension = (CachedEfCoreDbContextOptionExtension)this.Extension;
 
-                return HashCode.Combine(extension._contextType, extension._options.NonEvaluableTypes, extension._options.SqlQueryEntityExtractorType);
+                return HashCode.Combine(extension._contextType,
+                    extension._options.SqlQueryEntityExtractorType,
+                    extension._options.KeyGenerationOptions.NonEvaluableTypes, 
+                    extension._options.KeyGenerationOptions.JsonSerializerOptions
+                );
             }
 
             public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
@@ -128,8 +132,9 @@ namespace CachedEfCore.DbContextOptionExtensions
                 var extension = (CachedEfCoreDbContextOptionExtension)this.Extension;
 
                 return cachedEfCoreDbContextOptionExtension._contextType == extension._contextType
-                    && cachedEfCoreDbContextOptionExtension._options.NonEvaluableTypes.SequenceEqual(extension._options.NonEvaluableTypes)
-                    && cachedEfCoreDbContextOptionExtension._options.SqlQueryEntityExtractorType == extension._options.SqlQueryEntityExtractorType;
+                    && cachedEfCoreDbContextOptionExtension._options.SqlQueryEntityExtractorType == extension._options.SqlQueryEntityExtractorType
+                    && cachedEfCoreDbContextOptionExtension._options.KeyGenerationOptions.NonEvaluableTypes.SequenceEqual(extension._options.KeyGenerationOptions.NonEvaluableTypes)
+                    && cachedEfCoreDbContextOptionExtension._options.KeyGenerationOptions.JsonSerializerOptions == extension._options.KeyGenerationOptions.JsonSerializerOptions;
             }
         }
     }

@@ -1,9 +1,9 @@
-﻿using CachedEfCore.SqlAnalysis.SqlServer;
+﻿using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlAnalisys.Tests.Parsing.MergeParsing
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.MergeParsing
 {
     public class MergeSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

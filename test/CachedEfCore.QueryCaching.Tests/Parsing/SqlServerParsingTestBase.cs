@@ -1,12 +1,12 @@
 ﻿using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 
-namespace CachedEfCore.SqlAnalisys.Tests.Parsing
+namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing
 {
     public class SqlServerParsingTestBase
     {
@@ -26,7 +26,7 @@ namespace CachedEfCore.SqlAnalisys.Tests.Parsing
 
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
-                        cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
+                        cachedEfCoreOptions.UseSqlServer();
                     });
                 });
            });
