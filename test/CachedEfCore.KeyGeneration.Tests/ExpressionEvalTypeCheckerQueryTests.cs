@@ -30,7 +30,7 @@ namespace CachedEfCore.KeyGeneration.Tests
         {
             var dbContext = new TestDbContext();
 
-            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes);
+            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes);
 
             return new()
             {

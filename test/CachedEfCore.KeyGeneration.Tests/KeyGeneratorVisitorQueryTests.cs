@@ -56,15 +56,15 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 {
                     context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Select(x => x.LazyLoadPropId).Expression,
-                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Where(x => ThrowMethod(x.Id)).Expression,
-                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Select(x => x.StringData!.Where(s => ThrowMethod(x.Id) && ThrowMethod(x.Id))).Expression,
-                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes.ToArray()
                 },
             };
 
@@ -107,11 +107,11 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 {
                     context => context.LazyLoadEntity.Where(x => TestDbContext.CustomDbFunctionPlus(1, 2) < 1).Expression,
-                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes.ToArray()
                 },
                 {
                     context => context.LazyLoadEntity.Where(x => EF.Functions.Random() < 1).Expression,
-                    CachedEfCoreKeyGenerationOptions.DefaultNonEvaluableTypes.ToArray()
+                    CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes.ToArray()
                 },
             };
         }

@@ -1,18 +1,5 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
-using CachedEfCore.Cache.Metrics;
-using CachedEfCore.Configuration;
-using CachedEfCore.DependencyManager;
-using CachedEfCore.EntityMapping;
-using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.KeyGeneration.TypeCompatibility;
-using CachedEfCore.SqlAnalysis;
+﻿using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
@@ -24,75 +11,55 @@ namespace CachedEfCore.DbContextOptionExtensions
     public class CachedEfCoreDbContextOptionExtension : IDbContextOptionsExtension
     {
         private readonly Type _contextType;
-        private readonly CachedEfCoreOptions _options;
+        private readonly List<CachedEfCoreService> _services = CachedEfCoreCoreServices.GetCoreServices().ToList();
+
+        private IEnumerable<CachedEfCoreService> _orderedServices => _services.OrderBy(x => x.ServiceDescriptor.ServiceKey);
+
+        public void AddService(CachedEfCoreService cachedEfCoreService) 
+        {
+            _services.Add(cachedEfCoreService);
+        }
+
+        public void ReplaceService(CachedEfCoreService cachedEfCoreService)
+        {
+            var index = _services.FindIndex(x => x.ServiceDescriptor.ServiceType == cachedEfCoreService.ServiceDescriptor.ServiceType);
+            if (index != -1)
+            {
+                _services[index] = cachedEfCoreService;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Service {cachedEfCoreService.ServiceDescriptor.ServiceType} not found to replace.");
+            }
+        }
+
+        public void AddOrReplaceService(CachedEfCoreService cachedEfCoreService)
+        {
+            var index = _services.FindIndex(x => x.ServiceDescriptor.ServiceType == cachedEfCoreService.ServiceDescriptor.ServiceType);
+            if (index != -1)
+            {
+                _services[index] = cachedEfCoreService;
+            }
+            else
+            {
+                _services.Add(cachedEfCoreService);
+            }
+        }
 
         public DbContextOptionsExtensionInfo Info { get; }
 
-        public CachedEfCoreDbContextOptionExtension(Type contextType, CachedEfCoreOptions options)
+        public CachedEfCoreDbContextOptionExtension(Type contextType)
         {
             _contextType = contextType;
-            _options = options;
             Info = new ExtensionInfo(this);
         }
 
         public void ApplyServices(IServiceCollection services)
         {
-            services.AddMemoryCache();
-
-            services.TryAddScoped<EntityDependency>(sp =>
+            foreach (var item in _services)
             {
-                var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
-
-                var entityDependency = EntityDependency.GetOrAdd(dbContext.Model);
-
-                return entityDependency;
-            });
-
-            services.TryAddScoped<TableEntityMapping>(sp =>
-            {
-                var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
-
-                var tableEntityMapping = TableEntityMapping.GetOrAdd(dbContext.Model);
-
-                return tableEntityMapping;
-            });
-
-            services.TryAddSingleton<IPrintabilityChecker, PrintabilityChecker>();
-            services.TryAddSingleton<IExpressionEvalTypeChecker, ExpressionEvalTypeCheckerVisitor>();
-            services.TryAddSingleton<ICachedEfCoreEvalutableExpressionChecker, CachedEfCoreEvalutableExpressionChecker>();
-
-            services.TryAddScoped<KeyGeneratorVisitor>(sp =>
-            {
-                var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
-                var model = sp.GetRequiredService<IModel>();
-                var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
-
-                return new KeyGeneratorVisitor(
-                    printabilityChecker,
-                    model,
-                    cachedEfCoreEvalutableExpressionChecker,
-                    _options.KeyGenerationOptions.JsonSerializerOptions
-                );
-            });
-            services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
-            services.TryAddSingleton<IDbQueryCacheMetrics>(sp =>
-            {
-                return new DbQueryCacheWithGlobalMetrics(new DbQueryCacheMetrics());
-            });
-            services.TryAddSingleton<IDbQueryCacheInternalStore, DbQueryCacheInternalStore>();
-            services.TryAddScoped<IDbQueryCacheStore>(sp =>
-            {
-                var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
-                return new DbQueryCacheStore(dbContext);
-            });
-
-            services.TryAddSingleton(typeof(ISqlQueryEntityExtractor), _options.SqlQueryEntityExtractorType);
-            services.TryAddSingleton<DbStateInterceptor>();
-
-            services.TryAddSingleton<ITypeCompatibilityChecker>(sp =>
-            {
-                return new TypeCompatibilityChecker(_options.KeyGenerationOptions.NonEvaluableTypes);
-            });
+                services.TryAdd(item.ServiceDescriptor);
+            }
         }
 
         public IDbContextOptionsExtension ApplyDefaults(IDbContextOptions options)
@@ -114,15 +81,32 @@ namespace CachedEfCore.DbContextOptionExtensions
 
             public override string LogFragment => " CachedEfCore ";
 
+            private int? HashCodetServiceProvider;
+
             public override int GetServiceProviderHashCode()
             {
+                if (HashCodetServiceProvider.HasValue)
+                {
+                    return HashCodetServiceProvider.Value;
+                }
+
                 var extension = (CachedEfCoreDbContextOptionExtension)this.Extension;
 
-                return HashCode.Combine(extension._contextType,
-                    extension._options.SqlQueryEntityExtractorType,
-                    extension._options.KeyGenerationOptions.NonEvaluableTypes, 
-                    extension._options.KeyGenerationOptions.JsonSerializerOptions
-                );
+                HashCode hashCode = new HashCode();
+
+                foreach (var item in extension._orderedServices)
+                {
+                    if (item.GetServiceProviderHashCode is null)
+                    {
+                        continue;
+                    }
+
+                    hashCode.Add(item.GetServiceProviderHashCode(item));
+                }
+
+                HashCodetServiceProvider = hashCode.ToHashCode();
+
+                return HashCodetServiceProvider.Value;
             }
 
             public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
@@ -139,10 +123,33 @@ namespace CachedEfCore.DbContextOptionExtensions
 
                 var extension = (CachedEfCoreDbContextOptionExtension)this.Extension;
 
-                return cachedEfCoreDbContextOptionExtension._contextType == extension._contextType
-                    && cachedEfCoreDbContextOptionExtension._options.SqlQueryEntityExtractorType == extension._options.SqlQueryEntityExtractorType
-                    && cachedEfCoreDbContextOptionExtension._options.KeyGenerationOptions.NonEvaluableTypes.SequenceEqual(extension._options.KeyGenerationOptions.NonEvaluableTypes)
-                    && cachedEfCoreDbContextOptionExtension._options.KeyGenerationOptions.JsonSerializerOptions == extension._options.KeyGenerationOptions.JsonSerializerOptions;
+                foreach (var service in extension._services)
+                {
+                    if (service.ShouldUseSameServiceProvider is null)
+                    {
+                        continue;
+                    }
+
+                    var otherServices = cachedEfCoreDbContextOptionExtension._services.Where(x => x.ServiceDescriptor.ServiceType == service.ServiceDescriptor.ServiceType);
+
+                    if (!otherServices.Any())
+                    {
+                        continue;
+                    }
+
+                    var arg = new ShouldUseSameServiceProviderArgs
+                    {
+                        ThisService = service,
+                        OtherServices = otherServices
+                    };
+
+                    if (!service.ShouldUseSameServiceProvider(arg))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
         }
     }

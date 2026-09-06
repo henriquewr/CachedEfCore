@@ -26,11 +26,10 @@ namespace CachedEfCore.DependencyInjection
         {
             public DbContextOptionsBuilder UseCachedEfCore(Action<CachedEfCoreOptionsBuilder>? configure = null)
             {
-                var options = new CachedEfCoreOptionsBuilder();
-                configure?.Invoke(options);
-                var builtOptions = options.Build();
+                var extension = new CachedEfCoreDbContextOptionExtension(builder.Options.ContextType);
 
-                var extension = new CachedEfCoreDbContextOptionExtension(builder.Options.ContextType, builtOptions);
+                var options = new CachedEfCoreOptionsBuilder(extension);
+                configure?.Invoke(options);
 
                 ((IDbContextOptionsBuilderInfrastructure)builder).AddOrUpdateExtension(extension);
 
