@@ -1,14 +1,14 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
+﻿using CachedEfCore.Cache.Helper;
+using CachedEfCore.Cache.KeyGeneration;
+using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation;
+using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
 using CachedEfCore.Cache.Metrics;
+using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -128,26 +128,6 @@ namespace CachedEfCore.Configuration
                 ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheMetrics>(sp =>
                 {
                     return new DbQueryCacheWithGlobalMetrics(new DbQueryCacheMetrics());
-                }),
-                GetServiceProviderHashCode = null,
-                ShouldUseSameServiceProvider = null,
-                Options = null,
-            };
-
-            yield return new CachedEfCoreService
-            {
-                ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInternalStore, DbQueryCacheInternalStore>(),
-                GetServiceProviderHashCode = null,
-                ShouldUseSameServiceProvider = null,
-                Options = null,
-            };
-
-            yield return new CachedEfCoreService
-            {
-                ServiceDescriptor = ServiceDescriptor.Scoped<IDbQueryCacheStore>(sp =>
-                {
-                    var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
-                    return new DbQueryCacheStore(dbContext);
                 }),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,

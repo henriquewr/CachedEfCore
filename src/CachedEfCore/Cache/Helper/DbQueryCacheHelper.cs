@@ -1,6 +1,7 @@
-﻿using CachedEfCore.DependencyManager;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+﻿using CachedEfCore.Cache.KeyGeneration;
+using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Cache.Store;
+using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;

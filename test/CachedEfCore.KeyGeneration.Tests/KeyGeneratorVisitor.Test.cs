@@ -1,5 +1,6 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,8 @@ namespace CachedEfCore.KeyGeneration.Tests
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
                         cachedEfCoreOptions.UseSqlServer();
+
+                        cachedEfCoreOptions.UseInMemoryCacheStore();
 
                         cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
                         {

@@ -1,4 +1,4 @@
-﻿using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using System;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
-namespace CachedEfCore.KeyGeneration.ExpressionEvaluation
+namespace CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation
 {
     public class CachedEfCoreEvalutableExpressionChecker : ICachedEfCoreEvalutableExpressionChecker
     {

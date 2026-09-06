@@ -1,4 +1,4 @@
-﻿using CachedEfCore.Cache;
+﻿using CachedEfCore.Cache.Store;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;

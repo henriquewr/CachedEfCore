@@ -1,16 +1,13 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheStore : IDbQueryCacheStore
+    public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
     {
         private readonly IDbQueryCacheInternalStore _dbQueryCacheStore;
         private readonly Guid _dbContextId;
@@ -26,7 +23,7 @@ namespace CachedEfCore.Cache
             remove => _dbQueryCacheStore.OnInvalidatingDependentEntities -= value;
         }
 
-        public DbQueryCacheStore(DbContext dbContext)
+        public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
             _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInternalStore>();
             _dbContextId = dbContext.ContextId.InstanceId;

@@ -1,5 +1,8 @@
 ﻿using CachedEfCore.Cache.Metrics;
-using CachedEfCore.Cache.Tests.Common;
+using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.Caching.InMemory.Store;
+using CachedEfCore.Caching.InMemory.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
@@ -13,7 +16,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
+namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 {
     public class DbQueryCacheStoreTest : IClassFixture<ServiceProviderFixture>
     {
@@ -45,6 +48,8 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
+                           cachedEfCoreOptions.UseInMemoryCacheStore();
+
                            cachedEfCoreOptions.UseSqlServer();
                        });
                    });
@@ -238,9 +243,6 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
             var internalMetrics = dbContext.GetService<IDbQueryCacheMetrics>();
 
-            applicationMetrics.Reset();
-            internalMetrics.Reset();
-
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
@@ -259,6 +261,9 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                 Key = "cacheKeyAddToCache" + x,
                 DependentDbContext = dbContext.ContextId.InstanceId
             }).ToArray();
+
+            applicationMetrics.Reset();
+            internalMetrics.Reset();
 
             Parallel.ForEach(keys, parallelOptions, key =>
             {

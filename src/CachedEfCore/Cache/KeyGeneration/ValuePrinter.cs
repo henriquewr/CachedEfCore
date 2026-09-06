@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace CachedEfCore.KeyGeneration
+namespace CachedEfCore.Cache.KeyGeneration
 {
     public class ValuePrinter : IDisposable, IAsyncDisposable
     {

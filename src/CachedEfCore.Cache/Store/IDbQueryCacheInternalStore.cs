@@ -1,11 +1,9 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Caching.InMemory.Store
 {
     public interface IDbQueryCacheInternalStore
     {

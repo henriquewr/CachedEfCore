@@ -1,12 +1,14 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
+﻿using CachedEfCore.Cache.Helper;
+using CachedEfCore.Cache.KeyGeneration;
+using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation;
+using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
 using CachedEfCore.Cache.Metrics;
+using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.Caching.InMemory.Store;
 using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -32,6 +34,8 @@ namespace CachedEfCore.DependencyInjection.Tests
 
                 options.UseCachedEfCore(cachedEfCoreOptions =>
                 {
+                    cachedEfCoreOptions.UseInMemoryCacheStore();
+
                     cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
                     {
                         keyGen.ConfigureNonEvaluableTypes(originals =>
@@ -49,7 +53,7 @@ namespace CachedEfCore.DependencyInjection.Tests
                         });
                     });
 
-                    cachedEfCoreOptions.WithSqlQueryEntityExtractor<GenericSqlQueryEntityExtractor>();
+                    cachedEfCoreOptions.UseGenericProvider();
                 });
             });
 

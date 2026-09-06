@@ -1,4 +1,5 @@
-﻿using CachedEfCore.Configuration;
+﻿using CachedEfCore.Cache.Store;
+using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,7 +16,7 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         private IEnumerable<CachedEfCoreService> _orderedServices => _services.OrderBy(x => x.ServiceDescriptor.ServiceKey);
 
-        public void AddService(CachedEfCoreService cachedEfCoreService) 
+        public void AddService(CachedEfCoreService cachedEfCoreService)
         {
             _services.Add(cachedEfCoreService);
         }
@@ -69,6 +70,10 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         public void Validate(IDbContextOptions options)
         {
+            if (_services.Any(x => x.ServiceDescriptor.ServiceType == typeof(IDbQueryCacheStore)) == false)
+            {
+                throw new InvalidOperationException($"The service {nameof(IDbQueryCacheStore)} is required. A common cause is that you did not call any cache provider, e.g., {nameof(CachedEfCoreOptionsBuilder)}.UseInMemoryCacheStore()");
+            }
         }
 
         private sealed class ExtensionInfo : DbContextOptionsExtensionInfo

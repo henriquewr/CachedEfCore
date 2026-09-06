@@ -1,4 +1,4 @@
-﻿using CachedEfCore.KeyGeneration.ExpressionEvaluation;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Linq.Expressions;
@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace CachedEfCore.KeyGeneration.ExpressionKeyGen
+namespace CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen
 {
     public readonly struct KeyGeneratorResult<T>
     {

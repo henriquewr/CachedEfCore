@@ -1,19 +1,16 @@
 ﻿using CachedEfCore.Cache.EventData;
 using CachedEfCore.Cache.Metrics;
+using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Caching.InMemory.Store
 {
     public partial class DbQueryCacheInternalStore : IDbQueryCacheInternalStore
     {
@@ -29,17 +26,6 @@ namespace CachedEfCore.Cache
             _cache = cache;
             _metrics = metrics;
             _cacheOptions = cacheOptions;
-        }
-
-        public DbQueryCacheInternalStore(IMemoryCache cache, IDbQueryCacheMetrics metrics)
-        {
-            _cache = cache;
-            _metrics = metrics;
-
-            _cacheOptions = new() 
-            { 
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30),
-            };
         }
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;

@@ -1,9 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CachedEfCore.Cache.Tests.Common
+namespace CachedEfCore.Caching.InMemory.Tests.Common
 {
     public class TestDbContext : DbContext
     {

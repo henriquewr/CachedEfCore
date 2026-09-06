@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
 
-namespace CachedEfCore.KeyGeneration.ExpressionEvaluation
+namespace CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation
 {
     public interface ICachedEfCoreEvalutableExpressionChecker
     {

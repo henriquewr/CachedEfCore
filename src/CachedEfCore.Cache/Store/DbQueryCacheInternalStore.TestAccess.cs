@@ -1,9 +1,7 @@
 ﻿#if TEST_BUILD
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Caching.InMemory.Store
 {
     public partial class DbQueryCacheInternalStore
     {

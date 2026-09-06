@@ -1,4 +1,5 @@
-﻿using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.DependencyManager.Attributes;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
@@ -35,8 +36,11 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
                      options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
                      options.UseLazyLoadingProxies();
                      options.UseSqlServer();
+
                      options.UseCachedEfCore(cachedEfCoreOptions =>
                      {
+                         cachedEfCoreOptions.UseInMemoryCacheStore();
+
                          cachedEfCoreOptions.UseSqlServer();
                      });
                  });

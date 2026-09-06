@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CachedEfCore.KeyGeneration
+namespace CachedEfCore.Cache.KeyGeneration
 {
     public interface IPrintabilityChecker
     {

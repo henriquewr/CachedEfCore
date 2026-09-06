@@ -1,4 +1,5 @@
-﻿using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.DependencyInjection;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlServer.SqlAnalysis;
@@ -38,6 +39,8 @@ namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
                     options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
+                        cachedEfCoreOptions.UseInMemoryCacheStore();
+
                         cachedEfCoreOptions.WithSqlQueryEntityExtractor<SqlServerQueryEntityExtractor>();
                     });
                 });
