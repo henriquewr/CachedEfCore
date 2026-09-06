@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Context;
-using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +30,7 @@ namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing
                 });
            });
 
-        public class TestDbContext : CachedDbContext
+        public class TestDbContext : DbContext
         {
             public TestDbContext() : base()
             {

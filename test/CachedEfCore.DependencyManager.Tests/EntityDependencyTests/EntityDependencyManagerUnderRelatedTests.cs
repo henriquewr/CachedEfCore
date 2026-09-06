@@ -1,5 +1,6 @@
 ﻿using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -116,34 +117,35 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         public void GetUnderRelatedEntities_Should_Return_Under_Related_Not_IncludingFks(UnderRelatedData underRelatedData)
         {
             var expectedEntities = underRelatedData.Expected.Select(GetIEntityType).ToHashSet();
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
 
             var iEntityType = GetIEntityType(underRelatedData.Type);
-            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, false);
+            var entitiesByIEntityType = dependencyManager.GetUnderRelatedEntities(iEntityType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByIEntityType));
 
-            var entities = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, false);
+            var entities = dependencyManager.GetUnderRelatedEntities(underRelatedData.Type, false);
             Assert.True(expectedEntities.SetEquals(entities));
 
-            var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, false);
+            var entitiesByAnonymousType = dependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByAnonymousType));
 
-            var entitiesByNestedAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, false);
+            var entitiesByNestedAnonymousType = dependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousType));
 
-            var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, false);
+            var entitiesByGenericAnonymousType = dependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousType));
 
-            var entitiesByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, false);
+            var entitiesByNestedGenericAnonymousType = dependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousType));
 
-            var entitiesTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, false);
+            var entitiesTupleLiteralType = dependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, false);
             Assert.True(expectedEntities.SetEquals(entitiesTupleLiteralType));
 
-            var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, false);
+            var entitiesByGenericTupleLiteralType = dependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralType));
 
             var proxyType = _cachedDbContext.CreateProxy(underRelatedData.Type).GetType();
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(proxyType, false);
+            var entitiesByProxyType = dependencyManager.GetUnderRelatedEntities(proxyType, false);
             Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
         }
 
@@ -244,34 +246,35 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         public void GetUnderRelatedEntities_Should_Return_Under_Related_When_IncludingFks(UnderRelatedData underRelatedData)
         {
             var expectedEntities = underRelatedData.Expected.Select(GetIEntityType).ToHashSet();
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
 
             var iEntityType = GetIEntityType(underRelatedData.Type);
-            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(iEntityType, true);
+            var entitiesByIEntityTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(iEntityType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByIEntityTypeIncludingFks));
 
-            var entitiesIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.Type, true);
+            var entitiesIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.Type, true);
             Assert.True(expectedEntities.SetEquals(entitiesIncludingFks));
 
-            var entitiesByAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, true);
+            var entitiesByAnonymousTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.AnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByAnonymousTypeIncludingFks));
 
-            var entitiesByNestedAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, true);
+            var entitiesByNestedAnonymousTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.NestedAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousTypeIncludingFks));
 
-            var entitiesByGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, true);
+            var entitiesByGenericAnonymousTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.GenericAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousTypeIncludingFks));
 
-            var entitiesByNestedGenericAnonymousTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, true);
+            var entitiesByNestedGenericAnonymousTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.NestedGenericAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousTypeIncludingFks));
 
-            var entitiesByTupleLiteralTypeFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, true);
+            var entitiesByTupleLiteralTypeFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.TupleLiteralType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByTupleLiteralTypeFks));
 
-            var entitiesByGenericTupleLiteralTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, true);
+            var entitiesByGenericTupleLiteralTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(underRelatedData.GenericTupleLiteralType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralTypeIncludingFks));
 
             var proxyType = _cachedDbContext.CreateProxy(underRelatedData.Type).GetType();
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(proxyType, true);
+            var entitiesByProxyType = dependencyManager.GetUnderRelatedEntities(proxyType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
         }
 
@@ -308,7 +311,9 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         [MemberData(nameof(GetUnderRelatedEntitiesGeneratedByEfTestCases))]
         public void GetUnderRelatedEntities_Should_Return_Under_Related_Generated_By_EF(string iEntityType, bool includingRelatedInFks, HashSet<string> expected)
         {
-            var entitiesByIEntityTypeIncludingFks = _cachedDbContext.DependencyManager.GetUnderRelatedEntities(GetIEntityType(iEntityType), includingRelatedInFks);
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
+
+            var entitiesByIEntityTypeIncludingFks = dependencyManager.GetUnderRelatedEntities(GetIEntityType(iEntityType), includingRelatedInFks);
            
             var expectedEntities = expected.Select(GetIEntityType).ToHashSet();
             Assert.True(expectedEntities.SetEquals(entitiesByIEntityTypeIncludingFks));

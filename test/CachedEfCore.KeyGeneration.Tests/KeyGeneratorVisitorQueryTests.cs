@@ -1,5 +1,4 @@
 ﻿using CachedEfCore.Configuration;
-using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlServer.Configuration;
@@ -134,7 +133,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             var result = keyGeneratorVisitor.ExpressionToString(expression);
         }
 
-        public class TestDbContext : CachedDbContext
+        public class TestDbContext : DbContext
         {
             public static int CustomDbFunctionPlus(int value, int value2)
                 => throw new NotSupportedException("Custom database function should not be evaluated");

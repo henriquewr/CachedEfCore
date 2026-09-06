@@ -1,10 +1,11 @@
-﻿using CachedEfCore.Context;
-using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.DependencyInjection;
+using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlServer.SqlAnalysis;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -18,7 +19,7 @@ namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
     public class SqlServerQueryEntityExtractorTest : SqlQueryEntityExtractorTestBase, IClassFixture<ServiceProviderFixture>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
-        private readonly CachedDbContext _dbContext;
+        private readonly DbContext _dbContext;
         private readonly Dictionary<Type, IEntityType> _entityTypeMapping;
         public SqlServerQueryEntityExtractorTest(ServiceProviderFixture serviceProviderFixture)
         {
@@ -288,13 +289,15 @@ namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
         {
             var stateChangingEntities = testCase.StateChangingEntities.Select(GetIEntityType).ToHashSet();
 
+            var tableEntity = _dbContext.GetService<TableEntityMapping>();
+
             foreach (var sqlQueryEntityExtractor in SqlQueryEntityExtractorImplementations)
             {
                 foreach (var transformFunc in GetSqlVariantsTransformFunc())
                 {
                     var sql = testCase.GetSql(GetTableName(testCase.EntityTable), transformFunc);
 
-                    var entities = sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(_dbContext.TableEntity, sql).ToHashSet();
+                    var entities = sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntity, sql).ToHashSet();
 
                     Assert.True(stateChangingEntities.SetEquals(entities));
                 }

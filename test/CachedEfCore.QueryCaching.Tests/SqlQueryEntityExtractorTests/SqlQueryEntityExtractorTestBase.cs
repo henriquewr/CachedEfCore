@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Context;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -8,7 +7,7 @@ namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
 {
     public class SqlQueryEntityExtractorTestBase
     {
-        public class TestDbContext : CachedDbContext
+        public class TestDbContext : DbContext
         {
             public TestDbContext() : base()
             {

@@ -1,5 +1,4 @@
 ﻿using CachedEfCore.Configuration;
-using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.TypeCompatibility;
@@ -59,7 +58,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             Assert.True(willEval);
         }
 
-        private class TestDbContext : CachedDbContext
+        private class TestDbContext : DbContext
         {
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {

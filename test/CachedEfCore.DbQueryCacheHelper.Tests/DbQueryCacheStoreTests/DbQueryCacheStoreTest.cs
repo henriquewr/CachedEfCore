@@ -1,9 +1,9 @@
 ﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Tests.Common;
-using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +37,10 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 
                    services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                    {
+                       options.UseLazyLoadingProxies();
+
+                       options.UseInMemoryDatabase(Guid.NewGuid().ToString());
+
                        options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
@@ -45,11 +49,6 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                        });
                    });
                });
-
-        protected TestDbContext GetDbContext()
-        {
-            return CreateProvider().GetRequiredService<TestDbContext>();
-        }
 
         public static TheoryData<object?, bool> GetAddToCacheData()
         {
@@ -67,32 +66,37 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
         [MemberData(nameof(GetAddToCacheData))]
         public void AddToCache_Adds_To_Cache(object? valueToCache, bool isDbContextDependent)
         {
-            var dbContext = GetDbContext();
+            var serviceProvider = CreateProvider();
 
-            dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys.Clear();
-            dbContext.TestDbQueryCacheStore.TestTypeKeys.Clear();
+            var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
+
+            var dbQueryCacheInternalStore = (DbQueryCacheInternalStore)dbContext.GetService<IDbQueryCacheInternalStore>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+            dbQueryCacheInternalStore.TestDbContextDependentKeys.Clear();
+            dbQueryCacheInternalStore.TestTypeKeys.Clear();
 
             var cacheKey = new TestCacheKey
             {
                 Key = "cacheKeyAddToCache",
-                DependentDbContext = isDbContextDependent ? dbContext.Id : null,
+                DependentDbContext = isDbContextDependent ? dbContext.ContextId.InstanceId : null,
             };
             var rootType = typeof(object); // any type
 
-            dbContext.TestDbQueryCacheStore.AddToCache(dbContext, rootType, cacheKey, valueToCache);
+            dbQueryCacheStore.AddToCache(dbContext, rootType, cacheKey, valueToCache);
 
             if (isDbContextDependent)
             {
-                Assert.Single(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+                Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
             }
             else
             {
-                Assert.Empty(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+                Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
             }
 
-            Assert.Single(dbContext.TestDbQueryCacheStore.TestTypeKeys);
-            
-            var cached = dbContext.TestDbQueryCacheStore.GetCached<object>(cacheKey);
+            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+
+            var cached = dbQueryCacheStore.GetCached<object>(cacheKey);
             Assert.Same(valueToCache, cached);
         }
 
@@ -104,25 +108,27 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            var dbQueryCacheInternalStore = (DbQueryCacheInternalStore)dbContext.GetService<IDbQueryCacheInternalStore>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var key = "cacheKeyAddToCache";
 
             var dependentCacheKey = new TestCacheKey
             {
                 Key = key,
-                DependentDbContext = dbContext.Id,
+                DependentDbContext = dbContext.ContextId.InstanceId,
             };
             var rootType = typeof(object); // any type
 
             object dbContextDependentValue = "someValue";
 
-            dbContext.TestDbQueryCacheStore.AddToCache(dbContext, rootType, dependentCacheKey, dbContextDependentValue);
+            dbQueryCacheStore.AddToCache(dbContext, rootType, dependentCacheKey, dbContextDependentValue);
 
-            Assert.Single(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
 
-            Assert.Single(dbContext.TestDbQueryCacheStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
 
-            var cached = dbContext.TestDbQueryCacheStore.GetCached<object>(dependentCacheKey);
+            var cached = dbQueryCacheStore.GetCached<object>(dependentCacheKey);
             Assert.Same(dbContextDependentValue, cached);
 
             var otherDbContextCacheKey = new TestCacheKey
@@ -131,7 +137,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                 DependentDbContext = Guid.NewGuid(),
             };
 
-            var cachedToOtherDb = dbContext.TestDbQueryCacheStore.GetCached<object>(otherDbContextCacheKey);
+            var cachedToOtherDb = dbQueryCacheStore.GetCached<object>(otherDbContextCacheKey);
             Assert.Null(cachedToOtherDb);
         }
 
@@ -143,8 +149,8 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-
-            var dbQueryCacheStore = (DbQueryCacheStore)dbContext.DbQueryCacheStore;
+            var dbQueryCacheInternalStore = (DbQueryCacheInternalStore)dbContext.GetService<IDbQueryCacheInternalStore>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
 
@@ -157,7 +163,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 
             var keys = Enumerable.Range(0, 100000).Select(x => new TestCacheKey 
             { 
-                Key = "cacheKeyAddToCache" + x, DependentDbContext = dbContext.Id 
+                Key = "cacheKeyAddToCache" + x, DependentDbContext = dbContext.ContextId.InstanceId
             }).ToArray();
 
             Parallel.ForEach(keys, parallelOptions, key =>
@@ -165,9 +171,9 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                 dbQueryCacheStore.AddToCache(dbContext, rootType, key, dataToCache);
             });
 
-            Assert.Single(dbQueryCacheStore.TestDbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
 
-            Assert.Single(dbQueryCacheStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
 
             AssertContainsAllKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
         }
@@ -180,15 +186,15 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-
-            var dbQueryCacheStore = (DbQueryCacheStore)dbContext.DbQueryCacheStore;
+            var dbQueryCacheInternalStore = (DbQueryCacheInternalStore)dbContext.GetService<IDbQueryCacheInternalStore>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
 
             var keys = Enumerable.Range(0, 1000).Select(i => new TestCacheKey 
             {
                 Key = "removeAllKey" + i,
-                DependentDbContext = dbContext.Id 
+                DependentDbContext = dbContext.ContextId.InstanceId
             }).ToArray();
 
             foreach (var key in keys)
@@ -196,22 +202,22 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                 dbQueryCacheStore.AddToCache(dbContext, typeof(object) /* any type */, key, dataToCache);
             }
 
-            Assert.Single(dbQueryCacheStore.TestDbContextDependentKeys);
-            Assert.Single(dbQueryCacheStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
 
             AssertContainsAllKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
 
-            dbContext.DbQueryCacheStore.RemoveAll();
+            dbQueryCacheStore.RemoveAll();
 
-            Assert.Empty(dbQueryCacheStore.TestDbContextDependentKeys);
-            Assert.Empty(dbQueryCacheStore.TestTypeKeys);
+            Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+            Assert.Empty(dbQueryCacheInternalStore.TestTypeKeys);
 
             AssertDoesNotContainAnyKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
         }
 
-        public static TheoryData<Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>> GetReportsCacheMetricsData()
+        public static TheoryData<Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>> GetReportsCacheMetricsData()
         {
-            return new TheoryData<Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>>
+            return new TheoryData<Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>>
             {
                 { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<object>(key)) },
                 { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(cachedDbContext, rootEntityType, key, () => default!)) },
@@ -221,7 +227,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
 
         [Theory]
         [MemberData(nameof(GetReportsCacheMetricsData))]
-        public async Task Reports_Cache_Metrics(Func<ICachedDbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)
+        public async Task Reports_Cache_Metrics(Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)
         {
             var serviceProvider = CreateProvider();
 
@@ -235,7 +241,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             applicationMetrics.Reset();
             internalMetrics.Reset();
 
-            var dbQueryCacheStore = (DbQueryCacheStore)dbContext.DbQueryCacheStore;
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
 
@@ -251,7 +257,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
             var keys = Enumerable.Range(0, range).Select(x => new TestCacheKey
             {
                 Key = "cacheKeyAddToCache" + x,
-                DependentDbContext = dbContext.Id
+                DependentDbContext = dbContext.ContextId.InstanceId
             }).ToArray();
 
             Parallel.ForEach(keys, parallelOptions, key =>
@@ -278,7 +284,7 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheStoreTests
                 var nonExistingKey = new TestCacheKey
                 {
                     Key = "NonExisntingKey" + i,
-                    DependentDbContext = dbContext.Id
+                    DependentDbContext = dbContext.ContextId.InstanceId,
                 };
                 await getFromCache(dbContext, dbQueryCacheStore, nonExistingKey, rootType);
             });

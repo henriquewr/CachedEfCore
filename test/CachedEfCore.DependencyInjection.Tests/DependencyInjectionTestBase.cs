@@ -1,7 +1,6 @@
 ﻿using CachedEfCore.Cache;
 using CachedEfCore.Cache.Helper;
 using CachedEfCore.Cache.Metrics;
-using CachedEfCore.Context;
 using CachedEfCore.Interceptors;
 using CachedEfCore.KeyGeneration;
 using CachedEfCore.KeyGeneration.ExpressionEvaluation;
@@ -9,7 +8,6 @@ using CachedEfCore.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.KeyGeneration.TypeCompatibility;
 using CachedEfCore.SqlAnalysis;
-using CachedEfCore.SqlServer.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +77,7 @@ namespace CachedEfCore.DependencyInjection.Tests
             var typeCompatibilityChecker = dbContext.GetService<ITypeCompatibilityChecker>();
             var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<IDbQueryCacheInternalStore>();
             var dbQueryCacheMetrics = dbContext.GetService<IDbQueryCacheMetrics>();
             var cachedEfCoreEvalutableExpressionChecker = dbContext.GetService<ICachedEfCoreEvalutableExpressionChecker>();
             var sqlQueryEntityExtractor = dbContext.GetService<ISqlQueryEntityExtractor>();
@@ -86,7 +85,7 @@ namespace CachedEfCore.DependencyInjection.Tests
             var dbStateInterceptor = dbContext.GetService<DbStateInterceptor>();
         }
 
-        public class TestDbContext : CachedDbContext
+        public class TestDbContext : DbContext
         {
             public TestDbContext() : base()
             {
