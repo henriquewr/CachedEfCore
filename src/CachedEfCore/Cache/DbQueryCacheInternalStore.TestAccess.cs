@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace CachedEfCore.Cache
 {
-    public partial class DbQueryCacheStore
+    public partial class DbQueryCacheInternalStore
     {
         /// <summary>
         /// Access for testing purposes only

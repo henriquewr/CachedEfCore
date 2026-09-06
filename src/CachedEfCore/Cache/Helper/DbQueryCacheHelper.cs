@@ -1,6 +1,7 @@
-﻿using CachedEfCore.Context;
+﻿using CachedEfCore.DependencyManager;
 using CachedEfCore.KeyGeneration;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;
 using System.Linq.Expressions;
@@ -27,7 +28,7 @@ namespace CachedEfCore.Cache.Helper
 
         [OverloadResolutionPriority(-1)]
         public TReturnType GetOrAdd<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object?> query)
         {
@@ -36,7 +37,7 @@ namespace CachedEfCore.Cache.Helper
         [OverloadResolutionPriority(-1)]
         public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<object?> query)
         {
@@ -46,8 +47,9 @@ namespace CachedEfCore.Cache.Helper
 
             ResetAsyncLocalPrinter();
 
-            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
-            var printabilityChecker = dbContext.DbContext.GetService<IPrintabilityChecker>();
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var printabilityChecker = dbContext.GetService<IPrintabilityChecker>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -86,13 +88,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
         public TReturnType GetOrAdd<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             Expression query)
         {
@@ -100,11 +102,12 @@ namespace CachedEfCore.Cache.Helper
         }
         public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             Expression query)
         {
-            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
@@ -115,13 +118,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
         public TReturnType GetOrAdd<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
@@ -129,11 +132,12 @@ namespace CachedEfCore.Cache.Helper
         }
         public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             ReadOnlySpan<Expression> query)
         {
-            var keyGeneratorVisitor = dbContext.DbContext.GetService<KeyGeneratorVisitor>();
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
@@ -159,13 +163,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
         public TReturnType GetOrAdd<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             string key)
         {
@@ -173,23 +177,26 @@ namespace CachedEfCore.Cache.Helper
         }
         public TReturnType GetOrAdd<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<TReturnType> getDataFromDatabase,
             string key)
         {
             var expressionKey = new DbQueryCacheKey.ExpressionKey(key);
-
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
 
-        private static Guid? DependentDbContext(ICachedDbContext dbContext, Type returnType)
+        private static Guid? DependentDbContext(DbContext dbContext, Type returnType)
         {
-            var isDependent = dbContext.DependencyManager.HasLazyLoad(returnType);
+            var dependencyManager = dbContext.GetService<EntityDependency>();
 
-            return isDependent ? dbContext.Id : null;
+            var isDependent = dependencyManager.HasLazyLoad(returnType);
+
+            return isDependent ? dbContext.ContextId.InstanceId : null;
         }
     }
 }

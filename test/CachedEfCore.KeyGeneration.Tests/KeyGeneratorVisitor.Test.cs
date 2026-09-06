@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Context;
-using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.DependencyInjection;
 using CachedEfCore.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
@@ -27,7 +26,7 @@ namespace CachedEfCore.KeyGeneration.Tests
         protected virtual IServiceProvider CreateProvider(params IEnumerable<Type> nonEvaluableTypes)
            => _serviceProviderFixture.CreateProvider(services =>
            {
-               services.AddDbContext<CachedDbContext>((serviceProvider, options) =>
+               services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                {
                     options.UseSqlServer();
                     options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
@@ -54,7 +53,7 @@ namespace CachedEfCore.KeyGeneration.Tests
         {
             var provider = CreateProvider(nonEvaluableTypes).CreateScope().ServiceProvider;
 
-            var dbContext = provider.GetRequiredService<CachedDbContext>();
+            var dbContext = provider.GetRequiredService<TestDbContext>();
 
             var keyGenerator = dbContext.GetService<KeyGeneratorVisitor>();
 
@@ -388,6 +387,17 @@ namespace CachedEfCore.KeyGeneration.Tests
                     Assert.Equal(x.Item2, keyStr);
                 });
             });
+        }
+
+        public class TestDbContext : DbContext
+        {
+            public TestDbContext() : base()
+            {
+            }
+
+            public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
+            {
+            }
         }
     }
 }

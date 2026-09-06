@@ -1,5 +1,7 @@
-﻿using CachedEfCore.Tests.Common.Fixtures;
+﻿using CachedEfCore.Cache;
+using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -28,41 +30,43 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         {
             var expectedEntities = allRelatedData.Expected.Select(GetIEntityType).ToHashSet();
 
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
+
             var iEntityType = GetIEntityType(allRelatedData.Type);
-            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(iEntityType, true);
+            var entitiesByIEntityType = dependencyManager.GetAllRelatedEntities(iEntityType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByIEntityType));
 
 
-            var entities = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.Type, true);
+            var entities = dependencyManager.GetAllRelatedEntities(allRelatedData.Type, true);
             Assert.True(expectedEntities.SetEquals(entities));
 
 
-            var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.AnonymousType, true);
+            var entitiesByAnonymousType = dependencyManager.GetAllRelatedEntities(allRelatedData.AnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByAnonymousType));
 
 
-            var entitiesByNestedAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.NestedAnonymousType, true);
+            var entitiesByNestedAnonymousType = dependencyManager.GetAllRelatedEntities(allRelatedData.NestedAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousType));
 
 
-            var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.GenericAnonymousType, true);
+            var entitiesByGenericAnonymousType = dependencyManager.GetAllRelatedEntities(allRelatedData.GenericAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousType));
 
 
-            var entitiesByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.NestedGenericAnonymousType, true);
+            var entitiesByNestedGenericAnonymousType = dependencyManager.GetAllRelatedEntities(allRelatedData.NestedGenericAnonymousType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousType));
 
 
-            var entitiesByTupleLiteralType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.TupleLiteralType, true);
+            var entitiesByTupleLiteralType = dependencyManager.GetAllRelatedEntities(allRelatedData.TupleLiteralType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByTupleLiteralType));
 
 
-            var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(allRelatedData.GenericTupleLiteralType, true);
+            var entitiesByGenericTupleLiteralType = dependencyManager.GetAllRelatedEntities(allRelatedData.GenericTupleLiteralType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralType));
 
 
             var proxyType = _cachedDbContext.CreateProxy(allRelatedData.Type).GetType();
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetAllRelatedEntities(proxyType, true);
+            var entitiesByProxyType = dependencyManager.GetAllRelatedEntities(proxyType, true);
             Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
         }
 

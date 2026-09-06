@@ -1,7 +1,9 @@
-﻿using CachedEfCore.Context;
+﻿using CachedEfCore.Cache;
+using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
@@ -17,8 +19,13 @@ namespace CachedEfCore.Interceptors
             _sqlQueryEntityExtractor = sqlQueryEntityExtractor;
         }
 
-        private void CommandExecuting(string command, ICachedDbContext context, CommandSource commandSource)
+        private void CommandExecuting(string command, DbContext? context, CommandSource commandSource)
         {
+            if (context is null)
+            {
+                return;
+            }
+
             switch (commandSource)
             {
                 case CommandSource.Migrations:
@@ -27,14 +34,16 @@ namespace CachedEfCore.Interceptors
                     return;
 
                 case CommandSource.SaveChanges:
-                    var modifiedEntities = context.DbContext.ChangeTracker.Entries().Where(x => x.State != EntityState.Unchanged);
+                    var modifiedEntities = context.ChangeTracker.Entries().Where(x => x.State != EntityState.Unchanged);
                     var modifiedEntitiesTypes = modifiedEntities
                       .Select(e => e.Metadata)
                       .ToHashSet();
 
                     if (modifiedEntitiesTypes.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context);
+                        var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
+
+                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context);
                     }
                     return;
 
@@ -43,11 +52,15 @@ namespace CachedEfCore.Interceptors
                 case CommandSource.ExecuteSqlRaw:
                 case CommandSource.FromSqlQuery:
                 default:
-                    var stateChangingEntities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(context.TableEntity, command).ToHashSet();
+                    var tableEntityMapping = context.GetService<TableEntityMapping>();
+
+                    var stateChangingEntities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntityMapping, command).ToHashSet();
 
                     if (stateChangingEntities.Count != 0)
                     {
-                        context.DbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context);
+                        var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
+
+                        dbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context);
                     }
                 return;
             }
@@ -55,60 +68,42 @@ namespace CachedEfCore.Interceptors
 
         public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.ReaderExecuting(command, eventData, result);
         }
 
         public override InterceptionResult<object> ScalarExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.ScalarExecuting(command, eventData, result);
         }
 
         public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.NonQueryExecuting(command, eventData, result);
         }
 
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
         }
 
         public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
         }
 
         public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is ICachedDbContext cachedDbContext)
-            {
-                CommandExecuting(command.CommandText, cachedDbContext, eventData.CommandSource);
-            }
+            CommandExecuting(command.CommandText, eventData.Context, eventData.CommandSource);
 
             return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
         }

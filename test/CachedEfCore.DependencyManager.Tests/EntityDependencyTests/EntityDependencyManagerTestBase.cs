@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Context;
-using CachedEfCore.DependencyInjection;
+﻿using CachedEfCore.DependencyInjection;
 using CachedEfCore.DependencyManager.Attributes;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
@@ -53,7 +52,7 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
             return _cachedDbContext.Model.FindEntityType(name) ?? throw new InvalidDataException();
         }
 
-        public class TestDbContext : CachedDbContext
+        public class TestDbContext : DbContext
         {
             public TestDbContext() : base()
             {

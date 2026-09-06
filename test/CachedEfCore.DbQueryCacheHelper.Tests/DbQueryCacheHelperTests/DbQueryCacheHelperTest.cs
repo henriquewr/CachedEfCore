@@ -3,6 +3,8 @@ using CachedEfCore.Cache.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using Xunit;
@@ -25,6 +27,10 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
 
                 services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                 {
+                    options.UseLazyLoadingProxies();
+
+                    options.UseInMemoryDatabase(Guid.NewGuid().ToString());
+
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
                         cachedEfCoreOptions.UseSqlServer();
@@ -49,9 +55,10 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
 
             var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
             var dbQueryCacheHelper = serviceProvider.GetRequiredService<IDbQueryCacheHelper>();
+            var dbQueryCacheInternalStore = (DbQueryCacheInternalStore)dbContext.GetService<IDbQueryCacheInternalStore>();
 
-            dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys.Clear();
-            dbContext.TestDbQueryCacheStore.TestTypeKeys.Clear();
+            dbQueryCacheInternalStore.TestDbContextDependentKeys.Clear();
+            dbQueryCacheInternalStore.TestTypeKeys.Clear();
 
             const string cacheKey = "cacheKeyAddToCache";
 
@@ -61,14 +68,14 @@ namespace CachedEfCore.Cache.Tests.DbQueryCacheHelperTests
             if (isDbContextDependent)
             {
                 result = dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
-                Assert.Single(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+                Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
             }
             else
             {
                 result = dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
-                Assert.Empty(dbContext.TestDbQueryCacheStore.TestDbContextDependentKeys);
+                Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
             }
-            Assert.Single(dbContext.TestDbQueryCacheStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
 
             Assert.True(created);
             Assert.Same(valueToCache, result);
