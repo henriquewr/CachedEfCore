@@ -75,7 +75,10 @@ namespace CachedEfCore.DbContextOptionExtensions
                 );
             });
             services.TryAddSingleton<IDbQueryCacheHelper, DbQueryCacheHelper>();
-            services.TryAddSingleton<IDbQueryCacheMetrics, DbQueryCacheMetrics>();
+            services.TryAddSingleton<IDbQueryCacheMetrics>(sp =>
+            {
+                return new DbQueryCacheWithGlobalMetrics(new DbQueryCacheMetrics());
+            });
             services.TryAddSingleton<IDbQueryCacheInternalStore, DbQueryCacheInternalStore>();
             services.TryAddScoped<IDbQueryCacheStore>(sp =>
             {

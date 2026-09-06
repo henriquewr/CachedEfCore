@@ -123,11 +123,11 @@ namespace CachedEfCore.Cache
         {
             if (_cache.TryGetValue<T>(key, out var cached))
             {
-                ReportCacheHit();
+                _metrics.ReportCacheHit();
                 return cached;
             }
-            
-            ReportCacheMiss();
+
+            _metrics.ReportCacheMiss();
 
             return default;
         }
@@ -177,12 +177,12 @@ namespace CachedEfCore.Cache
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                ReportCacheHit();
+                _metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = create();
-            ReportCacheMiss();
+            _metrics.ReportCacheMiss();
             InternalAddToCache(dbContext, rootEntityType, key, createdValue);
 
             return createdValue;
@@ -193,28 +193,15 @@ namespace CachedEfCore.Cache
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                ReportCacheHit();
+                _metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = await create().ConfigureAwait(false);
-            ReportCacheMiss();
+            _metrics.ReportCacheMiss();
             InternalAddToCache(dbContext, rootEntityType, key, createdValue);
 
             return createdValue;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReportCacheHit()
-        {
-            DbQueryCacheMetrics.GlobalInstance.ReportCacheHit();
-            _metrics.ReportCacheHit();
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReportCacheMiss()
-        {
-            DbQueryCacheMetrics.GlobalInstance.ReportCacheMiss();
-            _metrics.ReportCacheMiss();
         }
     }
 }
