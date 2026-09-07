@@ -1,8 +1,9 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace System
+namespace CachedEfCore.Helpers.Perf
 {
 #if TEST_BUILD
     public

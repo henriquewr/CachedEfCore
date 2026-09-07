@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace CachedEfCore.Configuration
 {
-    public class CachedEfCoreKeyGenerationOptionsDefaults
+    public static class CachedEfCoreKeyGenerationOptionsDefaults
     {
         public static List<Type> DefaultNonEvaluableTypes => new List<Type>
         {

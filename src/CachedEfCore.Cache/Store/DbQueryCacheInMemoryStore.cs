@@ -1,19 +1,18 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheStore : IDbQueryCacheStore
+    public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
     {
-        private readonly IDbQueryCacheInternalStore _dbQueryCacheStore;
+        private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
+        private readonly DbContext _dbContext;
         private readonly Guid _dbContextId;
+        private bool _reseted;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
         {
@@ -26,15 +25,20 @@ namespace CachedEfCore.Cache
             remove => _dbQueryCacheStore.OnInvalidatingDependentEntities -= value;
         }
 
-        public DbQueryCacheStore(DbContext dbContext)
+        public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
-            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInternalStore>();
+            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            _dbContext = dbContext;
             _dbContextId = dbContext.ContextId.InstanceId;
         }
 
         private void Reset()
         {
-            _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
+            if (_reseted)
+            {
+                _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
+            }
+            _reseted = true;
         }
 
         public void Dispose()
@@ -52,6 +56,10 @@ namespace CachedEfCore.Cache
 
             return ValueTask.CompletedTask;
         }
+        ~DbQueryCacheInMemoryStore()
+        {
+            Reset();
+        }
 
         public void ResetState() => Reset();
 
@@ -66,31 +74,31 @@ namespace CachedEfCore.Cache
             => _dbQueryCacheStore.RemoveAllDbContextDependent(contextId);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true) 
-            => _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, dbContext, fireEvent);
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true) 
+            => _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, _dbContext, fireEvent);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true)
-            => _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove, dbContext, fireEvent);
+        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
+            => _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove, _dbContext, fireEvent);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll()
             => _dbQueryCacheStore.RemoveAll();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
-            => _dbQueryCacheStore.AddToCache(dbContext, rootEntityType, key, dataToCache);
+        public void AddToCache(Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
+            => _dbQueryCacheStore.AddToCache(_dbContext, rootEntityType, key, dataToCache);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
             => _dbQueryCacheStore.GetCached<T>(key);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
-            => _dbQueryCacheStore.GetOrAdd(dbContext, rootEntityType, key, create);
+        public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
+            => _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, create);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
-            => _dbQueryCacheStore.GetOrAddAsync(dbContext, rootEntityType, key, create);
+        public ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
+            => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, create);
     }
 }

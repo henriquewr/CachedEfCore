@@ -1,6 +1,9 @@
 ﻿using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CachedEfCore.SqlServer.SqlAnalysis
 {

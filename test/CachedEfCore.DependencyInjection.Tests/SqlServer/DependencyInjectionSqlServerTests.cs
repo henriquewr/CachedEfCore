@@ -1,4 +1,5 @@
-﻿using CachedEfCore.SqlAnalysis;
+﻿using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.SqlAnalysis;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.SqlServer.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,8 @@ namespace CachedEfCore.DependencyInjection.Tests.SqlServer
 
                 options.UseCachedEfCore(cachedEfCoreOptions =>
                 {
+                    cachedEfCoreOptions.UseInMemoryCacheStore();
+
                     cachedEfCoreOptions.UseSqlServer();
 
                     cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>

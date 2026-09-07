@@ -1,4 +1,4 @@
-﻿using CachedEfCore.Cache;
+﻿using CachedEfCore.Cache.Store;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace CachedEfCore.Interceptors
 {
-    public class DbStateInterceptor : DbCommandInterceptor, ISingletonInterceptor
+    public class DbStateInterceptor : DbCommandInterceptor
     {
         private readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor;
         public DbStateInterceptor(ISqlQueryEntityExtractor sqlQueryEntityExtractor)
@@ -43,7 +43,7 @@ namespace CachedEfCore.Interceptors
                     {
                         var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
 
-                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context);
+                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes);
                     }
                     return;
 
@@ -60,7 +60,7 @@ namespace CachedEfCore.Interceptors
                     {
                         var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
 
-                        dbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context);
+                        dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
                     }
                 return;
             }

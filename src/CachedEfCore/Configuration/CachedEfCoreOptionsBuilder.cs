@@ -8,16 +8,16 @@ namespace CachedEfCore.Configuration
 {
     public class CachedEfCoreOptionsBuilder
     {
-        private readonly CachedEfCoreDbContextOptionExtension _cachedEfCoreExtension;
+        public CachedEfCoreDbContextOptionExtension CachedEfCoreExtension { get; }
 
         public CachedEfCoreOptionsBuilder(CachedEfCoreDbContextOptionExtension cachedEfCoreExtension)
         {
-            _cachedEfCoreExtension = cachedEfCoreExtension;
+            CachedEfCoreExtension = cachedEfCoreExtension;
         }
 
         public virtual CachedEfCoreOptionsBuilder ConfigureKeyGeneration(Action<CachedEfCoreKeyGenerationOptionsBuilder> configure)
         {
-            var builder = new CachedEfCoreKeyGenerationOptionsBuilder(_cachedEfCoreExtension);
+            var builder = new CachedEfCoreKeyGenerationOptionsBuilder(CachedEfCoreExtension);
 
             configure(builder);
 
@@ -33,7 +33,7 @@ namespace CachedEfCore.Configuration
 
         public virtual CachedEfCoreOptionsBuilder WithSqlQueryEntityExtractor(Type sqlQueryEntityExtractorType)
         {
-            _cachedEfCoreExtension.AddOrReplaceService(new CachedEfCoreService
+            CachedEfCoreExtension.AddOrReplaceService(new CachedEfCoreService
             {
                 ServiceDescriptor = ServiceDescriptor.Singleton(typeof(ISqlQueryEntityExtractor), sqlQueryEntityExtractorType),
                 GetServiceProviderHashCode = thisService => ((Type)thisService.Options!).GetHashCode(),

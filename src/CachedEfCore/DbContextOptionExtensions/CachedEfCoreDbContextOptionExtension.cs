@@ -1,4 +1,6 @@
-﻿using CachedEfCore.Configuration;
+﻿using CachedEfCore.Cache.Store;
+using CachedEfCore.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -11,11 +13,12 @@ namespace CachedEfCore.DbContextOptionExtensions
     public class CachedEfCoreDbContextOptionExtension : IDbContextOptionsExtension
     {
         private readonly Type _contextType;
+        private readonly DbContextOptionsBuilder _dbContextOptionsBuilder;
         private readonly List<CachedEfCoreService> _services = CachedEfCoreCoreServices.GetCoreServices().ToList();
 
         private IEnumerable<CachedEfCoreService> _orderedServices => _services.OrderBy(x => x.ServiceDescriptor.ServiceKey);
 
-        public void AddService(CachedEfCoreService cachedEfCoreService) 
+        public void AddService(CachedEfCoreService cachedEfCoreService)
         {
             _services.Add(cachedEfCoreService);
         }
@@ -48,9 +51,10 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         public DbContextOptionsExtensionInfo Info { get; }
 
-        public CachedEfCoreDbContextOptionExtension(Type contextType)
+        public CachedEfCoreDbContextOptionExtension(DbContextOptionsBuilder dbContextOptionsBuilder)
         {
-            _contextType = contextType;
+            _dbContextOptionsBuilder = dbContextOptionsBuilder;
+            _contextType = dbContextOptionsBuilder.Options.ContextType;
             Info = new ExtensionInfo(this);
         }
 
@@ -69,6 +73,10 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         public void Validate(IDbContextOptions options)
         {
+            if (_services.Any(x => x.ServiceDescriptor.ServiceType == typeof(IDbQueryCacheStore)) == false)
+            {
+                throw new InvalidOperationException($"The service {nameof(IDbQueryCacheStore)} is required. A common cause is that you did not call any cache provider, e.g., {nameof(CachedEfCoreOptionsBuilder)}.UseInMemoryCacheStore()");
+            }
         }
 
         private sealed class ExtensionInfo : DbContextOptionsExtensionInfo

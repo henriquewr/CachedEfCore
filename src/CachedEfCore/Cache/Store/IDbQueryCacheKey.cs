@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CachedEfCore.Cache
+namespace CachedEfCore.Cache.Store
 {
     public interface IDbQueryCacheKey
     {

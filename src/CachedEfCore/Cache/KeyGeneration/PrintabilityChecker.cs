@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace CachedEfCore.KeyGeneration
+namespace CachedEfCore.Cache.KeyGeneration
 {
     public class PrintabilityChecker : IPrintabilityChecker
     {

@@ -1,8 +1,8 @@
-﻿using CachedEfCore.DbContextOptionExtensions;
-using CachedEfCore.KeyGeneration;
-using CachedEfCore.KeyGeneration.ExpressionEvaluation;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
-using CachedEfCore.KeyGeneration.TypeCompatibility;
+﻿using CachedEfCore.Cache.KeyGeneration;
+using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation;
+using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
+using CachedEfCore.DbContextOptionExtensions;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using System;
