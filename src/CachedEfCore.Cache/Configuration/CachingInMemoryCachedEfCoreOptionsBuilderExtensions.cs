@@ -6,12 +6,15 @@ namespace CachedEfCore.Caching.InMemory.Configuration
     {
         extension(CachedEfCoreOptionsBuilder builder)
         {
-            public CachedEfCoreOptionsBuilder UseInMemoryCacheStore()
+            public CachedEfCoreOptionsBuilder UseInMemoryCacheStore(Action<CachedEfCoreCachingInMemoryOptionsBuilder>? configure = null)
             {
                 foreach (var item in CachedEfCoreCachingInMemoryCoreServices.GetCoreServices())
                 {
                     builder.CachedEfCoreExtension.AddService(item);
                 }
+
+                var optionsBuilder = new CachedEfCoreCachingInMemoryOptionsBuilder(builder.CachedEfCoreExtension);
+                configure?.Invoke(optionsBuilder);
 
                 return builder;
             }

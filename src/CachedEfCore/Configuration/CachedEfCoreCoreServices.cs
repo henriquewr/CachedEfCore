@@ -5,7 +5,6 @@ using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
 using CachedEfCore.Cache.Metrics;
-using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.Interceptors;
