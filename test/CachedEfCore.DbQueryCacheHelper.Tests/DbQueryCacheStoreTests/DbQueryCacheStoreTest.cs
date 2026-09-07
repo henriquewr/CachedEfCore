@@ -88,7 +88,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             };
             var rootType = typeof(object); // any type
 
-            dbQueryCacheStore.AddToCache(dbContext, rootType, cacheKey, valueToCache);
+            dbQueryCacheStore.AddToCache(rootType, cacheKey, valueToCache);
 
             if (isDbContextDependent)
             {
@@ -127,7 +127,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             object dbContextDependentValue = "someValue";
 
-            dbQueryCacheStore.AddToCache(dbContext, rootType, dependentCacheKey, dbContextDependentValue);
+            dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, dbContextDependentValue);
 
             Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
 
@@ -173,7 +173,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             Parallel.ForEach(keys, parallelOptions, key =>
             {
-                dbQueryCacheStore.AddToCache(dbContext, rootType, key, dataToCache);
+                dbQueryCacheStore.AddToCache(rootType, key, dataToCache);
             });
 
             Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
@@ -204,7 +204,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             foreach (var key in keys)
             {
-                dbQueryCacheStore.AddToCache(dbContext, typeof(object) /* any type */, key, dataToCache);
+                dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, dataToCache);
             }
 
             Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
@@ -225,8 +225,8 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             return new TheoryData<Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>>
             {
                 { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<object>(key)) },
-                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(cachedDbContext, rootEntityType, key, () => default!)) },
-                { async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<object>(cachedDbContext, rootEntityType, key, () => Task.FromResult<object>(default!)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(rootEntityType, key, () => default!)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<object>(rootEntityType, key, () => Task.FromResult<object>(default!)) },
             };
         }
 
@@ -267,7 +267,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             Parallel.ForEach(keys, parallelOptions, key =>
             {
-                dbQueryCacheStore.AddToCache(dbContext, rootType, key, dataToCache);
+                dbQueryCacheStore.AddToCache(rootType, key, dataToCache);
             });
 
             Assert.Equal(0UL, internalMetrics.GetCacheMetrics().All);

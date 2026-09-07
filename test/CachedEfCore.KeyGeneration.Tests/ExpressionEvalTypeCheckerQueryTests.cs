@@ -1,5 +1,6 @@
 ﻿using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
 using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
+using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Configuration;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
@@ -66,6 +67,8 @@ namespace CachedEfCore.KeyGeneration.Tests
 
                 optionsBuilder.UseCachedEfCore(options =>
                 {
+                    options.UseInMemoryCacheStore();
+
                     options.UseSqlServer();
                 });
 
