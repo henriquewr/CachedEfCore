@@ -1,5 +1,6 @@
 ﻿using CachedEfCore.Cache.Store;
 using CachedEfCore.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -12,6 +13,7 @@ namespace CachedEfCore.DbContextOptionExtensions
     public class CachedEfCoreDbContextOptionExtension : IDbContextOptionsExtension
     {
         private readonly Type _contextType;
+        private readonly DbContextOptionsBuilder _dbContextOptionsBuilder;
         private readonly List<CachedEfCoreService> _services = CachedEfCoreCoreServices.GetCoreServices().ToList();
 
         private IEnumerable<CachedEfCoreService> _orderedServices => _services.OrderBy(x => x.ServiceDescriptor.ServiceKey);
@@ -49,9 +51,10 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         public DbContextOptionsExtensionInfo Info { get; }
 
-        public CachedEfCoreDbContextOptionExtension(Type contextType)
+        public CachedEfCoreDbContextOptionExtension(DbContextOptionsBuilder dbContextOptionsBuilder)
         {
-            _contextType = contextType;
+            _dbContextOptionsBuilder = dbContextOptionsBuilder;
+            _contextType = dbContextOptionsBuilder.Options.ContextType;
             Info = new ExtensionInfo(this);
         }
 

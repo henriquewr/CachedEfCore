@@ -16,12 +16,12 @@ namespace CachedEfCore.Caching.InMemory.Configuration
                 var memoryCacheOptions = CachedEfCoreCachingInMemoryOptionsDefaults.DefaultMemoryCacheEntryOptions;
                 yield return new CachedEfCoreService
                 {
-                    ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInternalStore, DbQueryCacheInternalStore>(sp =>
+                    ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(sp =>
                     {
                         var memoryCache = sp.GetRequiredService<IMemoryCache>();
                         var metrics = sp.GetRequiredService<IDbQueryCacheMetrics>();
 
-                        return new DbQueryCacheInternalStore(memoryCache, metrics, memoryCacheOptions);
+                        return new DbQueryCacheInMemoryInternalStore(memoryCache, metrics, memoryCacheOptions);
                     }),
                     GetServiceProviderHashCode = thisService => ((MemoryCacheEntryOptions)thisService.Options!).GetHashCode(),
                     ShouldUseSameServiceProvider = arg => ((MemoryCacheEntryOptions)arg.ThisService.Options!) == ((MemoryCacheEntryOptions)arg.OtherServices.Single().Options!),

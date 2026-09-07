@@ -9,9 +9,10 @@ namespace CachedEfCore.Caching.InMemory.Store
 {
     public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
     {
-        private readonly IDbQueryCacheInternalStore _dbQueryCacheStore;
+        private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly Guid _dbContextId;
+        private bool _reseted;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
         {
@@ -26,14 +27,18 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
-            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInternalStore>();
+            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
             _dbContext = dbContext;
             _dbContextId = dbContext.ContextId.InstanceId;
         }
 
         private void Reset()
         {
-            _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
+            if (_reseted)
+            {
+                _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
+            }
+            _reseted = true;
         }
 
         public void Dispose()
@@ -50,6 +55,10 @@ namespace CachedEfCore.Caching.InMemory.Store
             GC.SuppressFinalize(this);
 
             return ValueTask.CompletedTask;
+        }
+        ~DbQueryCacheInMemoryStore()
+        {
+            Reset();
         }
 
         public void ResetState() => Reset();

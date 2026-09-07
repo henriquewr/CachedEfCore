@@ -9,6 +9,7 @@ using CachedEfCore.DependencyManager;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -146,7 +147,7 @@ namespace CachedEfCore.Configuration
 
             yield return new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Singleton<DbStateInterceptor, DbStateInterceptor>(),
+                ServiceDescriptor = ServiceDescriptor.Scoped<IInterceptor, DbStateInterceptor>(),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,
                 Options = null,

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public interface IDbQueryCacheInternalStore
+    public interface IDbQueryCacheInMemoryInternalStore
     {
         event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;

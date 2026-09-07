@@ -12,6 +12,7 @@ using CachedEfCore.Interceptors;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
 using System.Text.Json;
@@ -81,12 +82,10 @@ namespace CachedEfCore.DependencyInjection.Tests
             var typeCompatibilityChecker = dbContext.GetService<ITypeCompatibilityChecker>();
             var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
-            var dbQueryCacheInternalStore = dbContext.GetService<IDbQueryCacheInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheMetrics = dbContext.GetService<IDbQueryCacheMetrics>();
             var cachedEfCoreEvalutableExpressionChecker = dbContext.GetService<ICachedEfCoreEvalutableExpressionChecker>();
             var sqlQueryEntityExtractor = dbContext.GetService<ISqlQueryEntityExtractor>();
-
-            var dbStateInterceptor = dbContext.GetService<DbStateInterceptor>();
         }
 
         public class TestDbContext : DbContext

@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace CachedEfCore.Interceptors
 {
-    public class DbStateInterceptor : DbCommandInterceptor, ISingletonInterceptor
+    public class DbStateInterceptor : DbCommandInterceptor
     {
         private readonly ISqlQueryEntityExtractor _sqlQueryEntityExtractor;
         public DbStateInterceptor(ISqlQueryEntityExtractor sqlQueryEntityExtractor)

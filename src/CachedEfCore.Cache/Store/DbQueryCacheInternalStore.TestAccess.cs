@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public partial class DbQueryCacheInternalStore
+    public partial class DbQueryCacheInMemoryInternalStore
     {
         /// <summary>
         /// Access for testing purposes only

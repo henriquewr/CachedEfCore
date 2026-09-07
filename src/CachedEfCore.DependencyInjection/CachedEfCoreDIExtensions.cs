@@ -2,6 +2,7 @@
 using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Configuration;
 using CachedEfCore.DbContextOptionExtensions;
+using CachedEfCore.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,7 +28,7 @@ namespace CachedEfCore.DependencyInjection
         {
             public DbContextOptionsBuilder UseCachedEfCore(Action<CachedEfCoreOptionsBuilder>? configure = null)
             {
-                var extension = new CachedEfCoreDbContextOptionExtension(builder.Options.ContextType);
+                var extension = new CachedEfCoreDbContextOptionExtension(builder);
 
                 var options = new CachedEfCoreOptionsBuilder(extension);
                 configure?.Invoke(options);
