@@ -43,7 +43,7 @@ namespace CachedEfCore.Interceptors
                     {
                         var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
 
-                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes, context);
+                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes);
                     }
                     return;
 
@@ -60,7 +60,7 @@ namespace CachedEfCore.Interceptors
                     {
                         var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
 
-                        dbQueryCacheStore.RemoveRootEntities(stateChangingEntities, context);
+                        dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
                     }
                 return;
             }

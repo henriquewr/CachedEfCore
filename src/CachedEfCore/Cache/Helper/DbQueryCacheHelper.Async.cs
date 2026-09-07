@@ -74,7 +74,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
@@ -104,7 +104,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
@@ -149,7 +149,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
@@ -173,7 +173,7 @@ namespace CachedEfCore.Cache.Helper
             
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
-            var result = dbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }

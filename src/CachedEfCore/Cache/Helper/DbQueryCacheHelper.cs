@@ -89,7 +89,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -119,7 +119,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -164,7 +164,7 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
@@ -186,7 +186,7 @@ namespace CachedEfCore.Cache.Helper
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
-            var result = dbQueryCacheStore.GetOrAdd(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }
