@@ -15,7 +15,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SqlQueryEntityExtractorTests
 {
     public class SqlServerQueryEntityExtractorTest : SqlQueryEntityExtractorTestBase, IClassFixture<ServiceProviderFixture>
     {

@@ -2,7 +2,7 @@
 using CachedEfCore.Tests.Common.Fixtures;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.BulkInsertParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.BulkInsertParsing
 {
     public class BulkInsertSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

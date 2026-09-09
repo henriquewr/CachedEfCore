@@ -3,7 +3,7 @@ using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.DeleteParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.DeleteParsing
 {
     public class DeleteSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

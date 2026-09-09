@@ -2,7 +2,7 @@
 using CachedEfCore.Tests.Common.Fixtures;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.SelectParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SelectParsing
 {
     public class SelectSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

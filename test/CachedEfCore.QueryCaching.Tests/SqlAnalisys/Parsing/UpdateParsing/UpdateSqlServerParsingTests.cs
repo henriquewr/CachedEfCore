@@ -3,7 +3,7 @@ using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.UpdateParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.UpdateParsing
 {
     public class UpdateSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {
