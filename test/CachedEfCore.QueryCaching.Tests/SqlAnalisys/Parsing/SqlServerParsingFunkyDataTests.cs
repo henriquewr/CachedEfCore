@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing
 {
     public class SqlServerParsingFunkyDataTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

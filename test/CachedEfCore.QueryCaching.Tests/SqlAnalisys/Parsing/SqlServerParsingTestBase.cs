@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing
 {
     public class SqlServerParsingTestBase
     {

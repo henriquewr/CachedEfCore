@@ -2,7 +2,7 @@
 using CachedEfCore.Tests.Common.Fixtures;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.TruncateTableParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.TruncateTableParsing
 {
     public class TruncateTableSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

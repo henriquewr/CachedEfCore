@@ -3,7 +3,7 @@ using CachedEfCore.Tests.Common.Fixtures;
 using System.Linq;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.Parsing.MergeParsing
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.MergeParsing
 {
     public class MergeSqlServerParsingTests : SqlServerParsingTestBase, IClassFixture<ServiceProviderFixture>
     {

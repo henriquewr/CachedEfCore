@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CachedEfCore.SqlServer.SqlAnalisys.Tests.SqlQueryEntityExtractorTests
+namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SqlQueryEntityExtractorTests
 {
     public class SqlQueryEntityExtractorTestBase
     {
