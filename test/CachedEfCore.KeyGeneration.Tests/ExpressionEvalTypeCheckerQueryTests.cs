@@ -1,12 +1,9 @@
-﻿using CachedEfCore.Cache;
-using CachedEfCore.Cache.Helper;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation.EvalTypeChecker;
+using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
+using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Configuration;
-using CachedEfCore.Context;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.Interceptors;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
-using CachedEfCore.SqlAnalysis;
-using CachedEfCore.SqlAnalysis.SqlServer;
+using CachedEfCore.SqlServer.Configuration;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -32,9 +29,9 @@ namespace CachedEfCore.KeyGeneration.Tests
 
         public static TheoryData<Expression, IExpressionEvalTypeChecker> GetNonEvalQueriesTestCases()
         {
-            var dbContext = new TestDbContext(null!);
+            var dbContext = new TestDbContext();
 
-            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreOptions.DefaultNonEvaluableTypes);
+            var defaultTypeChecker = CreateEvalTypeChecker(CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes);
 
             return new()
             {
@@ -62,15 +59,19 @@ namespace CachedEfCore.KeyGeneration.Tests
             Assert.True(willEval);
         }
 
-        private class TestDbContext : CachedDbContext
+        private class TestDbContext : DbContext
         {
-            public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
-            {
-            }
-
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
-                optionsBuilder.UseInMemoryDatabase("test").AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
+                optionsBuilder.UseSqlServer();
+
+                optionsBuilder.UseCachedEfCore(options =>
+                {
+                    options.UseInMemoryCacheStore();
+
+                    options.UseSqlServer();
+                });
+
                 base.OnConfiguring(optionsBuilder);
             }
 

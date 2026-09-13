@@ -1,4 +1,8 @@
-﻿using CachedEfCore.Context;
+﻿using CachedEfCore.Cache.KeyGeneration;
+using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Cache.Store;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -10,20 +14,24 @@ namespace CachedEfCore.Cache.Helper
     {
         [OverloadResolutionPriority(-1)]
         public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
-           ICachedDbContext dbContext,
-           Func<Task<TReturnType>> getDataFromDatabase,
-           object?[] query)
+            DbContext dbContext,
+            Func<Task<TReturnType>> getDataFromDatabase,
+            object?[] query)
         {
             return GetOrAddAsync<TReturnType>(typeof(TEntity), dbContext, getDataFromDatabase, query);
         }
         [OverloadResolutionPriority(-1)]
         public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
-           Type rootEntity,
-           ICachedDbContext dbContext,
-           Func<Task<TReturnType>> getDataFromDatabase,
-           object?[] query)
+            Type rootEntity,
+            DbContext dbContext,
+            Func<Task<TReturnType>> getDataFromDatabase,
+            object?[] query)
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
+
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var printabilityChecker = dbContext.GetService<IPrintabilityChecker>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var additionalJson = "";
 
@@ -35,7 +43,7 @@ namespace CachedEfCore.Cache.Helper
 
                 if (queryItem is Expression expr)
                 {
-                    var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(expr);
+                    var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(expr);
                     if (keyGenerated is null)
                     {
                         return await getDataFromDatabase().ConfigureAwait(false);
@@ -47,7 +55,7 @@ namespace CachedEfCore.Cache.Helper
                         additionalJson += keyGenerated.Value.AdditionalJson;
                     }
                 }
-                else if (_printabilityChecker.IsPrintable(queryItem))
+                else if (printabilityChecker.IsPrintable(queryItem))
                 {
                     expressionKeyBuilder.AddExpression(queryItem?.ToString());
                 }
@@ -66,13 +74,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
 
         public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
@@ -80,11 +88,14 @@ namespace CachedEfCore.Cache.Helper
         }
         public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression query)
         {
-            var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(query);
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+            var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(query);
             if (keyGenerated is null)
             {
                 return await getDataFromDatabase().ConfigureAwait(false);
@@ -93,13 +104,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
 
         public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query)
         {
@@ -107,10 +118,13 @@ namespace CachedEfCore.Cache.Helper
         }
         public async ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             Expression[] query)
         {
+            var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
             var additionalJson = "";
@@ -119,7 +133,7 @@ namespace CachedEfCore.Cache.Helper
             {
                 var queryItem = query[i];
 
-                var keyGenerated = _keyGeneratorVisitor.SafeExpressionToString(queryItem);
+                var keyGenerated = keyGeneratorVisitor.SafeExpressionToString(queryItem);
                 if (keyGenerated is null)
                 {
                     return await getDataFromDatabase().ConfigureAwait(false);
@@ -135,13 +149,13 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = expressionKeyBuilder.GetKey();
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = await dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
+            var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
         }
 
         public ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             string key)
         {
@@ -149,14 +163,17 @@ namespace CachedEfCore.Cache.Helper
         }
         public ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
-            ICachedDbContext dbContext,
+            DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
             string key)
         {
             var expressionKey = new DbQueryCacheKey.ExpressionKey(key);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbContext.DbQueryCacheStore.GetOrAddAsync(dbContext, rootEntity, cacheKey, getDataFromDatabase);
+            
+            var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+            var result = dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
         }

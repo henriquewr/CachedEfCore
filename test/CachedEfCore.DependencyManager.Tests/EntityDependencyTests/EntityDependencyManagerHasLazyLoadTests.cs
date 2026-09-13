@@ -1,7 +1,6 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
-using CachedEfCore.Tests.Common.Fixtures;
+﻿using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Diagnostics;
@@ -12,21 +11,10 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerHasLazyLoadTests : EntityDependencyManagerTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
-
-        public EntityDependencyManagerHasLazyLoadTests(ServiceProviderFixture serviceProviderFixture)
+        public EntityDependencyManagerHasLazyLoadTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _cachedDbContext = GetDbContext();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-            => _serviceProviderFixture.CreateProvider(services =>
-            {
-                services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-
-                services.AddDbContext<TestDbContext>();
-            });
 
         protected TestDbContext GetDbContext()
         {
@@ -68,39 +56,41 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         public void HasLazyLoad_Should_Return_HasLazyLoad(HasLazyLoadData hasLazyLoadData)
         {
             var iEntityType = GetIEntityType(hasLazyLoadData.Type);
-            var lazyLoadByIEntityType = _cachedDbContext.DependencyManager.HasLazyLoad(iEntityType);
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
+
+            var lazyLoadByIEntityType = dependencyManager.HasLazyLoad(iEntityType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByIEntityType);
 
 
-            var lazyLoadByType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.Type);
+            var lazyLoadByType = dependencyManager.HasLazyLoad(hasLazyLoadData.Type);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByType);
 
 
-            var lazyLoadByAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.AnonymousType);
+            var lazyLoadByAnonymousType = dependencyManager.HasLazyLoad(hasLazyLoadData.AnonymousType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByAnonymousType);
 
 
-            var lazyLoadByNestedAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.NestedAnonymousType);
+            var lazyLoadByNestedAnonymousType = dependencyManager.HasLazyLoad(hasLazyLoadData.NestedAnonymousType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByNestedAnonymousType);
 
 
-            var lazyLoadByGenericAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.GenericAnonymousType);
+            var lazyLoadByGenericAnonymousType = dependencyManager.HasLazyLoad(hasLazyLoadData.GenericAnonymousType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByGenericAnonymousType);
 
 
-            var lazyLoadByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.NestedGenericAnonymousType);
+            var lazyLoadByNestedGenericAnonymousType = dependencyManager.HasLazyLoad(hasLazyLoadData.NestedGenericAnonymousType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByNestedGenericAnonymousType);
 
 
-            var lazyLoadByTupleLiteralType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.TupleLiteralType);
+            var lazyLoadByTupleLiteralType = dependencyManager.HasLazyLoad(hasLazyLoadData.TupleLiteralType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByTupleLiteralType);
 
 
-            var lazyLoadByGenericTupleLiteralType = _cachedDbContext.DependencyManager.HasLazyLoad(hasLazyLoadData.GenericTupleLiteralType);
+            var lazyLoadByGenericTupleLiteralType = dependencyManager.HasLazyLoad(hasLazyLoadData.GenericTupleLiteralType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByGenericTupleLiteralType);
 
             var proxyType = _cachedDbContext.CreateProxy(hasLazyLoadData.Type).GetType();
-            var lazyLoadByProxyType = _cachedDbContext.DependencyManager.HasLazyLoad(proxyType);
+            var lazyLoadByProxyType = dependencyManager.HasLazyLoad(proxyType);
             Assert.Equal(hasLazyLoadData.Expected, lazyLoadByProxyType);
         }
 

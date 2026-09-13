@@ -6,18 +6,23 @@
     <BuildType Name="TestRelease" />
   </Configurations>
   <Folder Name="/src/">
+    <Project Path="src/CachedEfCore.Cache/CachedEfCore.Caching.InMemory.csproj" Id="7ceea8e1-1920-4ebd-846a-ad07fc192469" />
     <Project Path="src/CachedEfCore.DependencyInjection/CachedEfCore.DependencyInjection.csproj" Id="3a3b24f3-eb86-430f-8c43-40b5ab7b819f">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
+    <Project Path="src/CachedEfCore.SqlServer/CachedEfCore.SqlServer.csproj" Id="bc67619f-d1be-4980-8456-7327e45d279c">
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
     <Project Path="src/CachedEfCore/CachedEfCore.csproj" />
   </Folder>
   <Folder Name="/test/">
-    <Project Path="test/CachedEfCore.DbQueryCacheHelper.Tests/CachedEfCore.Cache.Tests.csproj" />
+    <Project Path="test/CachedEfCore.DbQueryCacheHelper.Tests/CachedEfCore.Caching.InMemory.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
     <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />
-    <Project Path="test/CachedEfCore.QueryCaching.Tests/CachedEfCore.SqlAnalisys.Tests.csproj" />
+    <Project Path="test/CachedEfCore.QueryCaching.Tests/CachedEfCore.SqlServer.Tests.csproj" />
     <Project Path="test/CachedEfCore.Tests.Common/CachedEfCore.Tests.Common.csproj">
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />

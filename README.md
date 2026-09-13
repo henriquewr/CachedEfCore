@@ -6,25 +6,71 @@ CachedEfCore is a caching library for entity framework core
 The cache of CachedEfCore is always the lastest version of the object cached, the library auto invalidates the cache when some entity related to the cached entity changes state, so is impossible to get an old cache
 
 ## **Configuration**
-```
-public void ConfigureServices(IServiceCollection services)
-{
-    services.AddCachedEfCore<SqlServerQueryEntityExtractor>(); // currently only SQL Server has a dedicated implementation, you can use GenericSqlQueryEntityExtractor for other database providers
 
-    // AddDbContextPool or AddDbContext
-    services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
+```csharp
+    public void ConfigureServices(IServiceCollection services)
     {
-        options.UseLazyLoadingProxies();
-        options.UseSqlServer(connectionString).AddInterceptors(serviceProvider.GetRequiredService<DbStateInterceptor>());
-    });
-}
+        services.AddCachedEfCore();
+
+        // AddDbContextPool or AddDbContext
+        services.AddDbContextPool<AppDbContext>(options =>
+        {
+            options.UseSqlServer();
+
+            options.UseCachedEfCore(cachedEfCoreOptions =>
+            {
+                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                cachedEfCoreOptions.UseSqlServer();
+            });
+        });
+    }
+```
+
+## **Full Configuration**
+```csharp
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddCachedEfCore();
+
+        // AddDbContextPool or AddDbContext
+        services.AddDbContextPool<AppDbContext>(options =>
+        {
+            options.UseSqlServer();
+
+            options.UseCachedEfCore(cachedEfCoreOptions =>
+            {
+                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                cachedEfCoreOptions.UseSqlServer();
+
+                cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
+                {
+                    keyGen.ConfigureNonEvaluableTypes(originals =>
+                    {
+                        originals.Add(typeof(SomeType));
+
+                        return originals;
+                    });
+
+                    keyGen.ConfigureJsonSerializer(original =>
+                    {
+                        var newOptions = new JsonSerializerOptions();
+                        return newOptions;
+                    });
+                });
+            });
+        });
+    }
 ```
 
 ## **DbContext**
 ```
 public class YourDbContext : CachedDbContext
 {
-    public YourDbContext(DbContextOptions options, IDbQueryCacheStore dbQueryCacheStore) : base(options, dbQueryCacheStore)
+    public YourDbContext() : base()
+    {
+    }
+
+    public YourDbContext(DbContextOptions options) : base(options)
     {
     }
 }

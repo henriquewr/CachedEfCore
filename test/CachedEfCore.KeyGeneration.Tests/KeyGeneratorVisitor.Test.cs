@@ -1,7 +1,12 @@
-﻿using CachedEfCore.Configuration;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.KeyGeneration.EvalTypeChecker;
-using CachedEfCore.KeyGeneration.ExpressionKeyGen;
+using CachedEfCore.SqlServer.Configuration;
+using CachedEfCore.Tests.Common.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,20 +16,52 @@ using Xunit;
 
 namespace CachedEfCore.KeyGeneration.Tests
 {
-    public class KeyGeneratorVisitorTests
+    public class KeyGeneratorVisitorTests : IClassFixture<ServiceProviderFixture>
     {
-        private static readonly PrintabilityChecker DefaultPrintabilityChecker = new PrintabilityChecker();
-        private static KeyGeneratorVisitor CreateVisitor(params IEnumerable<Type> nonEvaluableTypes)
+        private readonly ServiceProviderFixture _serviceProviderFixture;
+        public KeyGeneratorVisitorTests(ServiceProviderFixture serviceProviderFixture)
         {
-            return new KeyGeneratorVisitor
-            (
-                DefaultPrintabilityChecker,
-                new ExpressionEvalTypeCheckerVisitor(new TypeCompatibilityChecker(nonEvaluableTypes)),
-                CachedEfCoreOptions.DefaultKeyGeneratorJsonSerializerOptions
-            );
+            _serviceProviderFixture = serviceProviderFixture;
         }
 
-        private readonly KeyGeneratorVisitor _keyGeneratorVisitor = CreateVisitor([]);
+        protected virtual IServiceProvider CreateProvider(params IEnumerable<Type> nonEvaluableTypes)
+           => _serviceProviderFixture.CreateProvider(services =>
+           {
+               services.AddDbContext<TestDbContext>((serviceProvider, options) =>
+               {
+                    options.UseSqlServer();
+                    options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
+
+                    options.UseCachedEfCore(cachedEfCoreOptions =>
+                    {
+                        cachedEfCoreOptions.UseSqlServer();
+
+                        cachedEfCoreOptions.UseInMemoryCacheStore();
+
+                        cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
+                        {
+                            keyGen.ConfigureNonEvaluableTypes(configuration =>
+                            {
+                                configuration.Clear();
+                                configuration.AddRange(nonEvaluableTypes);
+
+                                return configuration;
+                            });
+                        });
+                    });
+               });
+           });
+
+        private KeyGeneratorVisitor CreateVisitor(params IEnumerable<Type> nonEvaluableTypes)
+        {
+            var provider = CreateProvider(nonEvaluableTypes).CreateScope().ServiceProvider;
+
+            var dbContext = provider.GetRequiredService<TestDbContext>();
+
+            var keyGenerator = dbContext.GetService<KeyGeneratorVisitor>();
+
+            return keyGenerator;
+        }
 
         private class TestClass
         {
@@ -63,18 +100,20 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Variable_Evaluation()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var variable = 1;
 
             Expression<Func<TestClass, bool>> expression = x => variable == x.TestVal;
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
             var variable2 = 1;
 
             Expression<Func<TestClass, bool>> expression2 = x => variable2 == x.TestVal;
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
             var notTheSameVariable = 2;
 
             Expression<Func<TestClass, bool>> expression3 = x => notTheSameVariable == x.TestVal;
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -84,21 +123,23 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Function_Evaluation_With_Printable_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var list1 = GetDefaultList();
             var variable1 = 1;
 
             Expression<Func<TestClass, bool>> expression = x => list1.First(l => l.TestVal == variable1).TestVal == x.TestVal;
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
             var list2 = GetDefaultList();
             var variable2 = 1;
             Expression<Func<TestClass, bool>> expression2 = x => list2.First(l => l.TestVal == variable2).TestVal == x.TestVal;
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
             var list3 = GetDefaultList();
             var variable3 = 2;
             Expression<Func<TestClass, bool>> expression3 = x => list2.First(l => l.TestVal == variable3).TestVal == x.TestVal;
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -108,21 +149,23 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Function_Evaluation_With_Non_Printable_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var list1 = GetDefaultList();
             var variable1 = 1;
 
             Expression<Func<TestClass, bool>> expression = x => list1.First(l => l.TestVal == variable1) == null;
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
             var list2 = GetDefaultList();
             var variable2 = 1;
             Expression<Func<TestClass, bool>> expression2 = x => list2.First(l => l.TestVal == variable2) == null;
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
             var list3 = GetDefaultList();
             var variable3 = 2;
             Expression<Func<TestClass, bool>> expression3 = x => list2.First(l => l.TestVal == variable3) == null;
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -132,16 +175,18 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Enumerable_Printer_With_Printable_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var list1 = GetDefaultList();
             var listWithPrintableValues = list1.Select(x => x.TestVal).ToList();
 
             Expression<Func<TestClass, bool>> expression = x => listWithPrintableValues.Contains(x.TestVal);
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
 
             var list2 = GetDefaultList();
             Expression<Func<TestClass, bool>> expression2 = x => list1.Select(l => l.TestVal).ToList().Contains(x.TestVal);
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
 
             var list3 = GetDefaultList();
@@ -149,7 +194,7 @@ namespace CachedEfCore.KeyGeneration.Tests
             var listWithPrintableValues3 = list3.Select(x => x.TestVal).ToList();
 
             Expression<Func<TestClass, bool>> expression3 = x => listWithPrintableValues3.Contains(x.TestVal);
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -159,18 +204,20 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Enumerable_Printer_With_Non_Printable_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var list1 = GetDefaultList();
             Expression<Func<TestClass, bool>> expression = x => list1.Contains(x);
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
             var list2 = GetDefaultList();
             Expression<Func<TestClass, bool>> expression2 = x => list2.Contains(x);
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
             var list3 = GetDefaultList();
             list3.Add(new TestClass { TestVal = 1234, Test = "different" });
             Expression<Func<TestClass, bool>> expression3 = x => list3.Contains(x);
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -180,21 +227,23 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Enumerable_Printer_With_Printable_Null_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var list1 = GetDefaultList().Select(x => (TestClass)null!).ToList();
             Expression<Func<TestClass, bool>> expression = x => list1.Contains(x);
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
 
             var list2 = GetDefaultList();
             Expression<Func<TestClass, bool>> expression2 = x => list2.Select(l => (TestClass)null!).ToList().Contains(x);
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
 
             var list3 = GetDefaultList().Select(x => (TestClass)null!).ToList();
             list3.Add(null!);
             list3.Add(null!);
             Expression<Func<TestClass, bool>> expression3 = x => list3.Contains(x);
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -204,19 +253,21 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_Dictionary_Printer_With_Printable_Values()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var dict1 = GetDefaultDict();
             Expression<Func<TestClass, bool>> expression = x => dict1.ContainsKey(x.TestVal);
-            var result1 = _keyGeneratorVisitor.ExpressionToString(expression);
+            var result1 = keyGeneratorVisitor.ExpressionToString(expression);
 
             var dict2 = GetDefaultDict();
             Expression<Func<TestClass, bool>> expression2 = x => dict2.ContainsKey(x.TestVal);
-            var result2 = _keyGeneratorVisitor.ExpressionToString(expression2);
+            var result2 = keyGeneratorVisitor.ExpressionToString(expression2);
 
             var dict3 = GetDefaultDict();
             dict3.Add(1234, "different");
 
             Expression<Func<TestClass, bool>> expression3 = x => dict3.ContainsKey(x.TestVal);
-            var result3 = _keyGeneratorVisitor.ExpressionToString(expression3);
+            var result3 = keyGeneratorVisitor.ExpressionToString(expression3);
 
             Assert.Equal(result1, result2);
 
@@ -231,21 +282,20 @@ namespace CachedEfCore.KeyGeneration.Tests
             public int AnyMethod()
             {
                 Evaluated = true;
-
-                throw new InvalidOperationException($"{nameof(AnyMethod)} Called");
+                return 1;
             }
 
             public int Anything 
             { 
                 get 
                 {
-                    Evaluated = true; 
-                    throw new InvalidOperationException($"Tried to get the value from prop: {nameof(Anything)}"); 
-                } 
+                    Evaluated = true;
+                    return 2;
+                }
             }
         }
 
-        public static TheoryData<Expression, KeyGeneratorVisitor, NonEvaluableTestClass> GetNonEvaluableTypesTestCases()
+        public static TheoryData<Expression, Type[], NonEvaluableTestClass> GetNonEvaluableTypesTestCases()
         {
             var variable = new NonEvaluableTestClass();
             Expression<Func<int>> test1 = () => variable.AnyMethod();
@@ -255,43 +305,45 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 {
                     test1,
-                    CreateVisitor(typeof(INonEvaluable)),
+                    [typeof(INonEvaluable)],
                     variable
                 },
                 {
                     test1,
-                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    [typeof(NonEvaluableTestClass)],
                     variable
                 },
 
                 {
                     test2,
-                    CreateVisitor(typeof(INonEvaluable)),
+                    [typeof(INonEvaluable)],
                     variable
                 },
                 {
                     test2,
-                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    [typeof(NonEvaluableTestClass)],
                     variable
                 },
 
                 {
                     test3,
-                    CreateVisitor(typeof(INonEvaluable)),
+                    [typeof(INonEvaluable)],
                     variable
                 },
                 {
                     test3,
-                    CreateVisitor(typeof(NonEvaluableTestClass)),
+                    [typeof(NonEvaluableTestClass)],
                     variable
                 },
             };
         }
         [Theory]
         [MemberData(nameof(GetNonEvaluableTypesTestCases))]
-        public void KeyGeneratorVisitor_Should_Not_Eval_Non_Evaluable_Types(Expression expression, KeyGeneratorVisitor keyGeneratorVisitor, NonEvaluableTestClass instance)
+        public void KeyGeneratorVisitor_Should_Not_Eval_Non_Evaluable_Types(Expression expression, Type[] nonEvalutableTypes, NonEvaluableTestClass instance)
         {
             instance.Evaluated = false;
+
+            var keyGeneratorVisitor = CreateVisitor(nonEvalutableTypes);
 
             var result = keyGeneratorVisitor.ExpressionToString(expression);
 
@@ -301,6 +353,8 @@ namespace CachedEfCore.KeyGeneration.Tests
         [Fact]
         public void Test_KeyGenerator_Is_Thread_Safe()
         {
+            var keyGeneratorVisitor = CreateVisitor([]);
+
             var nonPrintableType = new TestClass();
             var nonPrintableType2 = new TestClass
             {
@@ -316,10 +370,10 @@ namespace CachedEfCore.KeyGeneration.Tests
 
             var expressions = new List<(Expression, KeyGeneratorResult<string>?)>
             {
-                (expression1, _keyGeneratorVisitor.SafeExpressionToString(expression1)),
-                (expression2, _keyGeneratorVisitor.SafeExpressionToString(expression2)),
-                (expression3, _keyGeneratorVisitor.SafeExpressionToString(expression3)),
-                (expression4, _keyGeneratorVisitor.SafeExpressionToString(expression4)),
+                (expression1, keyGeneratorVisitor.SafeExpressionToString(expression1)),
+                (expression2, keyGeneratorVisitor.SafeExpressionToString(expression2)),
+                (expression3, keyGeneratorVisitor.SafeExpressionToString(expression3)),
+                (expression4, keyGeneratorVisitor.SafeExpressionToString(expression4)),
             };
 
             var parallelOptions = new ParallelOptions
@@ -331,11 +385,22 @@ namespace CachedEfCore.KeyGeneration.Tests
             {
                 Parallel.ForEach(expressions, parallelOptions, x =>
                 {
-                    var keyStr = _keyGeneratorVisitor.SafeExpressionToString(x.Item1);
+                    var keyStr = keyGeneratorVisitor.SafeExpressionToString(x.Item1);
 
                     Assert.Equal(x.Item2, keyStr);
                 });
             });
+        }
+
+        public class TestDbContext : DbContext
+        {
+            public TestDbContext() : base()
+            {
+            }
+
+            public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
+            {
+            }
         }
     }
 }

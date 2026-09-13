@@ -1,7 +1,6 @@
-﻿using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlAnalysis.SqlServer;
-using CachedEfCore.Tests.Common.Fixtures;
+﻿using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -14,21 +13,10 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 {
     public class EntityDependencyManagerUpperRelatedTests : EntityDependencyManagerTestBase, IClassFixture<ServiceProviderFixture>
     {
-        private readonly ServiceProviderFixture _serviceProviderFixture;
-
-        public EntityDependencyManagerUpperRelatedTests(ServiceProviderFixture serviceProviderFixture)
+        public EntityDependencyManagerUpperRelatedTests(ServiceProviderFixture serviceProviderFixture) : base(serviceProviderFixture)
         {
-            _serviceProviderFixture = serviceProviderFixture;
             _cachedDbContext = GetDbContext();
         }
-
-        protected virtual IServiceProvider CreateProvider()
-            => _serviceProviderFixture.CreateProvider(services =>
-            {
-                services.AddCachedEfCore<SqlServerQueryEntityExtractor>();
-
-                services.AddDbContext<TestDbContext>();
-            });
 
         protected TestDbContext GetDbContext()
         {
@@ -142,41 +130,42 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         public void GetUpperRelatedEntities_Should_Return_Upper_Related(UpperRelatedData upperRelatedData)
         {
             var expectedEntities = upperRelatedData.Expected.Select(GetIEntityType).ToHashSet();
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
 
             var iEntityType = GetIEntityType(upperRelatedData.Type);
-            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(iEntityType);
+            var entitiesByIEntityType = dependencyManager.GetUpperRelatedEntities(iEntityType);
             Assert.True(expectedEntities.SetEquals(entitiesByIEntityType));
 
 
-            var entities = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.Type);
+            var entities = dependencyManager.GetUpperRelatedEntities(upperRelatedData.Type);
             Assert.True(expectedEntities.SetEquals(entities));
 
 
-            var entitiesByAnonymousType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.AnonymousType);
+            var entitiesByAnonymousType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.AnonymousType);
             Assert.True(expectedEntities.SetEquals(entitiesByAnonymousType));
 
 
-            var entitiesByNestedAnonymousType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.NestedAnonymousType);
+            var entitiesByNestedAnonymousType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.NestedAnonymousType);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedAnonymousType));
 
 
-            var entitiesByGenericAnonymousType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.GenericAnonymousType);
+            var entitiesByGenericAnonymousType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.GenericAnonymousType);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericAnonymousType));
 
 
-            var entitiesByNestedGenericAnonymousType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.NestedGenericAnonymousType);
+            var entitiesByNestedGenericAnonymousType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.NestedGenericAnonymousType);
             Assert.True(expectedEntities.SetEquals(entitiesByNestedGenericAnonymousType));
 
 
-            var entitiesByTupleLiteralType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.TupleLiteralType);
+            var entitiesByTupleLiteralType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.TupleLiteralType);
             Assert.True(expectedEntities.SetEquals(entitiesByTupleLiteralType));
 
 
-            var entitiesByGenericTupleLiteralType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(upperRelatedData.GenericTupleLiteralType);
+            var entitiesByGenericTupleLiteralType = dependencyManager.GetUpperRelatedEntities(upperRelatedData.GenericTupleLiteralType);
             Assert.True(expectedEntities.SetEquals(entitiesByGenericTupleLiteralType));
 
             var proxyType = _cachedDbContext.CreateProxy(upperRelatedData.Type).GetType();
-            var entitiesByProxyType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(proxyType);
+            var entitiesByProxyType = dependencyManager.GetUpperRelatedEntities(proxyType);
             Assert.True(expectedEntities.SetEquals(entitiesByProxyType));
         }
 
@@ -203,7 +192,9 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
         [MemberData(nameof(GetUpperRelatedEntitiesGenByEfTestCases))]
         public void GetUpperRelatedEntities_Should_Return_Upper_Related_When_Is_Generated_By_EF(string iEntityType, HashSet<string> expected)
         {
-            var entitiesByIEntityType = _cachedDbContext.DependencyManager.GetUpperRelatedEntities(GetIEntityType(iEntityType));
+            var dependencyManager = _cachedDbContext.GetService<EntityDependency>();
+
+            var entitiesByIEntityType = dependencyManager.GetUpperRelatedEntities(GetIEntityType(iEntityType));
 
             var expectedEntities = expected.Select(GetIEntityType).ToHashSet();
 

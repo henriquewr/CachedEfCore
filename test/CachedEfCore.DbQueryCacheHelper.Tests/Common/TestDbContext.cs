@@ -1,31 +1,21 @@
-﻿using CachedEfCore.Context;
-using CachedEfCore.Interceptors;
-using CachedEfCore.SqlAnalysis;
-using CachedEfCore.SqlAnalysis.SqlServer;
-using Microsoft.EntityFrameworkCore;
-using System;
+﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CachedEfCore.Cache.Tests.Common
+namespace CachedEfCore.Caching.InMemory.Tests.Common
 {
-    public class TestDbContext : CachedDbContext
+    public class TestDbContext : DbContext
     {
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore) : base(dbQueryCacheStore)
+        public TestDbContext() : base()
         {
         }
 
-        public TestDbContext(IDbQueryCacheStore dbQueryCacheStore, DbContextOptions<TestDbContext> options) : base(options, dbQueryCacheStore)
+        public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
         {
         }
-
-        public Cache.DbQueryCacheStore TestDbQueryCacheStore => (Cache.DbQueryCacheStore)this.DbQueryCacheStore;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseLazyLoadingProxies();
-
-            optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(new DbStateInterceptor(new SqlServerQueryEntityExtractor()));
             base.OnConfiguring(optionsBuilder);
         }
 

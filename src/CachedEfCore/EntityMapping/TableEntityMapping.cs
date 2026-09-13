@@ -1,20 +1,19 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore;
-using System;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
-using System.Linq;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace CachedEfCore.EntityMapping
 {
     public class TableEntityMapping
     {
-        private static readonly ConcurrentDictionary<Type, TableEntityMapping> _tableEntityCache = new();
+        private static readonly ConcurrentDictionary<IModel, TableEntityMapping> _tableEntityCache = new();
 
-        public static TableEntityMapping GetOrAdd(DbContext dbContext)
+        public static TableEntityMapping GetOrAdd(IModel model)
         {
-            return _tableEntityCache.GetOrAdd(dbContext.GetType(), key => new(dbContext.Model));
+            return _tableEntityCache.GetOrAdd(model, key => new(model));
         }
 
         public FrozenDictionary<string, ImmutableArray<IEntityType>> Mapping { get; }
