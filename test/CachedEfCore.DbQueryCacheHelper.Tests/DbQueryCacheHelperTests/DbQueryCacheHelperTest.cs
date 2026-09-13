@@ -63,8 +63,8 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
             var dbQueryCacheHelper = serviceProvider.GetRequiredService<IDbQueryCacheHelper>();
             var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
 
-            dbQueryCacheInternalStore.TestDbContextDependentKeys.Clear();
-            dbQueryCacheInternalStore.TestTypeKeys.Clear();
+            dbQueryCacheInternalStore._dbContextDependentKeys.Clear();
+            dbQueryCacheInternalStore._typeKeys.Clear();
 
             const string cacheKey = "cacheKeyAddToCache";
 
@@ -74,15 +74,15 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
             if (isDbContextDependent)
             {
                 result = dbQueryCacheHelper.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext, DbContextDependentCreateFunc, cacheKey);
-                Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+                Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
             }
             else
             {
                 result = dbQueryCacheHelper.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext, NonDbContextDependentCreateFunc, cacheKey);
-                Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+                Assert.Empty(dbQueryCacheInternalStore._dbContextDependentKeys);
             }
             dbQueryCacheMetrics.Reset();
-            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             Assert.True(created);
             Assert.Same(valueToCache, result);
