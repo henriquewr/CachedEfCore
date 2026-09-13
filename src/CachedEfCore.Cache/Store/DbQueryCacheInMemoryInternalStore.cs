@@ -12,10 +12,10 @@ using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public partial class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
+    public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
     {
-        private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _dbContextDependentKeys = new();
-        private readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
+        internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> _dbContextDependentKeys = new();
+        internal readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
 
         private readonly IMemoryCache _cache;
         private readonly IDbQueryCacheMetrics _metrics;

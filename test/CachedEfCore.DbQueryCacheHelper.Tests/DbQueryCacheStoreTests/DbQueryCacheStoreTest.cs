@@ -78,8 +78,8 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
-            dbQueryCacheInternalStore.TestDbContextDependentKeys.Clear();
-            dbQueryCacheInternalStore.TestTypeKeys.Clear();
+            dbQueryCacheInternalStore._dbContextDependentKeys.Clear();
+            dbQueryCacheInternalStore._typeKeys.Clear();
 
             var cacheKey = new TestCacheKey
             {
@@ -92,14 +92,14 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             if (isDbContextDependent)
             {
-                Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+                Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
             }
             else
             {
-                Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+                Assert.Empty(dbQueryCacheInternalStore._dbContextDependentKeys);
             }
 
-            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             var cached = dbQueryCacheStore.GetCached<object>(cacheKey);
             Assert.Same(valueToCache, cached);
@@ -129,9 +129,9 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, dbContextDependentValue);
 
-            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
 
-            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             var cached = dbQueryCacheStore.GetCached<object>(dependentCacheKey);
             Assert.Same(dbContextDependentValue, cached);
@@ -176,9 +176,9 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
                 dbQueryCacheStore.AddToCache(rootType, key, dataToCache);
             });
 
-            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
 
-            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             AssertContainsAllKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
         }
@@ -207,15 +207,15 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
                 dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, dataToCache);
             }
 
-            Assert.Single(dbQueryCacheInternalStore.TestDbContextDependentKeys);
-            Assert.Single(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
+            Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             AssertContainsAllKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
 
             dbQueryCacheStore.RemoveAll();
 
-            Assert.Empty(dbQueryCacheInternalStore.TestDbContextDependentKeys);
-            Assert.Empty(dbQueryCacheInternalStore.TestTypeKeys);
+            Assert.Empty(dbQueryCacheInternalStore._dbContextDependentKeys);
+            Assert.Empty(dbQueryCacheInternalStore._typeKeys);
 
             AssertDoesNotContainAnyKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
         }
