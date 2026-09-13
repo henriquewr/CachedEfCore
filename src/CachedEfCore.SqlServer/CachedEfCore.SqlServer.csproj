@@ -7,11 +7,8 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
-		<RepositoryType>git</RepositoryType>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>CachedEfCore.DependencyInjection</Title>
-		<Authors>henriquewr</Authors>
 		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore.DependencyInjection</PackageProjectUrl>
 		<Description>SqlServer database provider for CachedEfCore</Description>
 		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
