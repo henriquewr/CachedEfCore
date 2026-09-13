@@ -30,7 +30,21 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Pack
-        run: dotnet pack -c Release --no-build -o ./artifacts -p:PackageVersion=${GITHUB_REF_NAME#v}
+        run: | 
+          VERSION="${GITHUB_REF_NAME#v}"
+          projects=(
+            "src/CachedEfCore/CachedEfCore.csproj"
+            "src/CachedEfCore.DependencyInjection/CachedEfCore.DependencyInjection.csproj"
+            "src/CachedEfCore.SqlServer/CachedEfCore.SqlServer.csproj"
+          )
+
+          for project in "${projects[@]}"; do
+            dotnet pack "$project" \
+              -c Release \
+              --no-build \
+              -o ./artifacts \
+              -p:Version="$VERSION"
+          done
 
       - name: NuGet login
         uses: NuGet/login@v1
@@ -40,7 +54,4 @@ jobs:
 
       - name: Publish
         run: |
-          dotnet nuget push "./artifacts/*.nupkg" \
-            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
-            --source "https://api.nuget.org/v3/index.json" \
-            --skip-duplicate
+          dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
