@@ -1,35 +1,37 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-	<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
-  </PropertyGroup>
-  <PropertyGroup>
-	<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
-	<RepositoryType>git</RepositoryType>
-	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-	<Title>CachedEfCore</Title>
-	<Authors>henriquewr</Authors>
-	<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
-	<Description>A Caching library for Entity Framework Core with automatic cache invalidation</Description>
-	<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-	<AnalysisLevel>latest-recommended</AnalysisLevel>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.5" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
+	</PropertyGroup>
+	
+	<PropertyGroup>
+		<RepositoryUrl>https://github.com/henriquewr/CachedEfCore</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>CachedEfCore</Title>
+		<Authors>henriquewr</Authors>
+		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
+		<Description>A Caching library for Entity Framework Core with automatic cache invalidation</Description>
+		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.5" />
+	</ItemGroup>
 
-  <PropertyGroup Condition="'$(Configuration)'=='TestDebug'">
-	<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='TestRelease'">
-	<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|AnyCPU'">
-    <Optimize>True</Optimize>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='TestDebug'">
+		<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='TestRelease'">
+		<DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|AnyCPU'">
+		<Optimize>True</Optimize>
+	</PropertyGroup>
 </Project>
