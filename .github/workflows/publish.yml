@@ -34,6 +34,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           projects=(
             "src/CachedEfCore/CachedEfCore.csproj"
+            "src/CachedEfCore.Caching.InMemory/CachedEfCore.Caching.InMemory.csproj"
             "src/CachedEfCore.DependencyInjection/CachedEfCore.DependencyInjection.csproj"
             "src/CachedEfCore.SqlServer/CachedEfCore.SqlServer.csproj"
           )
