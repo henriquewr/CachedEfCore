@@ -30,7 +30,6 @@ namespace CachedEfCore.KeyGeneration.Tests
                services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                {
                     options.UseSqlServer();
-                    options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
 
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {

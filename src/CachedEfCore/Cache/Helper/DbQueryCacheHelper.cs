@@ -191,13 +191,13 @@ namespace CachedEfCore.Cache.Helper
             return result;
         }
 
-        private static Guid? DependentDbContext(DbContext dbContext, Type returnType)
+        private static DbContextId? DependentDbContext(DbContext dbContext, Type returnType)
         {
             var dependencyManager = dbContext.GetService<EntityDependency>();
 
             var isDependent = dependencyManager.HasLazyLoad(returnType);
 
-            return isDependent ? dbContext.ContextId.InstanceId : null;
+            return isDependent ? dbContext.ContextId : null;
         }
     }
 }

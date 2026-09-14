@@ -1,8 +1,8 @@
 ﻿using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
-using CachedEfCore.SqlServer.Tests.Testing;
 using CachedEfCore.Tests.Common.Fixtures;
+using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace CachedEfCore.Configuration
@@ -40,8 +41,8 @@ namespace CachedEfCore.Configuration
                         jsonSerializerOptions
                     );
                 }),
-                GetServiceProviderHashCode = thisService => ((JsonSerializerOptions)thisService.Options!).GetHashCode(),
-                ShouldUseSameServiceProvider = args => ((JsonSerializerOptions)args.ThisService.Options!).Equals(((JsonSerializerOptions)args.OtherServices.Single().Options!)),
+                GetServiceProviderHashCode = thisService => RuntimeHelpers.GetHashCode((JsonSerializerOptions)thisService.Options!),
+                ShouldUseSameServiceProvider = args => ReferenceEquals((JsonSerializerOptions)args.ThisService.Options!, (JsonSerializerOptions)args.OtherServices.Single().Options!),
                 Options = jsonSerializerOptions,
             };
 
@@ -60,7 +61,7 @@ namespace CachedEfCore.Configuration
                 {
                     return new TypeCompatibilityChecker(nonEvaluableTypes);
                 }),
-                GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).GetHashCode(),
+                GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).Aggregate(0, (hash, type) => HashCode.Combine(hash, type)),
                 ShouldUseSameServiceProvider = args => ((List<Type>)args.ThisService.Options!).SequenceEqual(((List<Type>)args.OtherServices.Single().Options!)),
                 Options = nonEvaluableTypes,
             };

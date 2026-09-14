@@ -5,6 +5,7 @@ using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {
@@ -23,8 +24,8 @@ namespace CachedEfCore.Caching.InMemory.Configuration
 
                         return new DbQueryCacheInMemoryInternalStore(memoryCache, metrics, memoryCacheOptions);
                     }),
-                    GetServiceProviderHashCode = thisService => ((MemoryCacheEntryOptions)thisService.Options!).GetHashCode(),
-                    ShouldUseSameServiceProvider = arg => ((MemoryCacheEntryOptions)arg.ThisService.Options!) == ((MemoryCacheEntryOptions)arg.OtherServices.Single().Options!),
+                    GetServiceProviderHashCode = thisService => RuntimeHelpers.GetHashCode((MemoryCacheEntryOptions)thisService.Options!),
+                    ShouldUseSameServiceProvider = arg => ReferenceEquals((MemoryCacheEntryOptions)arg.ThisService.Options!, (MemoryCacheEntryOptions)arg.OtherServices.Single().Options!),
                     Options = memoryCacheOptions,
                 };
             }

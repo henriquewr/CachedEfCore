@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace CachedEfCore.Configuration
@@ -95,8 +96,8 @@ namespace CachedEfCore.Configuration
                             defaultJsonSerializerOptions
                         );
                     }),
-                    GetServiceProviderHashCode = thisService => ((JsonSerializerOptions)thisService.Options!).GetHashCode(),
-                    ShouldUseSameServiceProvider = args => ((JsonSerializerOptions)args.ThisService.Options!).Equals(((JsonSerializerOptions)args.OtherServices.Single().Options!)),
+                    GetServiceProviderHashCode = thisService => RuntimeHelpers.GetHashCode((JsonSerializerOptions)thisService.Options!),
+                    ShouldUseSameServiceProvider = args => ReferenceEquals((JsonSerializerOptions)args.ThisService.Options!, (JsonSerializerOptions)args.OtherServices.Single().Options!),
                     Options = defaultJsonSerializerOptions,
                 };
             }
@@ -109,7 +110,7 @@ namespace CachedEfCore.Configuration
                     {
                         return new TypeCompatibilityChecker(defaultNonEvaluableTypes);
                     }),
-                    GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).GetHashCode(),
+                    GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).Aggregate(0, (hash, type) => HashCode.Combine(hash, type)),
                     ShouldUseSameServiceProvider = args => ((List<Type>)args.ThisService.Options!).SequenceEqual(((List<Type>)args.OtherServices.Single().Options!)),
                     Options = defaultNonEvaluableTypes,
                 };
@@ -127,7 +128,7 @@ namespace CachedEfCore.Configuration
             {
                 ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheMetrics>(sp =>
                 {
-                    return new DbQueryCacheWithGlobalMetrics(new DbQueryCacheMetrics());
+                    return new DbQueryCacheWithGlobalMetrics(DbQueryCacheMetrics.GlobalInstance, new DbQueryCacheMetrics());
                 }),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,

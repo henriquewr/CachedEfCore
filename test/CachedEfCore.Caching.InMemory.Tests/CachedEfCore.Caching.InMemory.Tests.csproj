@@ -14,20 +14,22 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.9" />
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="xunit.v3" Version="3.2.2" />
+		<PackageReference Include="xunit.v3" Version="4.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\CachedEfCore.Caching.InMemory\CachedEfCore.Caching.InMemory.csproj" />
 		<ProjectReference Include="..\..\src\CachedEfCore.SqlServer\CachedEfCore.SqlServer.csproj" />
 		<ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
+		<ProjectReference Include="..\..\tests\CachedEfCore.Caching.Specification.Tests\CachedEfCore.Caching.Specification.Tests.csproj" />
 		<ProjectReference Include="..\CachedEfCore.Tests.Common\CachedEfCore.Tests.Common.csproj" />
 	</ItemGroup>
 

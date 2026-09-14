@@ -2,37 +2,65 @@
 using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Caching.InMemory.Store;
-using CachedEfCore.Caching.InMemory.Tests.Common;
+using CachedEfCore.Caching.Specification.Tests.Collections;
+using CachedEfCore.Caching.Specification.Tests.Common;
+using CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
+using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 {
-    public class DbQueryCacheHelperTest : IClassFixture<ServiceProviderFixture>
+    [Collection(typeof(NonParallelCollection))]
+    public class DbQueryCacheHelperTest : DbQueryCacheHelperSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
+        private readonly SqlServerTestContainer _sqlServerTestContainer;
 
-        public DbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture)
+        public DbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture, 
+            SqlServerTestContainer sqlServerTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
+            _sqlServerTestContainer = sqlServerTestContainer;
         }
 
-        protected virtual IServiceProvider CreateProvider()
+        protected override IServiceProvider CreateProvider(bool withLazyLoading)
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
 
                 services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                 {
-                    options.UseLazyLoadingProxies();
+                    options.UseLazyLoadingProxies(withLazyLoading);
 
-                    options.UseInMemoryDatabase(Guid.NewGuid().ToString());
+                    options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
+
+                    options.UseCachedEfCore(cachedEfCoreOptions =>
+                    {
+                        cachedEfCoreOptions.UseInMemoryCacheStore();
+
+                        cachedEfCoreOptions.UseSqlServer();
+                    });
+                });
+            });
+
+        protected override IServiceProvider CreatePooledProvider(bool withLazyLoading)
+            => _serviceProviderFixture.CreateProvider(services =>
+            {
+                services.AddCachedEfCore();
+
+                services.AddDbContextPool<TestDbContext>((serviceProvider, options) =>
+                {
+                    options.UseLazyLoadingProxies(withLazyLoading);
+
+                    options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
 
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
@@ -54,9 +82,9 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 
         [Theory]
         [MemberData(nameof(GetGetOrAddToCacheData))]
-        public void GetOrAdd_Adds_And_Gets_From_Cache(object valueToCache, bool isDbContextDependent)
+        public override async Task GetOrAdd_Adds_And_Gets_From_Cache(object valueToCache, bool isDbContextDependent)
         {
-            var serviceProvider = CreateProvider();
+            var serviceProvider = CreateProvider(true);
 
             var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
             var dbQueryCacheMetrics = serviceProvider.GetRequiredService<IDbQueryCacheMetrics>();

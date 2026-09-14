@@ -36,7 +36,6 @@ namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SqlQueryEntityExtract
                 {
                     options.UseSqlServer();
 
-                    options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
                     options.UseCachedEfCore(cachedEfCoreOptions =>
                     {
                         cachedEfCoreOptions.UseInMemoryCacheStore();
