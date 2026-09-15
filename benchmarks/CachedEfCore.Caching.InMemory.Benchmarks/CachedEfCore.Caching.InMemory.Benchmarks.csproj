@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageReference Include="Microsoft.VisualStudio.DiagnosticsHub.BenchmarkDotNetDiagnosers" Version="18.7.37220.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.13.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CachedEfCore.Cache\CachedEfCore.Caching.InMemory.csproj" />
+    <ProjectReference Include="..\..\src\CachedEfCore.DependencyInjection\CachedEfCore.DependencyInjection.csproj" />
+    <ProjectReference Include="..\..\src\CachedEfCore.SqlServer\CachedEfCore.SqlServer.csproj" />
+  </ItemGroup>
+</Project>
