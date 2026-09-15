@@ -19,13 +19,11 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         private readonly IMemoryCache _cache;
         private readonly IDbQueryCacheMetrics _metrics;
-        private readonly MemoryCacheEntryOptions _cacheOptions;
 
-        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, IDbQueryCacheMetrics metrics, MemoryCacheEntryOptions cacheOptions)
+        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, IDbQueryCacheMetrics metrics)
         {
             _cache = cache;
             _metrics = metrics;
-            _cacheOptions = cacheOptions;
         }
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
@@ -127,8 +125,9 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void InternalAddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey cacheKey, object? dataToCache)
         {
-            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_cacheOptions);
-            cacheEntry.SetSize(0);
+            var dbQueryCacheInMemoryCache = dbContext.GetService<DbQueryCacheStoreInMemoryCacheEntryOptions>();
+
+            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(dbQueryCacheInMemoryCache.EntryOptions);
             cacheEntry.Value = dataToCache;
 
             if (dataToCache is not null && cacheKey.DependentDbContext.HasValue)

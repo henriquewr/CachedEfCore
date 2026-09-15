@@ -2,7 +2,6 @@
 using CachedEfCore.Cache.Store;
 using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Caching.InMemory.Store;
-using CachedEfCore.Caching.Specification.Tests.Collections;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
@@ -18,7 +17,6 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 {
-    [Collection(typeof(NonParallelCollection))]
     public class DbQueryCacheStoreTest : IClassFixture<ServiceProviderFixture>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
@@ -41,6 +39,8 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
                    services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                    {
+                       options.EnableServiceProviderCaching(false);
+
                        options.UseLazyLoadingProxies();
 
                        options.UseInMemoryDatabase(Guid.NewGuid().ToString());

@@ -18,6 +18,6 @@ namespace CachedEfCore.Configuration
 #pragma warning restore EF1001
             typeof(QueryRootExpression),
         };
-        public static readonly JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions { IncludeFields = true };
+        public static JsonSerializerOptions DefaultJsonSerializerOptions => new JsonSerializerOptions { IncludeFields = true };
     }
 }

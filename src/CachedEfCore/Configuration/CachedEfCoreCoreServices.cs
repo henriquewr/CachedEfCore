@@ -16,8 +16,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 
 namespace CachedEfCore.Configuration
 {
@@ -83,24 +81,34 @@ namespace CachedEfCore.Configuration
                 var defaultJsonSerializerOptions = CachedEfCoreKeyGenerationOptionsDefaults.DefaultJsonSerializerOptions;
                 yield return new CachedEfCoreService
                 {
-                    ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitor>(sp =>
-                    {
-                        var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
-                        var model = sp.GetRequiredService<IModel>();
-                        var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
-
-                        return new KeyGeneratorVisitor(
-                            printabilityChecker,
-                            model,
-                            cachedEfCoreEvalutableExpressionChecker,
-                            defaultJsonSerializerOptions
-                        );
-                    }),
-                    GetServiceProviderHashCode = thisService => RuntimeHelpers.GetHashCode((JsonSerializerOptions)thisService.Options!),
-                    ShouldUseSameServiceProvider = args => ReferenceEquals((JsonSerializerOptions)args.ThisService.Options!, (JsonSerializerOptions)args.OtherServices.Single().Options!),
-                    Options = defaultJsonSerializerOptions,
+                    ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitorJsonSerializerOptions>(sp => new KeyGeneratorVisitorJsonSerializerOptions { Options = defaultJsonSerializerOptions }),
+                    GetServiceProviderHashCode = null,
+                    ShouldUseSameServiceProvider = null,
+                    Options = null,
                 };
             }
+
+            yield return new CachedEfCoreService
+            {
+                ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitor>(sp =>
+                {
+                    var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
+                    var model = sp.GetRequiredService<IModel>();
+                    var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
+                    var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
+                    var jsonSerializerOptions = dbContext.GetService<KeyGeneratorVisitorJsonSerializerOptions>().Options;
+
+                    return new KeyGeneratorVisitor(
+                        printabilityChecker,
+                        model,
+                        cachedEfCoreEvalutableExpressionChecker,
+                        jsonSerializerOptions
+                    );
+                }),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
+            };
 
             {
                 var defaultNonEvaluableTypes = CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes;

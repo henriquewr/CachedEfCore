@@ -1,14 +1,10 @@
-﻿using CachedEfCore.Cache.KeyGeneration;
-using CachedEfCore.Cache.KeyGeneration.ExpressionEvaluation;
-using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
+﻿using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.Cache.KeyGeneration.TypeCompatibility;
 using CachedEfCore.DbContextOptionExtensions;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace CachedEfCore.Configuration
@@ -25,25 +21,12 @@ namespace CachedEfCore.Configuration
         public virtual CachedEfCoreKeyGenerationOptionsBuilder ConfigureJsonSerializer(Func<JsonSerializerOptions, JsonSerializerOptions> configure)
         {
             var jsonSerializerOptions = configure(CachedEfCoreKeyGenerationOptionsDefaults.DefaultJsonSerializerOptions);
-
             var service = new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitor>(sp =>
-                {
-                    var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
-                    var model = sp.GetRequiredService<IModel>();
-                    var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
-
-                    return new KeyGeneratorVisitor(
-                        printabilityChecker,
-                        model,
-                        cachedEfCoreEvalutableExpressionChecker,
-                        jsonSerializerOptions
-                    );
-                }),
-                GetServiceProviderHashCode = thisService => RuntimeHelpers.GetHashCode((JsonSerializerOptions)thisService.Options!),
-                ShouldUseSameServiceProvider = args => ReferenceEquals((JsonSerializerOptions)args.ThisService.Options!, (JsonSerializerOptions)args.OtherServices.Single().Options!),
-                Options = jsonSerializerOptions,
+                ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitorJsonSerializerOptions>(sp => new KeyGeneratorVisitorJsonSerializerOptions { Options = jsonSerializerOptions }),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
             };
 
             _cachedEfCoreExtension.ReplaceService(service);

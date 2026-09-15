@@ -2,7 +2,6 @@
 using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Caching.InMemory.Store;
-using CachedEfCore.Caching.Specification.Tests.Collections;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests;
 using CachedEfCore.DependencyInjection;
@@ -18,7 +17,6 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 {
-    [Collection(typeof(NonParallelCollection))]
     public class DbQueryCacheHelperTest : DbQueryCacheHelperSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
