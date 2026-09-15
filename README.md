@@ -21,6 +21,9 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
             {
                 // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
                 cachedEfCoreOptions.UseSqlServer();
+
+                cachedEfCoreOptions.UseInMemoryCacheStore();
+
             });
         });
     }
@@ -41,6 +44,8 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
             {
                 // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
                 cachedEfCoreOptions.UseSqlServer();
+                
+                cachedEfCoreOptions.UseInMemoryCacheStore();
 
                 cachedEfCoreOptions.ConfigureKeyGeneration(keyGen =>
                 {
