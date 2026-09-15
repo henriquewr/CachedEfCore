@@ -2,7 +2,7 @@
 
 namespace CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen
 {
-    internal class KeyGeneratorVisitorJsonSerializerOptions
+    internal sealed class KeyGeneratorVisitorJsonSerializerOptions
     {
         public required JsonSerializerOptions Options { get; set; }
     }

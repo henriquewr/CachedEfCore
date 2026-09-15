@@ -2,7 +2,7 @@
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    internal class DbQueryCacheStoreInMemoryCacheEntryOptions
+    internal sealed class DbQueryCacheStoreInMemoryCacheEntryOptions
     {
         public required MemoryCacheEntryOptions EntryOptions { get; set; }
     }

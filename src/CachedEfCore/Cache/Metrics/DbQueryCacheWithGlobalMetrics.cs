@@ -1,6 +1,6 @@
 ﻿namespace CachedEfCore.Cache.Metrics
 {
-    internal class DbQueryCacheWithGlobalMetrics : IDbQueryCacheMetrics
+    internal sealed class DbQueryCacheWithGlobalMetrics : IDbQueryCacheMetrics
     {
         private readonly IDbQueryCacheMetrics _globalMetrics;
         private readonly IDbQueryCacheMetrics _innerCacheMetrics;
