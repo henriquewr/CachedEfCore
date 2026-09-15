@@ -2,12 +2,11 @@
 using CachedEfCore.Cache.Store;
 using CachedEfCore.Caching.InMemory.Configuration;
 using CachedEfCore.Caching.InMemory.Store;
-using CachedEfCore.Caching.InMemory.Tests.Common;
+using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -30,7 +29,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
         private record TestCacheKey : IDbQueryCacheKey
         {
             public object? Key { get; set; }
-            public Guid? DependentDbContext { get; set; }
+            public DbContextId? DependentDbContext { get; set; }
         }
 
         protected virtual IServiceProvider CreateProvider()
@@ -40,11 +39,11 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
                    services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                    {
+                       options.EnableServiceProviderCaching(false);
+
                        options.UseLazyLoadingProxies();
 
                        options.UseInMemoryDatabase(Guid.NewGuid().ToString());
-
-                       options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
@@ -84,7 +83,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var cacheKey = new TestCacheKey
             {
                 Key = "cacheKeyAddToCache",
-                DependentDbContext = isDbContextDependent ? dbContext.ContextId.InstanceId : null,
+                DependentDbContext = isDbContextDependent ? dbContext.ContextId : null,
             };
             var rootType = typeof(object); // any type
 
@@ -116,12 +115,14 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
+            dbQueryCacheStore.RemoveAll();
+
             var key = "cacheKeyAddToCache";
 
             var dependentCacheKey = new TestCacheKey
             {
                 Key = key,
-                DependentDbContext = dbContext.ContextId.InstanceId,
+                DependentDbContext = dbContext.ContextId,
             };
             var rootType = typeof(object); // any type
 
@@ -139,7 +140,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var otherDbContextCacheKey = new TestCacheKey
             {
                 Key = key,
-                DependentDbContext = Guid.NewGuid(),
+                DependentDbContext = new DbContextId(Guid.NewGuid(), 0),
             };
 
             var cachedToOtherDb = dbQueryCacheStore.GetCached<object>(otherDbContextCacheKey);
@@ -168,7 +169,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             var keys = Enumerable.Range(0, 100000).Select(x => new TestCacheKey 
             { 
-                Key = "cacheKeyAddToCache" + x, DependentDbContext = dbContext.ContextId.InstanceId
+                Key = "cacheKeyAddToCache" + x, DependentDbContext = dbContext.ContextId
             }).ToArray();
 
             Parallel.ForEach(keys, parallelOptions, key =>
@@ -199,7 +200,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var keys = Enumerable.Range(0, 1000).Select(i => new TestCacheKey 
             {
                 Key = "removeAllKey" + i,
-                DependentDbContext = dbContext.ContextId.InstanceId
+                DependentDbContext = dbContext.ContextId
             }).ToArray();
 
             foreach (var key in keys)
@@ -259,7 +260,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             var keys = Enumerable.Range(0, range).Select(x => new TestCacheKey
             {
                 Key = "cacheKeyAddToCache" + x,
-                DependentDbContext = dbContext.ContextId.InstanceId
+                DependentDbContext = dbContext.ContextId
             }).ToArray();
 
             applicationMetrics.Reset();
@@ -289,7 +290,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
                 var nonExistingKey = new TestCacheKey
                 {
                     Key = "NonExisntingKey" + i,
-                    DependentDbContext = dbContext.ContextId.InstanceId,
+                    DependentDbContext = dbContext.ContextId,
                 };
                 await getFromCache(dbContext, dbQueryCacheStore, nonExistingKey, rootType);
             });

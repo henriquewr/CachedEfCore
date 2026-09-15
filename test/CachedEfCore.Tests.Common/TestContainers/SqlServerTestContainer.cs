@@ -1,11 +1,9 @@
 ﻿using Microsoft.Data.SqlClient;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Testcontainers.MsSql;
 using Xunit;
 
-namespace CachedEfCore.SqlServer.Tests.Testing
+namespace CachedEfCore.Tests.Common.TestContainers
 {
     [DebuggerDisplay("{_databaseName}")]
     public class SqlServerTestContainer : IAsyncLifetime

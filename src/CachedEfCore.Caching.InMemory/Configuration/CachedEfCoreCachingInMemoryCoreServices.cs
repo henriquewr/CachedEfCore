@@ -1,9 +1,7 @@
-﻿using CachedEfCore.Cache.Metrics;
-using CachedEfCore.Cache.Store;
+﻿using CachedEfCore.Cache.Store;
 using CachedEfCore.Caching.InMemory.Store;
 using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
@@ -14,20 +12,26 @@ namespace CachedEfCore.Caching.InMemory.Configuration
         {
             {
                 var memoryCacheOptions = CachedEfCoreCachingInMemoryOptionsDefaults.DefaultMemoryCacheEntryOptions;
+
                 yield return new CachedEfCoreService
                 {
-                    ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(sp =>
+                    ServiceDescriptor = ServiceDescriptor.Scoped<DbQueryCacheStoreInMemoryCacheEntryOptions>(sp =>
                     {
-                        var memoryCache = sp.GetRequiredService<IMemoryCache>();
-                        var metrics = sp.GetRequiredService<IDbQueryCacheMetrics>();
-
-                        return new DbQueryCacheInMemoryInternalStore(memoryCache, metrics, memoryCacheOptions);
+                        return new DbQueryCacheStoreInMemoryCacheEntryOptions() { EntryOptions = memoryCacheOptions };
                     }),
-                    GetServiceProviderHashCode = thisService => ((MemoryCacheEntryOptions)thisService.Options!).GetHashCode(),
-                    ShouldUseSameServiceProvider = arg => ((MemoryCacheEntryOptions)arg.ThisService.Options!) == ((MemoryCacheEntryOptions)arg.OtherServices.Single().Options!),
-                    Options = memoryCacheOptions,
+                    GetServiceProviderHashCode = null,
+                    ShouldUseSameServiceProvider = null,
+                    Options = null,
                 };
             }
+
+            yield return new CachedEfCoreService
+            {
+                ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
+            };
 
             yield return new CachedEfCoreService
             {

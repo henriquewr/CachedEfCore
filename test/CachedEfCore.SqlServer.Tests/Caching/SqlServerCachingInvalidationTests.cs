@@ -1,6 +1,6 @@
 ﻿using CachedEfCore.Cache.Store;
-using CachedEfCore.SqlServer.Tests.Testing;
 using CachedEfCore.Tests.Common.Fixtures;
+using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +19,7 @@ namespace CachedEfCore.SqlServer.Tests.Caching
         public record class CacheKey : IDbQueryCacheKey
         {
             public required string Key { get; set; }
-            public Guid? DependentDbContext { get; set; }
+            public DbContextId? DependentDbContext { get; set; }
         }
 
         [Fact]

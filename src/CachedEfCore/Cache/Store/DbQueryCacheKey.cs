@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.ObjectPool;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.ObjectPool;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -84,8 +85,8 @@ namespace CachedEfCore.Cache.Store
         public DbQueryCacheKey(Type entityType, 
             ExpressionKey expression,
             string? additionalExpressionData, 
-            MethodInfo method, 
-            Guid? dependentDbContext)
+            MethodInfo method,
+            DbContextId? dependentDbContext)
         {
             EntityType = entityType;
             Expression = expression;
@@ -98,7 +99,7 @@ namespace CachedEfCore.Cache.Store
         public readonly ExpressionKey Expression { get; }
         public readonly string? AdditionalExpressionData { get; }
         public readonly MethodInfo Method { get; }
-        public readonly Guid? DependentDbContext { get; }
+        public readonly DbContextId? DependentDbContext { get; }
 
         public override bool Equals(object? obj)
         {

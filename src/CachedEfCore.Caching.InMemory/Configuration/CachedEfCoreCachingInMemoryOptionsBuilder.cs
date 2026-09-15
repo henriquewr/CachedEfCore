@@ -21,10 +21,13 @@ namespace CachedEfCore.Caching.InMemory.Configuration
 
             var service = new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(),
-                GetServiceProviderHashCode = thisService => ((MemoryCacheEntryOptions)thisService.Options!).GetHashCode(),
-                ShouldUseSameServiceProvider = arg => ((MemoryCacheEntryOptions)arg.ThisService.Options!) == ((MemoryCacheEntryOptions)arg.OtherServices.Single().Options!),
-                Options = memoryCacheOptions,
+                ServiceDescriptor = ServiceDescriptor.Scoped<DbQueryCacheStoreInMemoryCacheEntryOptions>(sp =>
+                {
+                    return new DbQueryCacheStoreInMemoryCacheEntryOptions() { EntryOptions = memoryCacheOptions };
+                }),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
             };
 
             _cachedEfCoreExtension.ReplaceService(service);

@@ -27,5 +27,9 @@
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
+    <Project Path="tests/CachedEfCore.Caching.Specification.Tests/CachedEfCore.Caching.Specification.Tests.csproj" Id="4b822216-b40f-4dc9-a5e7-ae445fa953ac">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
   </Folder>
 </Solution>

@@ -354,6 +354,9 @@ namespace CachedEfCore.DependencyManager.Tests.TypeScannerTests.Shallow
 }
 
 
+#pragma warning disable CS0169 // The field '' is never used
+#pragma warning disable CS0414 // The field '' is assigned but its value is never used
+
 namespace CachedEfCore.DependencyManager.Tests.TypeScannerTests.Shallow.Field
 {
     file class TestClass
@@ -624,3 +627,5 @@ namespace CachedEfCore.DependencyManager.Tests.TypeScannerTests.Shallow.NestedWi
     {
     }
 }
+#pragma warning restore CS0414 // The field '' is assigned but its value is never used
+#pragma warning restore CS0169 // The field '' is never used

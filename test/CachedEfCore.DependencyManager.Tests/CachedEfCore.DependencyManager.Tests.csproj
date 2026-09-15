@@ -7,7 +7,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
+	<OutputType>Exe</OutputType>
+	<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,14 +16,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.9" />
-      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-	  <PackageReference Include="xunit.v3" Version="3.2.2" />
-      <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
+	<PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
 
   <ItemGroup>

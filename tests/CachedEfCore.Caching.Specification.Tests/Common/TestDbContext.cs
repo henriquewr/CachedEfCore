@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CachedEfCore.Caching.InMemory.Tests.Common
+namespace CachedEfCore.Caching.Specification.Tests.Common
 {
     public class TestDbContext : DbContext
     {

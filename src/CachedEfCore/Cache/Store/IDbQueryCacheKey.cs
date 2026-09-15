@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
 
 namespace CachedEfCore.Cache.Store
 {
     public interface IDbQueryCacheKey
     {
-        Guid? DependentDbContext { get; }
+        DbContextId? DependentDbContext { get; }
     }
 }
