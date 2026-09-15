@@ -67,20 +67,6 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
     }
 ```
 
-## **DbContext**
-```
-public class YourDbContext : CachedDbContext
-{
-    public YourDbContext() : base()
-    {
-    }
-
-    public YourDbContext(DbContextOptions options) : base(options)
-    {
-    }
-}
-```
-
 ## **Usage**
 ```
 public IEnumerable<TResult> SelectMany<TResult>(Expression<Func<T, bool>> where, Expression<Func<T, TResult>> selector)
