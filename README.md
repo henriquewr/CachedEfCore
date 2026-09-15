@@ -19,6 +19,8 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 
             options.UseCachedEfCore(cachedEfCoreOptions =>
             {
+                cachedEfCoreOptions.UseInMemoryCacheStore();
+
                 // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
                 cachedEfCoreOptions.UseSqlServer();
             });
@@ -39,6 +41,8 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 
             options.UseCachedEfCore(cachedEfCoreOptions =>
             {
+                cachedEfCoreOptions.UseInMemoryCacheStore();
+
                 // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
                 cachedEfCoreOptions.UseSqlServer();
 
@@ -89,6 +93,45 @@ public async Task<IEnumerable<TResult>> SelectManyAsync<TResult>(Expression<Func
     var result = await _dbQueryCacheHelper.GetOrAddAsync<IEnumerable<TResult>, T>(_dbContext, async () => await _dbContext.Entity.Where(where).Select(selector).ToListAsync(), [where, selector]);
     return result!;
 }
+```
+
+## **Compiled cached queries**
+
+For hot queries, compile the cache identity and the Entity Framework query once. Cache hits use the typed parameter directly and do not visit an expression tree, serialize values, or create a string key.
+
+```csharp
+private static readonly CachedQuery<AppDbContext, int, ProductDto?> ProductById =
+    CachedQuery.For<Product>().Compile(
+        (AppDbContext context, int id) => context.Products
+            .Where(product => product.Id == id)
+            .Select(product => new ProductDto(product.Id, product.Name, product.Price))
+            .SingleOrDefault()
+    );
+
+public ProductDto? GetProduct(int id)
+{
+    return ProductById.GetOrAdd(_dbContext, id);
+}
+```
+
+Use `CompileAsync` and `GetOrAddAsync` for an EF compiled asynchronous query. The async expression receives a `CancellationToken` as its last parameter.
+
+All values that can change the query result must be part of the typed cache identity, either as the query parameter or the cache partition. Use immutable values with stable equality semantics, such as primitives, `Guid`, enums, strings, or immutable composite keys.
+
+When tenant or shard state comes from the `DbContext`, pass it as the typed cache partition:
+
+```csharp
+return ProductById.GetOrAdd(_dbContext, id, tenantId);
+```
+
+`CachedQuery.For<TEntity>()` defines the invalidation root. It must represent every entity read by the query through the configured entity dependency graph. Compiled cache keys are process-local and intended for in-process object-key cache stores such as `CachedEfCore.Caching.InMemory`.
+
+## **Benchmarks**
+
+Run the cache-hit comparison, including the 1, 4, 16, and 32-thread scenarios, with:
+
+```bash
+dotnet run -c Release --project benchmarks/CachedEfCore.Caching.InMemory.Benchmarks -- --filter '*CachedQuery*'
 ```
 
 ### **Performance impact**

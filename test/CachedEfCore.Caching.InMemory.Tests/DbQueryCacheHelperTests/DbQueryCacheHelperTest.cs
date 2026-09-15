@@ -14,6 +14,7 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 {
+    [Collection(CacheTestCollection.Name)]
     public class DbQueryCacheHelperTest : IClassFixture<ServiceProviderFixture>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;

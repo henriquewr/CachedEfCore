@@ -12,7 +12,7 @@ using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
+    public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore, IStatefulDbQueryCacheInMemoryInternalStore
     {
         internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> _dbContextDependentKeys = new();
         internal readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
@@ -37,7 +37,6 @@ namespace CachedEfCore.Caching.InMemory.Store
             if (_dbContextDependentKeys.TryRemove(contextId, out var keys))
             {
                 keys.Cancel();
-                keys.Dispose();
             }
         }
 
@@ -47,7 +46,6 @@ namespace CachedEfCore.Caching.InMemory.Store
             foreach (var item in l_cacheKeysByContextId)
             {
                 item.Value.Cancel();
-                item.Value.Dispose();
             }
             l_cacheKeysByContextId.Clear();
 
@@ -55,7 +53,6 @@ namespace CachedEfCore.Caching.InMemory.Store
             foreach (var item in l_cacheKeysByType)
             {
                 item.Value.Cancel();
-                item.Value.Dispose();
             }
             l_cacheKeysByType.Clear();
         }
@@ -99,7 +96,6 @@ namespace CachedEfCore.Caching.InMemory.Store
                 if (_typeKeys.TryRemove(item.ClrType, out var keysWithType))
                 {
                     keysWithType.Cancel();
-                    keysWithType.Dispose();
                 }
             }
         }
@@ -125,7 +121,12 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InternalAddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey cacheKey, object? dataToCache)
+        private void InternalAddToCache(
+            DbContext dbContext,
+            Type rootEntityType,
+            IDbQueryCacheKey cacheKey,
+            object? dataToCache,
+            CancellationTokenSource? ctsByType = null)
         {
             using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_cacheOptions);
             cacheEntry.SetSize(0);
@@ -134,28 +135,34 @@ namespace CachedEfCore.Caching.InMemory.Store
             if (dataToCache is not null && cacheKey.DependentDbContext.HasValue)
             {
                 // if dataToCache is null the object is not really dependent to the DbContext instance
-                CancellationTokenSource dbContextDependentCts;
-
                 var dbContextId = dbContext.ContextId.InstanceId;
-
-                if (!_dbContextDependentKeys.TryGetValue(dbContextId, out dbContextDependentCts!))
-                {
-                    dbContextDependentCts = new CancellationTokenSource();
-                    _dbContextDependentKeys.TryAdd(dbContextId, dbContextDependentCts);
-                }
+                var dbContextDependentCts = GetOrAddTokenSource(_dbContextDependentKeys, dbContextId);
 
                 cacheEntry.AddExpirationToken(new CancellationChangeToken(dbContextDependentCts.Token));
             }
 
-            CancellationTokenSource ctsByType;
-
-            if (!_typeKeys.TryGetValue(rootEntityType, out ctsByType!))
-            {
-                ctsByType = new CancellationTokenSource();
-                _typeKeys.TryAdd(rootEntityType, ctsByType);
-            }
+            ctsByType ??= GetOrAddTokenSource(_typeKeys, rootEntityType);
 
             cacheEntry.AddExpirationToken(new CancellationChangeToken(ctsByType.Token));
+        }
+
+        private static CancellationTokenSource GetOrAddTokenSource<TKey>(ConcurrentDictionary<TKey, CancellationTokenSource> tokenSources, TKey key)
+            where TKey : notnull
+        {
+            if (tokenSources.TryGetValue(key, out var tokenSource))
+            {
+                return tokenSource;
+            }
+
+            var newTokenSource = new CancellationTokenSource();
+            tokenSource = tokenSources.GetOrAdd(key, newTokenSource);
+
+            if (!ReferenceEquals(tokenSource, newTokenSource))
+            {
+                newTokenSource.Dispose();
+            }
+
+            return tokenSource;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -167,9 +174,10 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            var ctsByType = GetOrAddTokenSource(_typeKeys, rootEntityType);
             var createdValue = create();
             _metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, key, createdValue);
+            InternalAddToCache(dbContext, rootEntityType, key, createdValue, ctsByType);
 
             return createdValue;
         }
@@ -183,9 +191,44 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            var ctsByType = GetOrAddTokenSource(_typeKeys, rootEntityType);
             var createdValue = await create().ConfigureAwait(false);
             _metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, key, createdValue);
+            InternalAddToCache(dbContext, rootEntityType, key, createdValue, ctsByType);
+
+            return createdValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T GetOrAdd<TState, T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, TState state, Func<TState, T> create)
+        {
+            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            {
+                _metrics.ReportCacheHit();
+                return cachedValue!;
+            }
+
+            var ctsByType = GetOrAddTokenSource(_typeKeys, rootEntityType);
+            var createdValue = create(state);
+            _metrics.ReportCacheMiss();
+            InternalAddToCache(dbContext, rootEntityType, key, createdValue, ctsByType);
+
+            return createdValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async ValueTask<T> GetOrAddAsync<TState, T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, TState state, Func<TState, Task<T>> create)
+        {
+            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            {
+                _metrics.ReportCacheHit();
+                return cachedValue!;
+            }
+
+            var ctsByType = GetOrAddTokenSource(_typeKeys, rootEntityType);
+            var createdValue = await create(state).ConfigureAwait(false);
+            _metrics.ReportCacheMiss();
+            InternalAddToCache(dbContext, rootEntityType, key, createdValue, ctsByType);
 
             return createdValue;
         }

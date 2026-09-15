@@ -7,12 +7,11 @@ using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
+    public class DbQueryCacheInMemoryStore : IDbQueryCacheStore, IStatefulDbQueryCacheStore
     {
         private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly Guid _dbContextId;
-        private bool _reseted;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
         {
@@ -34,11 +33,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         private void Reset()
         {
-            if (_reseted)
-            {
-                _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
-            }
-            _reseted = true;
+            _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
         }
 
         public void Dispose()
@@ -74,7 +69,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             => _dbQueryCacheStore.RemoveAllDbContextDependent(contextId);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true) 
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
             => _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, _dbContext, fireEvent);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -100,5 +95,27 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
             => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, create);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T GetOrAdd<TState, T>(Type rootEntityType, IDbQueryCacheKey key, TState state, Func<TState, T> create)
+        {
+            if (_dbQueryCacheStore is IStatefulDbQueryCacheInMemoryInternalStore statefulCacheStore)
+            {
+                return statefulCacheStore.GetOrAdd(_dbContext, rootEntityType, key, state, create);
+            }
+
+            return _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, () => create(state));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<T> GetOrAddAsync<TState, T>(Type rootEntityType, IDbQueryCacheKey key, TState state, Func<TState, Task<T>> create)
+        {
+            if (_dbQueryCacheStore is IStatefulDbQueryCacheInMemoryInternalStore statefulCacheStore)
+            {
+                return statefulCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, state, create);
+            }
+
+            return _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, () => create(state));
+        }
     }
 }

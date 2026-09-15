@@ -9,15 +9,18 @@ using CachedEfCore.Tests.Common.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 {
+    [Collection(CacheTestCollection.Name)]
     public class DbQueryCacheStoreTest : IClassFixture<ServiceProviderFixture>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
@@ -159,16 +162,17 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             var dataToCache = new LazyLoadEntity();
 
-            var rootType = typeof(object); // any type
+            var rootType = typeof(LazyLoadEntity);
 
             var parallelOptions = new ParallelOptions
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 16
             };
 
-            var keys = Enumerable.Range(0, 100000).Select(x => new TestCacheKey 
-            { 
-                Key = "cacheKeyAddToCache" + x, DependentDbContext = dbContext.ContextId.InstanceId
+            var keys = Enumerable.Range(0, 100000).Select(x => new TestCacheKey
+            {
+                Key = "cacheKeyAddToCache" + x,
+                DependentDbContext = dbContext.ContextId.InstanceId
             }).ToArray();
 
             Parallel.ForEach(keys, parallelOptions, key =>
@@ -181,6 +185,73 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             Assert.Single(dbQueryCacheInternalStore._typeKeys);
 
             AssertContainsAllKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
+
+            var entityType = dbContext.Model.FindEntityType(typeof(LazyLoadEntity))!;
+            dbQueryCacheStore.RemoveDependentEntities(new HashSet<IEntityType> { entityType });
+
+            AssertDoesNotContainAnyKeys<TestCacheKey, LazyLoadEntity>(keys, dbQueryCacheStore);
+        }
+
+        [Fact]
+        public void Dispose_Removes_DbContext_Dependent_Entries()
+        {
+            var serviceProvider = CreateProvider();
+
+            using var scope = serviceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            var internalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var cacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+            var cacheKey = new TestCacheKey
+            {
+                Key = "context-dependent",
+                DependentDbContext = dbContext.ContextId.InstanceId
+            };
+
+            cacheStore.AddToCache(typeof(LazyLoadEntity), cacheKey, new LazyLoadEntity());
+            Assert.Single(internalStore._dbContextDependentKeys);
+
+            cacheStore.Dispose();
+
+            Assert.Empty(internalStore._dbContextDependentKeys);
+            Assert.Null(cacheStore.GetCached<LazyLoadEntity>(cacheKey));
+        }
+
+        [Fact]
+        public async Task Invalidation_During_Creation_Should_Not_Cache_Created_Value()
+        {
+            var serviceProvider = CreateProvider();
+
+            using var scope = serviceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            var cacheStore = dbContext.GetService<IDbQueryCacheStore>();
+            var entityType = dbContext.Model.FindEntityType(typeof(NonLazyLoadEntity))!;
+            var cacheKey = new TestCacheKey { Key = "in-flight-creation" };
+
+            using var creationStarted = new ManualResetEventSlim();
+            using var completeCreation = new ManualResetEventSlim();
+
+            var getOrAddTask = Task.Run(() => cacheStore.GetOrAdd(
+                typeof(NonLazyLoadEntity),
+                cacheKey,
+                () =>
+                {
+                    creationStarted.Set();
+                    completeCreation.Wait(TestContext.Current.CancellationToken);
+
+                    return new NonLazyLoadEntity();
+                }
+            ));
+
+            creationStarted.Wait(TestContext.Current.CancellationToken);
+            cacheStore.RemoveDependentEntities(new HashSet<IEntityType> { entityType });
+            completeCreation.Set();
+
+            await getOrAddTask;
+
+            Assert.Null(cacheStore.GetCached<NonLazyLoadEntity>(cacheKey));
         }
 
         [Fact]
@@ -196,7 +267,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             var dataToCache = new LazyLoadEntity();
 
-            var keys = Enumerable.Range(0, 1000).Select(i => new TestCacheKey 
+            var keys = Enumerable.Range(0, 1000).Select(i => new TestCacheKey
             {
                 Key = "removeAllKey" + i,
                 DependentDbContext = dbContext.ContextId.InstanceId
