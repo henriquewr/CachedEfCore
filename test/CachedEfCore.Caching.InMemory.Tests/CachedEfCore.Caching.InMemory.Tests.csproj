@@ -18,11 +18,6 @@
 		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
-		<PackageReference Include="Microsoft.Testing.Platform.MSBuild" Version="2.4.0" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
 		<PackageReference Include="xunit.v3" Version="4.0.1" />
 	</ItemGroup>
 
