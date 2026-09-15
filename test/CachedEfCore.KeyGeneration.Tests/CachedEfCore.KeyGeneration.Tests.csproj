@@ -6,7 +6,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
+	<OutputType>Exe</OutputType>
+	<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

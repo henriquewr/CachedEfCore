@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
+	<OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
