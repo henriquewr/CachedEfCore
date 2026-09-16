@@ -12,7 +12,6 @@ namespace CachedEfCore.Caching.InMemory.Store
         private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly Guid _dbContextId;
-        private bool _reseted;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
         {
@@ -34,11 +33,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         private void Reset()
         {
-            if (_reseted)
-            {
-                _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
-            }
-            _reseted = true;
+            _dbQueryCacheStore.RemoveAllDbContextDependent(_dbContextId);
         }
 
         public void Dispose()
