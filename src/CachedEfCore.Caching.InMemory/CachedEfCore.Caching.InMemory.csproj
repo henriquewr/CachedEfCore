@@ -2,24 +2,22 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<ImplicitUsings>disable</ImplicitUsings>
+		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
 	</PropertyGroup>
-	
+
 	<PropertyGroup>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<Title>CachedEfCore</Title>
-		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore</PackageProjectUrl>
-		<Description>A Caching library for Entity Framework Core with automatic cache invalidation</Description>
+		<Title>CachedEfCore.Caching.InMemory</Title>
+		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore.Caching.InMemory</PackageProjectUrl>
+		<Description>InMemory store for CachedEfCore</Description>
 		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
 		<AnalysisLevel>latest-recommended</AnalysisLevel>
 	</PropertyGroup>
-	
+
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
-		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.5" />
+		<ProjectReference Include="..\CachedEfCore\CachedEfCore.csproj" />
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='TestDebug'">
@@ -31,4 +29,9 @@
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestRelease|AnyCPU'">
 		<Optimize>True</Optimize>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="CachedEfCore.Caching.InMemory.Tests" />
+	</ItemGroup>
+
 </Project>

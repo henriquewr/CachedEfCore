@@ -16,7 +16,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 
 namespace CachedEfCore.Configuration
 {
@@ -82,24 +81,34 @@ namespace CachedEfCore.Configuration
                 var defaultJsonSerializerOptions = CachedEfCoreKeyGenerationOptionsDefaults.DefaultJsonSerializerOptions;
                 yield return new CachedEfCoreService
                 {
-                    ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitor>(sp =>
-                    {
-                        var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
-                        var model = sp.GetRequiredService<IModel>();
-                        var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
-
-                        return new KeyGeneratorVisitor(
-                            printabilityChecker,
-                            model,
-                            cachedEfCoreEvalutableExpressionChecker,
-                            defaultJsonSerializerOptions
-                        );
-                    }),
-                    GetServiceProviderHashCode = thisService => ((JsonSerializerOptions)thisService.Options!).GetHashCode(),
-                    ShouldUseSameServiceProvider = args => ((JsonSerializerOptions)args.ThisService.Options!).Equals(((JsonSerializerOptions)args.OtherServices.Single().Options!)),
-                    Options = defaultJsonSerializerOptions,
+                    ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitorJsonSerializerOptions>(sp => new KeyGeneratorVisitorJsonSerializerOptions { Options = defaultJsonSerializerOptions }),
+                    GetServiceProviderHashCode = null,
+                    ShouldUseSameServiceProvider = null,
+                    Options = null,
                 };
             }
+
+            yield return new CachedEfCoreService
+            {
+                ServiceDescriptor = ServiceDescriptor.Scoped<KeyGeneratorVisitor>(sp =>
+                {
+                    var printabilityChecker = sp.GetRequiredService<IPrintabilityChecker>();
+                    var model = sp.GetRequiredService<IModel>();
+                    var cachedEfCoreEvalutableExpressionChecker = sp.GetRequiredService<ICachedEfCoreEvalutableExpressionChecker>();
+                    var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
+                    var jsonSerializerOptions = dbContext.GetService<KeyGeneratorVisitorJsonSerializerOptions>().Options;
+
+                    return new KeyGeneratorVisitor(
+                        printabilityChecker,
+                        model,
+                        cachedEfCoreEvalutableExpressionChecker,
+                        jsonSerializerOptions
+                    );
+                }),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
+            };
 
             {
                 var defaultNonEvaluableTypes = CachedEfCoreKeyGenerationOptionsDefaults.DefaultNonEvaluableTypes;
@@ -109,7 +118,7 @@ namespace CachedEfCore.Configuration
                     {
                         return new TypeCompatibilityChecker(defaultNonEvaluableTypes);
                     }),
-                    GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).GetHashCode(),
+                    GetServiceProviderHashCode = thisService => ((List<Type>)thisService.Options!).Aggregate(0, (hash, type) => HashCode.Combine(hash, type)),
                     ShouldUseSameServiceProvider = args => ((List<Type>)args.ThisService.Options!).SequenceEqual(((List<Type>)args.OtherServices.Single().Options!)),
                     Options = defaultNonEvaluableTypes,
                 };
@@ -127,7 +136,7 @@ namespace CachedEfCore.Configuration
             {
                 ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheMetrics>(sp =>
                 {
-                    return new DbQueryCacheWithGlobalMetrics(new DbQueryCacheMetrics());
+                    return new DbQueryCacheWithGlobalMetrics(DbQueryCacheMetrics.GlobalInstance, new DbQueryCacheMetrics());
                 }),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,

@@ -1,11 +1,13 @@
 ﻿namespace CachedEfCore.Cache.Metrics
 {
-    internal class DbQueryCacheWithGlobalMetrics : IDbQueryCacheMetrics
+    internal sealed class DbQueryCacheWithGlobalMetrics : IDbQueryCacheMetrics
     {
+        private readonly IDbQueryCacheMetrics _globalMetrics;
         private readonly IDbQueryCacheMetrics _innerCacheMetrics;
 
-        public DbQueryCacheWithGlobalMetrics(IDbQueryCacheMetrics innerCacheMetrics)
+        public DbQueryCacheWithGlobalMetrics(IDbQueryCacheMetrics globalMetrics, IDbQueryCacheMetrics innerCacheMetrics)
         {
+            _globalMetrics = globalMetrics;
             _innerCacheMetrics = innerCacheMetrics;
         }
 
@@ -16,13 +18,13 @@
 
         public void ReportCacheHit()
         {
-            DbQueryCacheMetrics.GlobalInstance.ReportCacheHit();
+            _globalMetrics.ReportCacheHit();
             _innerCacheMetrics.ReportCacheHit();
         }
 
         public void ReportCacheMiss()
         {
-            DbQueryCacheMetrics.GlobalInstance.ReportCacheMiss();
+            _globalMetrics.ReportCacheMiss();
             _innerCacheMetrics.ReportCacheMiss();
         }
 

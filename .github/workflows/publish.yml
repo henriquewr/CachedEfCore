@@ -1,0 +1,58 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+
+  publish:
+  
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Pack
+        run: | 
+          VERSION="${GITHUB_REF_NAME#v}"
+          projects=(
+            "src/CachedEfCore/CachedEfCore.csproj"
+            "src/CachedEfCore.Caching.InMemory/CachedEfCore.Caching.InMemory.csproj"
+            "src/CachedEfCore.DependencyInjection/CachedEfCore.DependencyInjection.csproj"
+            "src/CachedEfCore.SqlServer/CachedEfCore.SqlServer.csproj"
+          )
+
+          for project in "${projects[@]}"; do
+            dotnet pack "$project" \
+              -c Release \
+              --no-build \
+              -o ./artifacts \
+              -p:Version="$VERSION"
+          done
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: henriquewr
+
+      - name: Publish
+        run: |
+          dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate

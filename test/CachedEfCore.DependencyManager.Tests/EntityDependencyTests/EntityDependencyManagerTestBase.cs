@@ -33,7 +33,6 @@ namespace CachedEfCore.DependencyManager.Tests.EntityDependencyTests
 
                  services.AddDbContext<TestDbContext>(options =>
                  {
-                     options.ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
                      options.UseLazyLoadingProxies();
                      options.UseSqlServer();
 
