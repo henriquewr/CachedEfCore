@@ -25,7 +25,7 @@
 		<ProjectReference Include="..\..\src\CachedEfCore.Caching.InMemory\CachedEfCore.Caching.InMemory.csproj" />
 		<ProjectReference Include="..\..\src\CachedEfCore.SqlServer\CachedEfCore.SqlServer.csproj" />
 		<ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
-		<ProjectReference Include="..\..\tests\CachedEfCore.Caching.Specification.Tests\CachedEfCore.Caching.Specification.Tests.csproj" />
+		<ProjectReference Include="..\..\test\CachedEfCore.Caching.Specification.Tests\CachedEfCore.Caching.Specification.Tests.csproj" />
 		<ProjectReference Include="..\CachedEfCore.Tests.Common\CachedEfCore.Tests.Common.csproj" />
 	</ItemGroup>
 
