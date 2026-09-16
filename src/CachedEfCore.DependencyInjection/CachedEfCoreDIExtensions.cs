@@ -38,5 +38,11 @@ namespace CachedEfCore.DependencyInjection
                 return builder;
             }
         }
+        extension<TDbContext> (DbContextOptionsBuilder<TDbContext> builder)
+            where TDbContext : DbContext
+        {
+            public DbContextOptionsBuilder<TDbContext> UseCachedEfCore(Action<CachedEfCoreOptionsBuilder>? configure = null)
+                => (DbContextOptionsBuilder<TDbContext>)((DbContextOptionsBuilder)builder).UseCachedEfCore(configure);
+        }
     }
 }
