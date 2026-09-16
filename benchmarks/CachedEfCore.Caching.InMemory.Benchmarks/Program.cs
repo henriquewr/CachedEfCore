@@ -1,8 +1,4 @@
-﻿// -----------------------------------------------------------------------
-// Copyright (c) Microsoft Corporation.  All rights reserved.
-// -----------------------------------------------------------------------
-
-using BenchmarkDotNet.Running;
+﻿using BenchmarkDotNet.Running;
 
 namespace CachedEfCore.Caching.InMemory.Benchmarks
 {
@@ -10,7 +6,7 @@ namespace CachedEfCore.Caching.InMemory.Benchmarks
     {
         static void Main(string[] args)
         {
-            var _ = BenchmarkRunner.Run(typeof(Program).Assembly);
+            _ = BenchmarkRunner.Run(typeof(Program).Assembly);
         }
     }
 }
