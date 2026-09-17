@@ -10,12 +10,12 @@ namespace CachedEfCore.Cache.Helper
         ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
-            object[] query);
+            object?[] query);
         ValueTask<TReturnType> GetOrAddAsync<TReturnType>(
             Type rootEntity,
             DbContext dbContext,
             Func<Task<TReturnType>> getDataFromDatabase,
-            object[] query);
+            object?[] query);
 
         ValueTask<TReturnType> GetOrAddAsync<TReturnType, TEntity>(
             DbContext dbContext,
