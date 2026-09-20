@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -16,9 +17,9 @@ namespace CachedEfCore.Caching.InMemory.Store
         void RemoveAll();
 
         void AddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, object? dataToCache);
-        T? GetCached<T>(IDbQueryCacheKey key);
+        T? GetCached<T>(IDbQueryCacheKey key, IDbQueryCacheMetrics metrics);
 
-        T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create);
-        ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create);
+        T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create, IDbQueryCacheMetrics metrics);
+        ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create, IDbQueryCacheMetrics metrics);
     }
 }

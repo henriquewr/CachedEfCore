@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Testcontainers.MsSql;
 
-namespace CachedEfCore.Caching.InMemory.Benchmarks.TestContainer
+namespace CachedEfCore.Benchmarks.Common.TestContainer
 {
     [DebuggerDisplay("{_databaseName}")]
     public class SqlServerTestContainer

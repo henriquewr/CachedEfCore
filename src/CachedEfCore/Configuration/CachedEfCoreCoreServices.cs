@@ -134,7 +134,7 @@ namespace CachedEfCore.Configuration
 
             yield return new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheMetrics>(sp =>
+                ServiceDescriptor = ServiceDescriptor.Scoped<IDbQueryCacheMetrics>(sp =>
                 {
                     return new DbQueryCacheWithGlobalMetrics(DbQueryCacheMetrics.GlobalInstance, new DbQueryCacheMetrics());
                 }),

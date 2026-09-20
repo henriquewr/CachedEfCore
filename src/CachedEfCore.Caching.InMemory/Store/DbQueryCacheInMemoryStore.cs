@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Cache.EventData;
+using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -11,6 +12,7 @@ namespace CachedEfCore.Caching.InMemory.Store
     {
         private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
+        private readonly IDbQueryCacheMetrics _metrics;
         private readonly Guid _dbContextId;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
@@ -27,6 +29,7 @@ namespace CachedEfCore.Caching.InMemory.Store
         public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
             _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            _metrics = dbContext.GetService<IDbQueryCacheMetrics>();
             _dbContext = dbContext;
             _dbContextId = dbContext.ContextId.InstanceId;
         }
@@ -86,14 +89,14 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
-            => _dbQueryCacheStore.GetCached<T>(key);
+            => _dbQueryCacheStore.GetCached<T>(key, _metrics);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
-            => _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, create);
+            => _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, create, _metrics);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
-            => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, create);
+            => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, create, _metrics);
     }
 }

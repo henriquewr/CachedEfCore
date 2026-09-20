@@ -4,7 +4,6 @@ using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using System;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -20,6 +19,11 @@ namespace CachedEfCore.SqlServer.Tests.Caching
         {
             public required string Key { get; set; }
             public DbContextId? DependentDbContext { get; set; }
+
+            public string Stringify()
+            {
+                return $"{Key}:{DependentDbContext}";
+            }
         }
 
         [Fact]

@@ -1,11 +1,10 @@
 ﻿using BenchmarkDotNet.Attributes;
 using CachedEfCore.Benchmarks.Common.TestContainer;
 using CachedEfCore.Cache.Helper;
-using CachedEfCore.Caching.InMemory.Configuration;
+using CachedEfCore.Caching.FusionCache.Configuration;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VSDiagnostics;
 using System;
@@ -14,7 +13,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 
-namespace CachedEfCore.Caching.InMemory.Benchmarks
+namespace CachedEfCore.Caching.FusionCache.Benchmarks
 {
     [CPUUsageDiagnoser]
     [MemoryDiagnoser(true)]
@@ -34,13 +33,20 @@ namespace CachedEfCore.Caching.InMemory.Benchmarks
                 options.UseCachedEfCore(cachedEfCoreOptions =>
                 {
                     cachedEfCoreOptions.UseSqlServer();
-                    cachedEfCoreOptions.UseInMemoryCacheStore();
+                    cachedEfCoreOptions.UseFusionCacheStore(conf =>
+                    {
+                        conf.ConfigureRegistration(fusionCacheServices =>
+                        {
+                            fusionCacheServices.AddFusionCache();
+                        });
+                    });
                 });
             });
+
             var builtServiceProvider = services.BuildServiceProvider();
             return builtServiceProvider;
         }
-        
+
         public class TestDbContext : DbContext
         {
             public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
@@ -87,7 +93,7 @@ namespace CachedEfCore.Caching.InMemory.Benchmarks
             var id = 2;
             var value = await _dbQueryCacheHelper.GetOrAddAsync(typeof(TestEntity), _dbContext, async () =>
             {
-               return await _dbContext.TestEntities.Where(x => x.Id == id).ToListAsync();
+                return await _dbContext.TestEntities.Where(x => x.Id == id).ToListAsync();
             }, [id]);
 
             return value;
@@ -119,7 +125,6 @@ namespace CachedEfCore.Caching.InMemory.Benchmarks
 
             return value;
         }
-
 
         [Benchmark]
         public List<TestEntity> GetOrAdd_With_Simple_Int_Id()
