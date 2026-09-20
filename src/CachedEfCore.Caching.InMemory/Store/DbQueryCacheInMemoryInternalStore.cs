@@ -18,12 +18,10 @@ namespace CachedEfCore.Caching.InMemory.Store
         internal readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
 
         private readonly IMemoryCache _cache;
-        private readonly IDbQueryCacheMetrics _metrics;
 
-        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, IDbQueryCacheMetrics metrics)
+        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache)
         {
             _cache = cache;
-            _metrics = metrics;
         }
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
@@ -103,15 +101,15 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetCached<T>(IDbQueryCacheKey key)
+        public T? GetCached<T>(IDbQueryCacheKey key, IDbQueryCacheMetrics metrics)
         {
             if (_cache.TryGetValue<T>(key, out var cached))
             {
-                _metrics.ReportCacheHit();
+                metrics.ReportCacheHit();
                 return cached;
             }
 
-            _metrics.ReportCacheMiss();
+            metrics.ReportCacheMiss();
 
             return default;
         }
@@ -158,32 +156,32 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
+        public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create, IDbQueryCacheMetrics metrics)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                _metrics.ReportCacheHit();
+                metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = create();
-            _metrics.ReportCacheMiss();
+            metrics.ReportCacheMiss();
             InternalAddToCache(dbContext, rootEntityType, key, createdValue);
 
             return createdValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
+        public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
         {
             if (_cache.TryGetValue<T>(key, out var cachedValue))
             {
-                _metrics.ReportCacheHit();
+                metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
             var createdValue = await create().ConfigureAwait(false);
-            _metrics.ReportCacheMiss();
+            metrics.ReportCacheMiss();
             InternalAddToCache(dbContext, rootEntityType, key, createdValue);
 
             return createdValue;

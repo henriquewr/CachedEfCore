@@ -17,12 +17,12 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 {
-    public class DbQueryCacheHelperTest : DbQueryCacheHelperSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
+    public class InMemoryDbQueryCacheHelperTest : DbQueryCacheHelperSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly SqlServerTestContainer _sqlServerTestContainer;
 
-        public DbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture, 
+        public InMemoryDbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture, 
             SqlServerTestContainer sqlServerTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
@@ -128,6 +128,25 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
 
             Assert.False(created);
             Assert.Same(valueToCache, cached);
+
+            {
+                var serviceProvider2 = CreateProvider(true);
+
+                var dbContext2 = serviceProvider2.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper2 = serviceProvider2.GetRequiredService<IDbQueryCacheHelper>();
+                created = false;
+                if (isDbContextDependent)
+                {
+                    var result2 = dbQueryCacheHelper2.GetOrAdd<LazyLoadEntity, object/*any type*/>(dbContext2, DbContextDependentCreateFunc, cacheKey);
+                    Assert.True(created);
+                }
+                else
+                {
+                    var result2 = dbQueryCacheHelper2.GetOrAdd<NonLazyLoadEntity, object/*any type*/>(dbContext2, NonDbContextDependentCreateFunc, cacheKey);
+                    Assert.False(created);
+                }
+            }
 
             LazyLoadEntity DbContextDependentCreateFunc()
             {

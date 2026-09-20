@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+		<OutputType>Exe</OutputType>
+		<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="coverlet.collector" Version="10.0.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
+		<PackageReference Include="xunit.v3" Version="4.0.1" />
+		<PackageReference Include="ZiggyCreatures.FusionCache.Backplane.Memory" Version="2.8.0" />
+		<PackageReference Include="ZiggyCreatures.FusionCache.Serialization.SystemTextJson" Version="2.8.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\CachedEfCore.Caching.FusionCache\CachedEfCore.Caching.FusionCache.csproj" />
+		<ProjectReference Include="..\..\src\CachedEfCore.SqlServer\CachedEfCore.SqlServer.csproj" />
+		<ProjectReference Include="..\..\src\CachedEfCore\CachedEfCore.csproj" />
+		<ProjectReference Include="..\..\test\CachedEfCore.Caching.Specification.Tests\CachedEfCore.Caching.Specification.Tests.csproj" />
+		<ProjectReference Include="..\CachedEfCore.Tests.Common\CachedEfCore.Tests.Common.csproj" />
+	</ItemGroup>
+
+</Project>
