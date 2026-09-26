@@ -72,30 +72,36 @@ namespace CachedEfCore.Cache.Store
             return !(left == right);
         }
 
-        private readonly struct SimpleKeyBuilder()
+        private struct SimpleKeyBuilder()
         {
             private static readonly ObjectPool<StringBuilder> _stringBuilderPool = new DefaultObjectPoolProvider().CreateStringBuilderPool();
 
             private readonly StringBuilder _stringBuilder = _stringBuilderPool.Get();
 
+            private uint _keysCount = 0;
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public readonly void AddKey(string? expression)
+            public void AddKey(string? key)
             {
-                if (expression is null)
+                ++_keysCount;
+
+                if (key is null)
                 {
                     _stringBuilder.Append("-1:");
                 }
                 else
                 {
-                    _stringBuilder.Append(expression.Length)
+                    _stringBuilder.Append(key.Length)
                       .Append(':')
-                      .Append(expression);
+                      .Append(key);
                 }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public string GetKey()
+            public readonly string GetKey()
             {
+                _stringBuilder.Append(_keysCount).Append(':');
+
                 var key = _stringBuilder.ToString();
                 _stringBuilderPool.Return(_stringBuilder);
 

@@ -7,11 +7,13 @@ namespace CachedEfCore.DependencyManager
 {
     public partial class EntityDependency
     {
-        private readonly ConcurrentDictionary<string, bool> _hasLazyLoadCache = new();
+        private readonly ConcurrentDictionary<HasLazyLoadCacheKey, bool> _hasLazyLoadCache = new();
+
+        private sealed record class HasLazyLoadCacheKey(string Name);
 
         public bool HasLazyLoad(Type rootType)
         {
-            var key = rootType.FullName!;
+            var key = new HasLazyLoadCacheKey(rootType.FullName!);
 
             if (_hasLazyLoadCache.TryGetValue(key, out var value))
             {
@@ -38,7 +40,8 @@ namespace CachedEfCore.DependencyManager
 
         public bool HasLazyLoad(IEntityType entityType)
         {
-            var key = entityType.Name;
+            var key = new HasLazyLoadCacheKey(entityType.Name);
+
             if (_hasLazyLoadCache.TryGetValue(key, out var value))
             {
                 return value;
