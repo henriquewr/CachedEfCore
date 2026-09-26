@@ -11,8 +11,10 @@ namespace CachedEfCore.DependencyManager
     public partial class EntityDependency
     {
         private sealed record class AllEntitiesUnderRelatedCacheKey(Type Type, bool RelatedInFks, bool IgnoreDependentOnEntityAttribute);
+        private sealed record class UnderRelatedCacheKey(string Name, bool RelatedInFks, bool IgnoreDependentOnEntityAttribute);
 
-        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _underRelatedCache = new();
+
+        private readonly ConcurrentDictionary<UnderRelatedCacheKey, FrozenSet<IEntityType>> _underRelatedCache = new();
         private readonly ConcurrentDictionary<AllEntitiesUnderRelatedCacheKey, FrozenSet<IEntityType>> _allEntitiesUnderRelatedCache = new();
 
 
@@ -61,7 +63,7 @@ namespace CachedEfCore.DependencyManager
 
         private FrozenSet<IEntityType> GetUnderRelatedEntitiesImpl(IEntityType rootEntityType, bool relatedInFks, bool ignoreDependentOnEntityAttribute)
         {
-            var key = $"{relatedInFks}.{ignoreDependentOnEntityAttribute}.{rootEntityType.Name}";
+            var key = new UnderRelatedCacheKey(rootEntityType.Name, relatedInFks, ignoreDependentOnEntityAttribute);
 
             if (_underRelatedCache.TryGetValue(key, out var cached))
             {

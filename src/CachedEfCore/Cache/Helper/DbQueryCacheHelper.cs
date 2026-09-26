@@ -4,9 +4,11 @@ using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.ObjectPool;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 
 namespace CachedEfCore.Cache.Helper
@@ -14,6 +16,7 @@ namespace CachedEfCore.Cache.Helper
     public partial class DbQueryCacheHelper : IDbQueryCacheHelper
     {
         private static readonly AsyncLocal<ValuePrinter> _printerAsyncLocal = new();
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool = new DefaultObjectPoolProvider().CreateStringBuilderPool();
 
         private static void ResetAsyncLocalPrinter()
         {
@@ -44,7 +47,7 @@ namespace CachedEfCore.Cache.Helper
         {
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
-            var additionalJson = "";
+            StringBuilder? stringBuilder = null;
 
             ResetAsyncLocalPrinter();
 
@@ -67,7 +70,9 @@ namespace CachedEfCore.Cache.Helper
                     expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                     if (keyGenerated.Value.AdditionalJson != null)
                     {
-                        additionalJson += keyGenerated.Value.AdditionalJson;
+                        stringBuilder ??= _stringBuilderPool.Get();
+
+                        stringBuilder.Append(keyGenerated.Value.AdditionalJson);
                     }
                 }
                 else if (printabilityChecker.IsPrintable(queryItem))
@@ -88,7 +93,14 @@ namespace CachedEfCore.Cache.Helper
 
             var expressionKey = expressionKeyBuilder.GetKey();
 
-            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            string? additionalKey = null;
+            if (stringBuilder is not null)
+            {
+                additionalKey = stringBuilder.ToString();
+                _stringBuilderPool.Return(stringBuilder);
+            }
+
+            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;
@@ -142,7 +154,7 @@ namespace CachedEfCore.Cache.Helper
 
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
-            var additionalJson = "";
+            StringBuilder? stringBuilder = null;
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -157,13 +169,22 @@ namespace CachedEfCore.Cache.Helper
                 expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                 if (keyGenerated.Value.AdditionalJson != null)
                 {
-                    additionalJson += keyGenerated.Value.AdditionalJson;
+                    stringBuilder ??= _stringBuilderPool.Get();
+
+                    stringBuilder.Append(keyGenerated.Value.AdditionalJson);
                 }
             }
 
             var expressionKey = expressionKeyBuilder.GetKey();
 
-            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            string? additionalKey = null;
+            if (stringBuilder is not null)
+            {
+                additionalKey = stringBuilder.ToString();
+                _stringBuilderPool.Return(stringBuilder);
+            }
+
+            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
 
             return result;

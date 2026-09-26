@@ -11,7 +11,9 @@ namespace CachedEfCore.DependencyManager
 {
     public partial class EntityDependency
     {
-        private readonly ConcurrentDictionary<string, FrozenSet<IEntityType>> _upperRelatedCache = new();
+        private sealed record class UpperRelatedCacheKey(string Name);
+
+        private readonly ConcurrentDictionary<UpperRelatedCacheKey, FrozenSet<IEntityType>> _upperRelatedCache = new();
         private readonly ConcurrentDictionary<Type, FrozenSet<IEntityType>> _allEntitiesUpperRelatedCache = new();
 
         public FrozenSet<IEntityType> GetUpperRelatedEntities(Type rootType)
@@ -40,7 +42,7 @@ namespace CachedEfCore.DependencyManager
 
         private FrozenSet<IEntityType> GetUpperRelatedEntitiesImpl(IEntityType rootEntityType)
         {
-            var key = rootEntityType.Name;
+            var key = new UpperRelatedCacheKey(rootEntityType.Name);
 
             if (_upperRelatedCache.TryGetValue(key, out var cached))
             {

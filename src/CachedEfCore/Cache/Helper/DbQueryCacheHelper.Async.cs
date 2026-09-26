@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using System;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.Cache.Helper
@@ -33,7 +34,7 @@ namespace CachedEfCore.Cache.Helper
             var printabilityChecker = dbContext.GetService<IPrintabilityChecker>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
-            var additionalJson = "";
+            StringBuilder? stringBuilder = null;
 
             ResetAsyncLocalPrinter();
 
@@ -52,7 +53,9 @@ namespace CachedEfCore.Cache.Helper
                     expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                     if (keyGenerated.Value.AdditionalJson != null)
                     {
-                        additionalJson += keyGenerated.Value.AdditionalJson;
+                        stringBuilder ??= _stringBuilderPool.Get();
+
+                        stringBuilder.Append(keyGenerated.Value.AdditionalJson);
                     }
                 }
                 else if (printabilityChecker.IsPrintable(queryItem))
@@ -66,14 +69,18 @@ namespace CachedEfCore.Cache.Helper
             }
 
             var printerResult = _printerAsyncLocal.Value!.GetResult();
-            if (!string.IsNullOrEmpty(printerResult))
-            {
-                expressionKeyBuilder.AddExpression(printerResult);
-            }
+            expressionKeyBuilder.AddExpression(printerResult);
 
             var expressionKey = expressionKeyBuilder.GetKey();
 
-            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            string? additionalKey = null;
+            if (stringBuilder is not null)
+            {
+                additionalKey = stringBuilder.ToString();
+                _stringBuilderPool.Return(stringBuilder);
+            }
+
+            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
@@ -127,7 +134,7 @@ namespace CachedEfCore.Cache.Helper
 
             var expressionKeyBuilder = new DbQueryCacheKey.ExpressionKey.Builder();
 
-            var additionalJson = "";
+            StringBuilder? stringBuilder = null;
 
             for (var i = 0; i < query.Length; i++)
             {
@@ -142,13 +149,22 @@ namespace CachedEfCore.Cache.Helper
                 expressionKeyBuilder.AddExpression(keyGenerated.Value.Expression);
                 if (keyGenerated.Value.AdditionalJson != null)
                 {
-                    additionalJson += keyGenerated.Value.AdditionalJson;
+                    stringBuilder ??= _stringBuilderPool.Get();
+
+                    stringBuilder.Append(keyGenerated.Value.AdditionalJson);
                 }
             }
 
             var expressionKey = expressionKeyBuilder.GetKey();
 
-            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
+            string? additionalKey = null;
+            if (stringBuilder is not null)
+            {
+                additionalKey = stringBuilder.ToString();
+                _stringBuilderPool.Return(stringBuilder);
+            }
+
+            var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             var result = await dbQueryCacheStore.GetOrAddAsync(rootEntity, cacheKey, getDataFromDatabase).ConfigureAwait(false);
 
             return result;
