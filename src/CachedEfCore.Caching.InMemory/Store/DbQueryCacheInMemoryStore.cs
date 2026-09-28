@@ -13,7 +13,7 @@ namespace CachedEfCore.Caching.InMemory.Store
         private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly IDbQueryCacheMetrics _metrics;
-        private readonly Guid _dbContextId;
+        private readonly DbContextId _dbContextId;
 
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
         {
@@ -31,7 +31,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
             _metrics = dbContext.GetService<IDbQueryCacheMetrics>();
             _dbContext = dbContext;
-            _dbContextId = dbContext.ContextId.InstanceId;
+            _dbContextId = dbContext.ContextId;
         }
 
         private void Reset()
@@ -68,8 +68,8 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAllDbContextDependent(Guid contextId)
-            => _dbQueryCacheStore.RemoveAllDbContextDependent(contextId);
+        public void RemoveAllDbContextDependent(DbContextId dbContextId)
+            => _dbQueryCacheStore.RemoveAllDbContextDependent(dbContextId);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true) 

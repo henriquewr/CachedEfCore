@@ -21,8 +21,8 @@ namespace CachedEfCore.Caching.FusionCache.Store
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
-        private static string GetDbContextCacheTag(in Guid instanceId)
-            => $"DbCtx:{instanceId}";
+        private static string GetDbContextCacheTag(in DbContextId dbContextId)
+            => $"DbCtx:{dbContextId}";
 
         private static string GetEntityCacheTag(IEntityType entity)
             => entity.ClrType is null ? $"Ent:{entity.Name}" : GetTypeCacheTag(entity.ClrType);
@@ -36,14 +36,12 @@ namespace CachedEfCore.Caching.FusionCache.Store
         {
             _fusionCache = fusionCache;
             _dbContext = dbContext;
-            _dbContextCacheTag = GetDbContextCacheTag(dbContext.ContextId.InstanceId);
+            _dbContextCacheTag = GetDbContextCacheTag(dbContext.ContextId);
             _metrics = metrics;
         }
 
-        private static readonly FusionCacheEntryOptions _resetOptions = new FusionCacheEntryOptions 
-        { 
-            SkipBackplaneNotifications = true 
-        };
+        // we skip distributed cache and notifications, as no value dependending on the DbContext reaches L2
+        private static readonly FusionCacheEntryOptions _resetOptions = new FusionCacheEntryOptions().SetSkipDistributedCache(true, true);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Reset()
             => _fusionCache.RemoveByTag(_dbContextCacheTag, _resetOptions);
@@ -76,9 +74,9 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAllDbContextDependent(Guid contextId)
+        public void RemoveAllDbContextDependent(DbContextId dbContextId)
         {
-            _fusionCache.RemoveByTag(GetDbContextCacheTag(contextId));
+            _fusionCache.RemoveByTag(GetDbContextCacheTag(dbContextId));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -122,7 +120,6 @@ namespace CachedEfCore.Caching.FusionCache.Store
             _fusionCache.RemoveByTag(tags);
         }
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll()
         {
@@ -130,11 +127,11 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private (bool SkipDistributedAndNotifications, string[] Tags) GetMetadata(Type rootEntityType, IDbQueryCacheKey cacheKey, object? dataToCache)
+        private (bool SkipDistributedAndNotifications, string[] Tags) GetMetadata(Type rootEntityType, IDbQueryCacheKey cacheKey)
         {
-            if (dataToCache is not null && cacheKey.DependentDbContext.HasValue)
+            if (ShoudSkipDistributed(cacheKey))
             {
-                // if dataToCache is null the object is not really dependent to the DbContext instance
+                // we don't bother to check if dataToCache is null to prevent calling l2 cache on every dispose/reset
 
                 return (true, [_dbContextCacheTag, GetTypeCacheTag(rootEntityType)]);
             }
@@ -145,11 +142,15 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool ShoudSkipDistributed(IDbQueryCacheKey cacheKey)
+            => cacheKey.DependentDbContext.HasValue;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddToCache(Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
         {
             var stringKey = key.Stringify();
 
-            var metadata = GetMetadata(rootEntityType, key, dataToCache);
+            var metadata = GetMetadata(rootEntityType, key);
 
             if (metadata.SkipDistributedAndNotifications)
             {
@@ -169,7 +170,9 @@ namespace CachedEfCore.Caching.FusionCache.Store
         {
             var stringKey = key.Stringify();
 
-            var maybeFromCache = _fusionCache.TryGet<T>(stringKey);
+            var maybeFromCache = ShoudSkipDistributed(key) 
+                ? _fusionCache.TryGet<T>(stringKey, options => options.SetSkipDistributedCache(true, true))
+                : _fusionCache.TryGet<T>(stringKey);
 
             if (maybeFromCache.HasValue)
             {
@@ -188,23 +191,11 @@ namespace CachedEfCore.Caching.FusionCache.Store
 
             var isCacheHit = true;
 
-            var result = _fusionCache.GetOrSet<T>(stringKey, (context, ct) =>
-            {
-                var createdValue = create();
-                _metrics.ReportCacheMiss();
+            var metadata = GetMetadata(rootEntityType, key);
 
-                isCacheHit = false;
-
-                var metadata = GetMetadata(rootEntityType, key, createdValue);
-                context.Tags = metadata.Tags;
-
-                if (metadata.SkipDistributedAndNotifications)
-                {
-                    context.Options.SetSkipDistributedCache(true, true);
-                }
-
-                return createdValue;
-            });
+            var result = metadata.SkipDistributedAndNotifications
+                ? _fusionCache.GetOrSet<T>(stringKey, CreateFunc, options => options.SetSkipDistributedCache(true, true), tags: metadata.Tags)
+                : _fusionCache.GetOrSet<T>(stringKey, CreateFunc, tags: metadata.Tags);
 
             if (isCacheHit)
             {
@@ -212,6 +203,16 @@ namespace CachedEfCore.Caching.FusionCache.Store
             }
 
             return result;
+
+            T CreateFunc(CancellationToken ct)
+            {
+                var createdValue = create();
+                _metrics.ReportCacheMiss();
+
+                isCacheHit = false;
+
+                return createdValue;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -221,23 +222,11 @@ namespace CachedEfCore.Caching.FusionCache.Store
 
             var isCacheHit = true;
 
-            var result = await _fusionCache.GetOrSetAsync<T>(stringKey, async (context, ct) =>
-            {
-                var createdValue = await create().ConfigureAwait(false);
-                _metrics.ReportCacheMiss();
+            var metadata = GetMetadata(rootEntityType, key);
 
-                isCacheHit = false;
-
-                var metadata = GetMetadata(rootEntityType, key, createdValue);
-                context.Tags = metadata.Tags;
-
-                if (metadata.SkipDistributedAndNotifications)
-                {
-                    context.Options.SetSkipDistributedCache(true, true);
-                }
-
-                return createdValue;
-            });
+            var result = metadata.SkipDistributedAndNotifications
+                ? await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, options => options.SetSkipDistributedCache(true, true), tags: metadata.Tags)
+                : await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, tags: metadata.Tags);
 
             if (isCacheHit)
             {
@@ -245,6 +234,16 @@ namespace CachedEfCore.Caching.FusionCache.Store
             }
 
             return result;
+
+            async Task<T> CreateFunc(CancellationToken ct)
+            {
+                var createdValue = await create().ConfigureAwait(false);
+                _metrics.ReportCacheMiss();
+
+                isCacheHit = false;
+
+                return createdValue;
+            }
         }
     }
 }

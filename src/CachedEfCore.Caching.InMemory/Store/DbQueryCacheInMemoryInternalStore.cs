@@ -14,7 +14,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 {
     public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
     {
-        internal readonly ConcurrentDictionary<Guid, CancellationTokenSource> _dbContextDependentKeys = new();
+        internal readonly ConcurrentDictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new();
         internal readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
 
         private readonly IMemoryCache _cache;
@@ -28,9 +28,9 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
-        public void RemoveAllDbContextDependent(Guid contextId)
+        public void RemoveAllDbContextDependent(DbContextId dbContextId)
         {
-            if (_dbContextDependentKeys.TryRemove(contextId, out var keys))
+            if (_dbContextDependentKeys.TryRemove(dbContextId, out var keys))
             {
                 keys.Cancel();
                 keys.Dispose();
@@ -133,7 +133,7 @@ namespace CachedEfCore.Caching.InMemory.Store
                 // if dataToCache is null the object is not really dependent to the DbContext instance
                 CancellationTokenSource dbContextDependentCts;
 
-                var dbContextId = dbContext.ContextId.InstanceId;
+                var dbContextId = dbContext.ContextId;
 
                 if (!_dbContextDependentKeys.TryGetValue(dbContextId, out dbContextDependentCts!))
                 {

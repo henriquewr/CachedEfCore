@@ -1,4 +1,5 @@
 using CachedEfCore.Cache.EventData;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
@@ -12,7 +13,7 @@ namespace CachedEfCore.Cache.Store
         event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
-        void RemoveAllDbContextDependent(Guid contextId);
+        void RemoveAllDbContextDependent(DbContextId dbContextId);
         void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
         void RemoveAll();
