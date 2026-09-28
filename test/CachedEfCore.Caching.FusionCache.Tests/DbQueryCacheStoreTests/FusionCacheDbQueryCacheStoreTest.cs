@@ -35,10 +35,15 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
         protected override IServiceProvider CreateProvider(bool withLazyLoading)
            => _serviceProviderFixture.CreateProvider(services =>
                {
+                   services.AddFusionCache("CachedEfCore");
+                   services.AddFusionCacheMemoryBackplane();
+
                    services.AddCachedEfCore();
 
                    services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                    {
+                       var efCache = serviceProvider.GetRequiredService<IFusionCacheProvider>().GetCache("CachedEfCore");
+
                        options.EnableServiceProviderCaching(false);
 
                        options.UseLazyLoadingProxies(withLazyLoading);
@@ -51,8 +56,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                            {
                                options.ConfigureRegistration(fusionCacheServices =>
                                {
-                                   fusionCacheServices.AddFusionCache();
-                                   fusionCacheServices.AddFusionCacheMemoryBackplane();
+                                   fusionCacheServices.AddSingleton<IFusionCache>(efCache);
                                });
                            });
 

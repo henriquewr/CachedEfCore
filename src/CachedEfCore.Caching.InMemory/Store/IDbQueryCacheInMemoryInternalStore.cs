@@ -11,7 +11,7 @@ namespace CachedEfCore.Caching.InMemory.Store
         event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
-        void RemoveAllDbContextDependent(Guid contextId);
+        void RemoveAllDbContextDependent(DbContextId dbContextId);
         void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true);
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true);
         void RemoveAll();
