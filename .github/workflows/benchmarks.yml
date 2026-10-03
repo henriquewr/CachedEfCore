@@ -1,0 +1,74 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Benchmark project name (empty = all)"
+        required: false
+        default: ""
+        type: string
+
+      filter:
+        description: "Benchmark filter"
+        required: false
+        default: "*"
+        type: string
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+          dotnet-version: '10.0.x'
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          if [ -z "${{ inputs.project }}" ]; then
+            mapfile -t projects < <(find benchmarks -name "*.csproj")
+          else
+            mapfile -t projects < <(
+              find benchmarks \
+                -name "${{ inputs.project }}.csproj"
+            )
+          fi
+
+          if [ ${#projects[@]} -eq 0 ]; then
+            echo "No benchmark projects found."
+
+            if [ -n "${{ inputs.project }}" ]; then
+              echo "Project: ${{ inputs.project }}"
+            fi
+
+            exit 1
+          fi
+
+          echo "Projects to benchmark:"
+          printf '  %s\n' "${projects[@]}"
+
+          for project in "${projects[@]}"; do
+            echo
+            echo "========================================"
+            echo "Running: $project"
+            echo "========================================"
+
+            dotnet run \
+              --project "$project" \
+              --configuration Release \
+              -- \
+              --filter "${{ inputs.filter }}"
+          done
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmarks/**/BenchmarkDotNet.Artifacts/**
+          if-no-files-found: warn
