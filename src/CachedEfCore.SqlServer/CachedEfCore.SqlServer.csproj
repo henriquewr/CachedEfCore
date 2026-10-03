@@ -8,8 +8,8 @@
 
 	<PropertyGroup>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<Title>CachedEfCore.DependencyInjection</Title>
-		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore.DependencyInjection</PackageProjectUrl>
+		<Title>CachedEfCore.SqlServer</Title>
+		<PackageProjectUrl>https://www.nuget.org/packages/CachedEfCore.SqlServer</PackageProjectUrl>
 		<Description>SqlServer database provider for CachedEfCore</Description>
 		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
 		<AnalysisLevel>latest-recommended</AnalysisLevel>

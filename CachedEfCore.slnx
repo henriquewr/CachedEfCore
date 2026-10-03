@@ -18,6 +18,10 @@
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
+    <Project Path="benchmarks/CachedEfCore.SqlServer.Benchmarks/CachedEfCore.SqlServer.Benchmarks.csproj">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/CachedEfCore.Caching.FusionCache/CachedEfCore.Caching.FusionCache.csproj" Id="16fc08ee-2626-4e95-91cd-4cb97794c37e">

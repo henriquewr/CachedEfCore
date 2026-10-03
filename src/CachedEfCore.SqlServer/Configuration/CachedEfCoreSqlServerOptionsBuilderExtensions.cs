@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace CachedEfCore.SqlServer.Configuration
 {
-    public static class CachedEfCoreOptionsBuilderExtensions
+    public static class CachedEfCoreSqlServerOptionsBuilderExtensions
     {
         extension(CachedEfCoreOptionsBuilder builder)
         {
