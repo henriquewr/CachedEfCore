@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 namespace CachedEfCore.SqlServer.SqlAnalysis
 {
     [DebuggerDisplay("{Index} -> {Remaining}")]
-    public class SqlSourceCode : IEnumerable<char>, IEnumerator<char>
+    internal class SqlSourceCode : IEnumerable<char>, IEnumerator<char>
     {
         public string Sql { get; }
 
