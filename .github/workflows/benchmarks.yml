@@ -35,7 +35,10 @@ jobs:
         shell: bash
         run: |
           if [ -z "${{ inputs.project }}" ]; then
-            mapfile -t projects < <(find benchmarks -name "*.csproj")
+            mapfile -t projects < <(
+              find benchmarks -name "*.csproj" \
+              ! -name "CachedEfCore.Benchmarks.Common.csproj"
+            )
           else
             mapfile -t projects < <(
               find benchmarks \
