@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
@@ -25,7 +26,7 @@ namespace CachedEfCore.EntityMapping
 
         private static FrozenDictionary<string, ImmutableArray<IEntityType>> GetTableEntity(IModel model)
         {
-            var tableEntity = model.GetEntityTypes().GroupBy(x => x.GetTableName() ?? x.GetViewName()!).ToFrozenDictionary(k => k.Key, v => v.ToImmutableArray());
+            var tableEntity = model.GetEntityTypes().GroupBy(x => x.GetTableName() ?? x.GetViewName()!, StringComparer.OrdinalIgnoreCase).ToFrozenDictionary(k => k.Key, v => v.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
             return tableEntity;
         }
     }

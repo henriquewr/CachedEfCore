@@ -267,6 +267,101 @@ namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SqlQueryEntityExtract
             Test(testCase);
         }
 
+
+        public static TheoryData<TestCase> GetBadNamingTestCasesData()
+        {
+            var theoryData = new TheoryData<TestCase>();
+
+
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"INSERT INTO {applyVariantFunc(table)} (StringData) VALUES (\"test\");",
+                EntityTable = typeof(BadNamingLowerCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"INSERT INTO {applyVariantFunc(table)} (StringData) VALUES (\"test\");",
+                EntityTable = typeof(BadNamingUpperCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"""
+                UPDATE {applyVariantFunc("u")}
+                SET {applyVariantFunc("u")}.StringData = 'test'
+                FROM {applyVariantFunc(table)} AS {applyVariantFunc("u")};
+                """,
+                EntityTable = typeof(BadNamingLowerCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"""
+                UPDATE {applyVariantFunc("u")}
+                SET {applyVariantFunc("u")}.StringData = 'test'
+                FROM {applyVariantFunc(table)} AS {applyVariantFunc("u")};
+                """,
+                EntityTable = typeof(BadNamingUpperCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"""
+                DELETE {applyVariantFunc("u")}
+                FROM {applyVariantFunc(table)}
+                {applyVariantFunc("u")};
+                """,
+                EntityTable = typeof(BadNamingLowerCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+            theoryData.Add(new TestCase
+            {
+                GetSql = (table, applyVariantFunc) => $"""
+                DELETE {applyVariantFunc("u")}
+                FROM {applyVariantFunc(table)}
+                {applyVariantFunc("u")};
+                """,
+                EntityTable = typeof(BadNamingUpperCase),
+                StateChangingEntities = new HashSet<Type>
+                {
+                    typeof(BadNamingLowerCase),
+                    typeof(BadNamingUpperCase)
+                },
+            });
+
+            return theoryData;
+        }
+
+        [Theory]
+        [MemberData(nameof(GetBadNamingTestCasesData))]
+        public void Extract_Entities_From_BadNaming_Query(TestCase testCase)
+        {
+            Test(testCase);
+        }
+
         [Fact]
         public void Extract_Entities_Should_Be_Thread_Safe()
         {

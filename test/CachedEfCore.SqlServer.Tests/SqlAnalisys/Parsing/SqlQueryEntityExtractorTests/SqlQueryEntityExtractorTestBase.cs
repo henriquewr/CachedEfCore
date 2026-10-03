@@ -18,10 +18,29 @@ namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.SqlQueryEntityExtract
                 
             }
 
+            public DbSet<BadNamingLowerCase> BadNamingLowerCase { get; set; }
+            public DbSet<BadNamingUpperCase> BadNamingUpperCase { get; set; }
+
             public DbSet<LazyLoadEntity> LazyLoadEntity { get; set; }
             public DbSet<NonLazyLoadEntity> NonLazyLoadEntity { get; set; }
             public DbSet<AnotherLazyLoadEntity> AnotherLazyLoadEntity { get; set; }
             public DbSet<LazyLoadWithGenericEntity> LazyLoadWithGenericEntity { get; set; }
+        }
+        
+        [Table("badnaming")]
+        public class BadNamingLowerCase
+        {
+            [Key]
+            public int Id { get; set; }
+            public string? StringData { get; set; }
+        }
+
+        [Table("BADNAMING")]
+        public class BadNamingUpperCase
+        {
+            [Key]
+            public int Id { get; set; }
+            public string? StringData { get; set; }
         }
 
         public class AnotherLazyLoadEntity
