@@ -76,6 +76,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: |
-            benchmarks/**/bin/**/BenchmarkDotNet.Artifacts/**
-          if-no-files-found: warn
+          path: BenchmarkDotNet.Artifacts/**
+          if-no-files-found: error
