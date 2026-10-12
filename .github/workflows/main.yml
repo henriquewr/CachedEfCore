@@ -21,9 +21,6 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: .NET clean
-      run: dotnet clean
-
     - name: .NET Build
       run: dotnet build -c TestRelease
 
