@@ -43,8 +43,11 @@ namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing.InsertParsing
         [InlineData("INSERT INTO Test VALUES (1), (2);")]
         [InlineData("INSERT INTO Test (Value) VALUES (1);")]
         [InlineData("INSERT INTO Test (Value) VALUES (1), (2);")]
-        [InlineData("INSERT INTO Test (Value), (Value2) VALUES (1, ')'), (2, ')');")]
+        [InlineData("INSERT INTO Test (Value, Value2) VALUES (1, ')'), (2, ')');")]
         [InlineData("INSERT dbo.Test VALUES (1);")]
+        [InlineData("INSERT dbo . Test VALUES (1);")]
+        [InlineData("INSERT dbo. Test VALUES (1);")]
+        [InlineData("INSERT dbo .Test VALUES (1);")]
         [InlineData("INSERT [Test] VALUES (1);")]
         public void Insert(string sql)
         {

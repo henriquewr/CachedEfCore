@@ -18,7 +18,11 @@
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
-    <Project Path="benchmarks/CachedEfCore.SqlServer.Benchmarks/CachedEfCore.SqlServer.Benchmarks.csproj">
+    <Project Path="benchmarks/CachedEfCore.PostgreSQL.Benchmarks/CachedEfCore.PostgreSQL.Benchmarks.csproj" Id="dcd1968c-b11b-41d0-9f82-33ad6f99bbeb">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
+    <Project Path="benchmarks/CachedEfCore.SqlServer.Benchmarks/CachedEfCore.SqlServer.Benchmarks.csproj" Id="6d22171b-5b4f-4004-8211-3403b06c364c">
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
@@ -30,6 +34,10 @@
     </Project>
     <Project Path="src/CachedEfCore.Caching.InMemory/CachedEfCore.Caching.InMemory.csproj" Id="7ceea8e1-1920-4ebd-846a-ad07fc192469" />
     <Project Path="src/CachedEfCore.DependencyInjection/CachedEfCore.DependencyInjection.csproj" Id="3a3b24f3-eb86-430f-8c43-40b5ab7b819f">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
+    <Project Path="src/CachedEfCore.PostgreSQL/CachedEfCore.PostgreSQL.csproj" Id="0e4f8208-4ba3-41f0-b4bd-36e4f54d4b4e">
       <BuildType Solution="TestDebug|*" Project="Debug" />
       <BuildType Solution="TestRelease|*" Project="Release" />
     </Project>
@@ -52,6 +60,10 @@
     <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
     <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />
+    <Project Path="test/CachedEfCore.PostgreSQL.Tests/CachedEfCore.PostgreSQL.Tests.csproj" Id="1864ca68-7331-4d74-8821-0aaa04b3cc43">
+      <BuildType Solution="TestDebug|*" Project="Debug" />
+      <BuildType Solution="TestRelease|*" Project="Release" />
+    </Project>
     <Project Path="test/CachedEfCore.SqlServer.Tests/CachedEfCore.SqlServer.Tests.csproj" />
     <Project Path="test/CachedEfCore.Tests.Common/CachedEfCore.Tests.Common.csproj">
       <BuildType Solution="TestDebug|*" Project="Debug" />

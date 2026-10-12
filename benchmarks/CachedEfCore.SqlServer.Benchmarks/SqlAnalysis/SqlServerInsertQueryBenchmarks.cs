@@ -37,7 +37,7 @@ namespace CachedEfCore.SqlServer.Benchmarks.SqlAnalysis
         [Benchmark]
         public HashSet<ReadOnlyMemory<char>> Insert()
         {
-            var identifiers = _sqlServerParser.Parse("INSERT INTO Test (Value), (Value2) VALUES (1, ')'), (2, ')');");
+            var identifiers = _sqlServerParser.Parse("INSERT INTO Test (Value, Value2) VALUES (1, ')'), (2, ')');");
 
             return identifiers;
         }
