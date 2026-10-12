@@ -60,10 +60,7 @@
     <Project Path="test/CachedEfCore.DependencyInjection.Tests/CachedEfCore.DependencyInjection.Tests.csproj" />
     <Project Path="test/CachedEfCore.DependencyManager.Tests/CachedEfCore.DependencyManager.Tests.csproj" />
     <Project Path="test/CachedEfCore.KeyGeneration.Tests/CachedEfCore.KeyGeneration.Tests.csproj" />
-    <Project Path="test/CachedEfCore.PostgreSQL.Tests/CachedEfCore.PostgreSQL.Tests.csproj" Id="1864ca68-7331-4d74-8821-0aaa04b3cc43">
-      <BuildType Solution="TestDebug|*" Project="Debug" />
-      <BuildType Solution="TestRelease|*" Project="Release" />
-    </Project>
+    <Project Path="test/CachedEfCore.PostgreSQL.Tests/CachedEfCore.PostgreSQL.Tests.csproj" />
     <Project Path="test/CachedEfCore.SqlServer.Tests/CachedEfCore.SqlServer.Tests.csproj" />
     <Project Path="test/CachedEfCore.Tests.Common/CachedEfCore.Tests.Common.csproj">
       <BuildType Solution="TestDebug|*" Project="Debug" />
