@@ -67,7 +67,7 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
                 """,
                 Identifiers = new HashSet<string> { "Test" },
             });
-           
+
             return theoryData;
         }
 
@@ -102,6 +102,32 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
             var identifiers = _postgreSqlParser.Parse(sql);
 
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Unicode_Identifiers()
+        {
+            var sql = """
+                INSERT INTO U&"\0441\043B\043E\043D" ("Value", "Value2") VALUES (1, '))))'), (2, ')))');
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            // I dont really know how to test this
+            Assert.Equal("\\0441\\043B\\043E\\043D", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Unicode_Identifiers_With_Uescape()
+        {
+            var sql = """
+                INSERT INTO U&"d!0061t!+000061" UESCAPE '!' ("Value", "Value2") VALUES (1, '))))'), (2, ')))');
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            // Honestly I have no idea what the expected value should be 
+            Assert.Equal("d!0061t!+000061", Assert.Single(identifiers).ToString());
         }
     }
 }

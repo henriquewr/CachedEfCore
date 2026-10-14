@@ -783,37 +783,55 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             // update"identifier"
             AdvanceSeparators();
 
+            // https://www.postgresql.org/docs/18/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
+
             var sqlSourceCode = _sqlSourceCode;
+
+            bool canBeUnicodeEscapedIdentifier = false;
 
             switch (sqlSourceCode.Current)
             {
                 case '"':
                     {
-                        // https://learn.microsoft.com/en-sg/sql/relational-databases/databases/database-identifiers?view=sql-server-ver17#double-quote-delimited-identifiers
-
                         var identifier = ParseDoubleQuoteEnclosedIdentifier();
                         enclosed = true;
 
+                        ReadOnlyMemory<char> enclosingIdentifier;
+
                         if (identifier.DoubleQuotesCount == 2)
                         {
-                            var enclosingIdentifier = sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
-                            return enclosingIdentifier;
+                            enclosingIdentifier = sqlSourceCode.Sql.AsMemory(identifier.Start, identifier.Length);
                         }
                         else
                         {
                             // "really""bad""identifier" is a valid identifier -> really"bad"identifier
 
-                            var enclosingIdentifier = sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
+                            var enclosingIdentifierStr = sqlSourceCode.Sql.Substring(identifier.Start, identifier.Length);
 
-                            enclosingIdentifier = enclosingIdentifier.Replace("\"\"", "\"");
-
-                            return enclosingIdentifier.AsMemory();
+                            enclosingIdentifier = enclosingIdentifierStr.Replace("\"\"", "\"").AsMemory();
                         }
-                    }
 
+                        if (canBeUnicodeEscapedIdentifier)
+                        {
+                            AdvanceSeparators();
+
+                            if (sqlSourceCode.TryAdvanceText("UESCAPE"))
+                            {
+                                AdvanceSeparators();
+                                ParseStringLiteral();
+                            }
+                        }
+
+                        return enclosingIdentifier;
+                    }
                 default:
                     {
-                        // https://www.postgresql.org/docs/18/sql-syntax-lexical.html
+                        if (sqlSourceCode.TryAdvanceText("U&"))
+                        {
+                            canBeUnicodeEscapedIdentifier = true;
+                            // escaped Unicode identifier
+                            goto case '"';
+                        }
 
                         var startIndex = sqlSourceCode.Index;
                         sqlSourceCode.Expect(PostgreSqlSyntaxFacts.IsIdentifierFirstCharacter);
