@@ -4,7 +4,6 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace CachedEfCore.PostgreSQL.SqlAnalysis
 {
@@ -20,7 +19,6 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
     {
         private SqlSourceCode _sqlSourceCode = null!;
         private readonly List<ReadOnlyMemory<char>> _tablesIdentifiers = new();
-        private readonly Dictionary<ReadOnlyMemory<char>, List<ReadOnlyMemory<char>>> _tablesAliases = new(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AdvanceSeparators()
@@ -38,38 +36,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private HashSet<ReadOnlyMemory<char>> GetResult()
         {
-            var result = new HashSet<ReadOnlyMemory<char>>(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
-
-            var tablesAliases = _tablesAliases;
-
-            foreach (var item in _tablesIdentifiers)
-            {
-                if (tablesAliases.TryGetValue(item, out var aliases))
-                {
-                    PopulateTables(aliases);
-                }
-                else
-                {
-                    result.Add(item);
-                }
-            }
-
-            return result;
-
-            void PopulateTables(List<ReadOnlyMemory<char>> aliases)
-            {
-                foreach (var alias in aliases)
-                {
-                    if (tablesAliases.TryGetValue(alias, out var nestedAliases))
-                    {
-                        PopulateTables(nestedAliases);
-                    }
-                    else
-                    {
-                        result.Add(alias);
-                    }
-                }
-            }
+            return _tablesIdentifiers.ToHashSet(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
         }
 
         private readonly static FrozenSet<string> StateChangingKeywords = new[] { "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "COPY" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
@@ -155,7 +122,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     }
                 }
 
-                var result = GetResult().ToHashSet();
+                var result = GetResult();
 
                 return result;
             }
@@ -165,7 +132,6 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 _sqlSourceCode = null!;
 
                 _tablesIdentifiers.Clear();
-                _tablesAliases.Clear();
             }
         }
 
@@ -195,8 +161,6 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
                 var alias = ParseIdentifier(out var aliasEnclosed);
                 AdvanceSeparators();
-
-                AddOnlyTableAlias(alias, identifier);
             }
 
             if (sqlSourceCode.Current == '(')
@@ -1180,81 +1144,6 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     break;
                 }
             }
-        }
-
-        private (ReadOnlyMemory<char>? Identifier, ReadOnlyMemory<char>? Alias) ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias()
-        {
-            var identifier = ParseIdentifierOrMemberExpression(out var enclosed);
-            AdvanceSeparators();
-
-            if (!enclosed && PostgreSqlSyntaxFacts.IsKeyword(identifier.Span))
-            {
-                return (null, null);
-            }
-
-            var sqlSourceCode = _sqlSourceCode;
-
-            var hasAs = sqlSourceCode.TryAdvanceText("AS", StringComparison.OrdinalIgnoreCase);
-
-            if (hasAs)
-            {
-                AdvanceSeparators();
-            }
-            else if (!sqlSourceCode.HasCurrent())
-            {
-                return (identifier, null);
-            }
-
-            if (CanBeIdentifier())
-            {
-                var start = sqlSourceCode.Index;
-
-                var alias = ParseIdentifier(out var aliasEnclosed);
-
-                if (!hasAs && !aliasEnclosed && PostgreSqlSyntaxFacts.IsKeyword(alias.Span))
-                {
-                    sqlSourceCode.Index = start;
-                    return (identifier, null);
-                }
-
-                AdvanceSeparators();
-
-                return (identifier, alias);
-            }
-
-            return (identifier, null);
-        }
-
-        private void ParseTableMemberExpressionOrTableMemberExpressionAsAliasAddOnlyIfAliasEquals(scoped in ReadOnlyMemory<char> firstIdentifier)
-        {
-            (var identifier, var alias) = ParseGetTableMemberExpressionOrTableMemberExpressionAsAlias();
-
-            if (identifier is null || alias is null
-                || !alias.Value.Span.Equals(firstIdentifier.Span, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            AddTableIdentifier(identifier.Value);
-
-            AddTableAlias(alias.Value, identifier.Value);
-        }
-
-        private void AddTableAlias(scoped in ReadOnlyMemory<char> alias, scoped in ReadOnlyMemory<char> identifier)
-        {
-            AddOnlyTableAlias(alias, identifier);
-
-            AddTableIdentifier(alias);
-        }
-
-        private void AddOnlyTableAlias(scoped in ReadOnlyMemory<char> alias, scoped in ReadOnlyMemory<char> identifier)
-        {
-            ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(_tablesAliases, alias, out var exists);
-            if (!exists)
-            {
-                list = new List<ReadOnlyMemory<char>>(2);
-            }
-            list!.Add(identifier);
         }
 
         private void AddTableIdentifier(scoped in ReadOnlyMemory<char> identifier)

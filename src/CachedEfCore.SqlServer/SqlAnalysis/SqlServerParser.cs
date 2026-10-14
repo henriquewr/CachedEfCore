@@ -155,7 +155,7 @@ namespace CachedEfCore.SqlServer.SqlAnalysis
                     }
                 }
 
-                var result = GetResult().ToHashSet();
+                var result = GetResult();
 
                 return result;
             }
