@@ -155,7 +155,7 @@ namespace CachedEfCore.SqlServer.SqlAnalysis
                     }
                 }
 
-                var result = GetResult().ToHashSet();
+                var result = GetResult();
 
                 return result;
             }
@@ -1213,8 +1213,22 @@ namespace CachedEfCore.SqlServer.SqlAnalysis
 
             var sqlSourceCode = _sqlSourceCode;
 
-            while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf('.'))
+            while (sqlSourceCode.HasCurrent())
             {
+                AdvanceSeparators();
+
+                if (!sqlSourceCode.HasCurrent() || !sqlSourceCode.AdvanceIf('.'))
+                {
+                    return lastIdentifier;
+                }
+
+                AdvanceSeparators();
+
+                if (!sqlSourceCode.HasCurrent() || sqlSourceCode.TryAdvanceText("*"))
+                {
+                    return lastIdentifier;
+                }
+
                 isMemberExpression = true;
                 AdvanceSeparators();
                 lastIdentifier = ParseIdentifier(out lastIsEnclosed);

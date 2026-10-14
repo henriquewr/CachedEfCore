@@ -155,7 +155,7 @@ namespace CachedEfCore.SqlServer.Tests.SqlAnalisys.Parsing
         }
 
         [Theory]
-        [InlineData("INSERT INTO Test (Value), (Value2) VALUES (1, '))))'), (2, ')))');")]
+        [InlineData("INSERT INTO Test (Value, Value2) VALUES (1, '))))'), (2, ')))');")]
         [InlineData("""
             UPDATE Test
             SET Value = Func(
