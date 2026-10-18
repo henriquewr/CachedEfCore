@@ -1366,6 +1366,8 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     sqlSourceCode.Index += previousSingleQuotedStringDelimiterLength;
                     _insideStringScopes.Pop();
 
+                    AdvanceSeparators();
+
                     if (scope.InsideUnicodeEscapedString)
                     {
                         if (sqlSourceCode.TryAdvanceText("UESCAPE"))
