@@ -19,6 +19,9 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
         {
             yield return identifier => identifier;
             yield return identifier => $"\"{identifier}\"";
+            yield return identifier => $"U&\"{identifier}\"";
+            yield return identifier => $"u&\"{identifier}\"";
+            yield return identifier => $"U&\"{identifier}\" UESCAPE '!'";
         }
 
         public class TestCase

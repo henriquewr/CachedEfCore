@@ -129,5 +129,91 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
             // Honestly I have no idea what the expected value should be 
             Assert.Equal("d!0061t!+000061", Assert.Single(identifiers).ToString());
         }
+
+        [Fact]
+        public void Unicode_String_Inside_Parenthesis()
+        {
+            var sql = """
+                INSERT INTO "Test" ("Value", "Value2") VALUES (1, U&'d\0061t\+000061'), (2, U&'\0441\043B\043E\043D');
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Unicode_String()
+        {
+            var sql = """
+                UPDATE "Test"
+                SET
+                    "Value" = 1,
+                    "Value2" = U&'d\0061t\+000061'
+                WHERE "Id" = 1;
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Unicode_String_With_Uescape_Inside_Parenthesis()
+        {
+            var sql = """
+                INSERT INTO "Test" ("Value", "Value2") VALUES (1, U&'d!0061t!+000061' UESCAPE '!'), (2, U&'d!0061t!+000061'UESCAPE '!');
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Unicode_String_With_Uescape()
+        {
+            var sql = """
+                UPDATE "Test"
+                SET
+                    "Value" = 1,
+                    "Value2" = U&'d!0061t!+000061' UESCAPE '!'
+                WHERE "Id" = 1;
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Theory]
+        [InlineData("$$Dianne's horse$$")]
+        [InlineData("$SomeTag$Dianne's horse$SomeTag$")]
+        public void Dollar_String(string dollarString)
+        {
+            var sql = $"""
+                UPDATE "Test"
+                SET
+                    "Value" = 1,
+                    "Value2" = {dollarString}
+                WHERE "Id" = 1;
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
+        [Fact]
+        public void Dollar_String_Inside_Parenthesis()
+        {
+            var sql = """
+                INSERT INTO "Test" ("Value", "Value2") VALUES (1, $$Dianne's horse$$), (2, $SomeTag$Dianne's horse$SomeTag$);
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
     }
 }

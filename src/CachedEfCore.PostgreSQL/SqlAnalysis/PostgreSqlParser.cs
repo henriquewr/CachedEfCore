@@ -39,7 +39,37 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             return _tablesIdentifiers.ToHashSet(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
         }
 
-        private readonly static FrozenSet<string> StateChangingKeywords = new[] { "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "COPY" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+        private void PushInsideStringScope(bool insideUnicodeEscapedString, bool isSingleQuoted, ReadOnlyMemory<char>? dollarQuotedStringTag)
+        {
+            string? singleQuotedStringDelimiter;
+
+            if (_insideStringScopes.TryPeek(out var previosScope) && isSingleQuoted)
+            {
+                singleQuotedStringDelimiter = previosScope.SingleQuotedStringDelimiter + previosScope.SingleQuotedStringDelimiter;
+            }
+            else
+            {
+                singleQuotedStringDelimiter = null;
+            }
+
+            _insideStringScopes.Push(new InsideStringScope
+            {
+                DollarQuotedStringTag = dollarQuotedStringTag,
+                SingleQuotedStringDelimiter = singleQuotedStringDelimiter,
+                InsideUnicodeEscapedString = insideUnicodeEscapedString,
+            });
+        }
+
+        private readonly Stack<InsideStringScope> _insideStringScopes = new Stack<InsideStringScope>(0);
+
+        public class InsideStringScope
+        {
+            public required bool InsideUnicodeEscapedString { get; set; }
+            public required string? SingleQuotedStringDelimiter { get; set; }
+            public required ReadOnlyMemory<char>? DollarQuotedStringTag { get; set; }
+        }
+
+        private readonly static FrozenSet<string> StateChangingKeywords = new[] { "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "COPY", "DO" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
         private readonly static FrozenSet<string>.AlternateLookup<ReadOnlySpan<char>> StateChangingKeywordsSpanLookup = StateChangingKeywords.GetAlternateLookup<ReadOnlySpan<char>>();
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
@@ -78,6 +108,11 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                             ParseDelete();
                             break;
 
+                        case 'd' or 'D'
+                            when IsOnlyText("DO"):
+                            ParseDo();
+                            break;
+
                         case 'i' or 'I'
                             when IsOnlyText("INSERT"):
                             ParseInsert();
@@ -104,7 +139,16 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                             break;
 
                         case '\'':
-                            ParseStringLiteral();
+                            ParseSingleQuoteStringLiteral();
+                            AdvanceSeparators();
+                            break;
+                        case 'U' or 'u'
+                        when sqlSourceCode.Remaining.StartsWith("U&'", StringComparison.OrdinalIgnoreCase):
+                            ParseUnicodeEscapedStringLiteral();
+                            AdvanceSeparators();
+                            break;
+                        case '$':
+                            ParseDollarStringLiteral();
                             AdvanceSeparators();
                             break;
 
@@ -132,12 +176,13 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 _sqlSourceCode = null!;
 
                 _tablesIdentifiers.Clear();
+                _insideStringScopes.Clear();
             }
         }
 
         private bool ParseInsert()
         {
-            // https://www.postgresql.org/docs/current/sql-insert.html
+            // https://www.postgresql.org/docs/18/sql-insert.html
 
             AdvanceSeparators();
 
@@ -275,7 +320,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private bool ParseUpdate()
         {
-            // https://www.postgresql.org/docs/current/sql-update.html
+            // https://www.postgresql.org/docs/18/sql-update.html
 
             AdvanceSeparators();
 
@@ -326,7 +371,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private bool ParseDelete()
         {
-            // https://www.postgresql.org/docs/current/sql-delete.html
+            // https://www.postgresql.org/docs/18/sql-delete.html
 
             AdvanceSeparators();
 
@@ -362,9 +407,62 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             return true;
         }
 
+        private bool ParseDo()
+        {
+            // https://www.postgresql.org/docs/18/sql-do.html
+
+            var sqlSourceCode = _sqlSourceCode;
+
+            AdvanceSeparators();
+
+            if (sqlSourceCode.TryAdvanceText("LANGUAGE"))
+            {
+                AdvanceSeparators();
+                ParseIdentifier(out _);
+                AdvanceSeparators();
+            }
+
+            _insideStringScopes.TryPeek(out var previousScope);
+
+            switch (sqlSourceCode.Current)
+            {
+                case '\'':
+                    {
+
+                        var singleQuotes = previousScope?.SingleQuotedStringDelimiter ?? "'";
+                        sqlSourceCode.Expect(singleQuotes);
+
+                        PushInsideStringScope(false, true, null);
+                        break;
+                    }
+                case 'U' or 'u':
+                    {
+                        sqlSourceCode.Expect("U&");
+
+                        var singleQuotes = previousScope?.SingleQuotedStringDelimiter ?? "'";
+                        sqlSourceCode.Expect(singleQuotes);
+
+                        PushInsideStringScope(true, true, null);
+                        break;
+                    }
+                case '$':
+                    var start = sqlSourceCode.Index;
+                    sqlSourceCode.Expect('$');
+                    sqlSourceCode.AdvanceUntilPast('$');
+                    var end = sqlSourceCode.Index;
+
+                    var tag = sqlSourceCode.Sql.AsMemory(start, end - start);
+                    PushInsideStringScope(false, false, tag);
+
+                    break;
+            }
+
+            return true;
+        }
+
         private bool ParseMerge()
         {
-            // https://www.postgresql.org/docs/current/sql-merge.html
+            // https://www.postgresql.org/docs/18/sql-merge.html
 
             AdvanceSeparators();
 
@@ -485,7 +583,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private bool ParseTruncate()
         {
-            // https://www.postgresql.org/docs/current/sql-truncate.html
+            // https://www.postgresql.org/docs/18/sql-truncate.html
 
             AdvanceSeparators();
 
@@ -511,7 +609,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 {
                     AdvanceSeparators();
                 }
-            } while (sqlSourceCode.HasCurrent() && sqlSourceCode.TryAdvanceText(","));
+            } while (sqlSourceCode.HasCurrent() && sqlSourceCode.AdvanceIf(','));
 
             if (sqlSourceCode.TryAdvanceText("RESTART") || sqlSourceCode.TryAdvanceText("CONTINUE"))
             {
@@ -546,7 +644,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
         ]);
         private bool ParseCopy()
         {
-            // https://www.postgresql.org/docs/current/sql-copy.html
+            // https://www.postgresql.org/docs/18/sql-copy.html
 
             AdvanceSeparators();
 
@@ -625,7 +723,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
         ]);
         private bool ParseCte()
         {
-            // https://www.postgresql.org/docs/current/queries-with.html
+            // https://www.postgresql.org/docs/18/queries-with.html
             // https://www.postgresql.org/docs/18/sql-select.html with_query
 
             var sqlSourceCode = _sqlSourceCode;
@@ -718,7 +816,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private void ParseSelect()
         {
-            // https://www.postgresql.org/docs/current/sql-select.html
+            // https://www.postgresql.org/docs/18/sql-select.html
 
             AdvanceSeparators();
 
@@ -824,8 +922,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
             while (sqlSourceCode.HasCurrent())
             {
-                sqlSourceCode.AdvanceUntil(closingCharacter);
-                sqlSourceCode.Advance();
+                sqlSourceCode.AdvanceUntilPast(closingCharacter);
                 ++doubleQuotesCount;
 
                 if (sqlSourceCode.AdvanceIf(closingCharacter))
@@ -867,7 +964,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
                 AdvanceSeparators();
 
-                if (!sqlSourceCode.HasCurrent() || sqlSourceCode.TryAdvanceText("*"))
+                if (!sqlSourceCode.HasCurrent() || sqlSourceCode.AdvanceIf('*'))
                 {
                     return lastIdentifier;
                 }
@@ -929,7 +1026,14 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                         // was already inside (
                         return;
                     case '\'':
-                        ParseStringLiteral();
+                        ParseSingleQuoteStringLiteral();
+                        break;
+                    case 'U' or 'u'
+                        when sqlSourceCode.Remaining.StartsWith("U&'", StringComparison.OrdinalIgnoreCase):
+                        ParseUnicodeEscapedStringLiteral();
+                        break;
+                    case '$':
+                        ParseDollarStringLiteral();
                         break;
                     case '-':
                         if (TryParseSingleLineComment())
@@ -1040,7 +1144,10 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             return true;
         }
 
-        private static ReadOnlySpan<char> ParseParenthesisExpressionSearchChars => ['\'', '"', '-', '/', '(', ')'];
+        private static ReadOnlySpan<char> ParseParenthesisExpressionSearchChars => [
+            '\'', 'U', 'u', '$', 
+            '"', '-', '/', '(', ')'
+        ];
         private readonly static SearchValues<char> ParseParenthesisExpressionSearchValues = SearchValues.Create(ParseParenthesisExpressionSearchChars);
         private void ParseParenthesisExpression()
         {
@@ -1072,7 +1179,14 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 switch (sqlSourceCode.Current)
                 {
                     case '\'':
-                        ParseStringLiteral();
+                        ParseSingleQuoteStringLiteral();
+                        break;
+                    case 'U' or 'u'
+                        when sqlSourceCode.Remaining.StartsWith("U&'", StringComparison.OrdinalIgnoreCase):
+                        ParseUnicodeEscapedStringLiteral();
+                        break;
+                    case '$':
+                        ParseDollarStringLiteral();
                         break;
 
                     case '"':
@@ -1120,14 +1234,104 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
         {
             var sqlSourceCode = _sqlSourceCode;
 
-            sqlSourceCode.Expect('\'');
+            switch (sqlSourceCode.Current)
+            {
+                case '\'':
+                    ParseSingleQuoteStringLiteral();
+                    break;
+                case 'U' or 'u':
+                    ParseUnicodeEscapedStringLiteral();
+                    break;
+                case '$':
+                    ParseDollarStringLiteral();
+                    break;
+            }
+        }
+
+        private void ParseDollarStringLiteral()
+        {
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (_insideStringScopes.TryPeek(out var scope) && scope.DollarQuotedStringTag.HasValue)
+            {
+                if (sqlSourceCode.TryAdvanceText(scope.DollarQuotedStringTag.Value.Span, StringComparison.Ordinal))
+                {
+                    _insideStringScopes.Pop();
+
+                    return;
+                }
+            }
+
+            var start = sqlSourceCode.Index;
+            sqlSourceCode.Expect("$");
+
+            sqlSourceCode.AdvanceUntilPast('$');
+            var end = sqlSourceCode.Index;
+
+            var tag = sqlSourceCode.Sql.AsSpan(start, end - start);
+
+            var indexOfLastTag = sqlSourceCode.Remaining.IndexOf(tag, StringComparison.Ordinal);
+
+            sqlSourceCode.Index += indexOfLastTag + tag.Length;
+        }
+
+        private void ParseUnicodeEscapedStringLiteral()
+        {
+            var sqlSourceCode = _sqlSourceCode;
+
+            sqlSourceCode.Expect("U&");
+
+            ParseSingleQuoteStringLiteral();
+
+            AdvanceSeparators();
+
+            if (sqlSourceCode.TryAdvanceText("UESCAPE"))
+            {
+                AdvanceSeparators();
+
+                ParseStringLiteral();
+            }
+        }
+
+        private void ParseSingleQuoteStringLiteral()
+        {
+            var sqlSourceCode = _sqlSourceCode;
+
+            if (_insideStringScopes.TryPeek(out var scope) && scope.SingleQuotedStringDelimiter is not null)
+            {
+                var remaining = sqlSourceCode.Remaining;
+
+                var previousSingleQuotedStringDelimiterLength = scope.SingleQuotedStringDelimiter.Length;
+
+                if (remaining.Length > previousSingleQuotedStringDelimiterLength
+                    && remaining[previousSingleQuotedStringDelimiterLength + 1] != '\'')
+                {
+                    sqlSourceCode.Index += previousSingleQuotedStringDelimiterLength;
+                    _insideStringScopes.Pop();
+
+                    if (scope.InsideUnicodeEscapedString)
+                    {
+                        if (sqlSourceCode.TryAdvanceText("UESCAPE"))
+                        {
+                            AdvanceSeparators();
+
+                            ParseStringLiteral();
+                        }
+                    }
+
+                    return;
+                }
+            }
+
+            var currentStringDelimiter = scope?.SingleQuotedStringDelimiter ?? "'";
+
+            sqlSourceCode.Expect(currentStringDelimiter);
 
             var characterCount = 1;
 
             while (sqlSourceCode.HasCurrent())
             {
-                sqlSourceCode.AdvanceUntil('\'');
-                sqlSourceCode.Advance();
+                sqlSourceCode.AdvanceUntilPast(currentStringDelimiter);
                 ++characterCount;
 
                 if (!sqlSourceCode.HasCurrent())
@@ -1135,7 +1339,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     return;
                 }
 
-                if (sqlSourceCode.AdvanceIf('\''))
+                if (sqlSourceCode.TryAdvanceText(currentStringDelimiter))
                 {
                     ++characterCount;
                 }

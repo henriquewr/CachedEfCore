@@ -20,7 +20,19 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         public int Index { get; set; }
 
-        public bool HasNext() => Index + 1 < Sql.Length;
+        public bool TryGetNext(out char next)
+        {
+            var index = Index + 1;
+
+            if (index < Sql.Length)
+            {
+                next = Sql[index];
+                return true;
+            }
+
+            next = default;
+            return false;
+        }
         public bool HasCurrent() => Index < Sql.Length;
 
         public bool MoveBack()
@@ -96,23 +108,6 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             return equals;
         }
 
-        public ReadOnlySpan<char> PeekText(int length)
-        {
-            return Sql.AsSpan(Index, length);
-        }
-
-        public bool TryPeekLast(out char lastCharacter)
-        {
-            if (Index > 0)
-            {
-                lastCharacter = Sql[Index - 1];
-                return true;
-            }
-
-            lastCharacter = default;
-            return false;
-        }
-
         public ReadOnlySpan<char> AdvanceUntil(char character)
         {
             int startIndex = Index;
@@ -131,6 +126,34 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             var result = Sql.AsSpan(startIndex, Index - startIndex);
 
             return result;
+        }
+
+        public void AdvanceUntilPast(scoped in ReadOnlySpan<char> text)
+        {
+            int indexOfChar = Remaining.IndexOf(text);
+
+            if (indexOfChar >= 0)
+            {
+                Index += indexOfChar + text.Length;
+            }
+            else
+            {
+                Index = Sql.Length;
+            }
+        }
+
+        public void AdvanceUntilPast(char character)
+        {
+            int indexOfChar = Remaining.IndexOf(character);
+
+            if (indexOfChar >= 0)
+            {
+                Index += indexOfChar + 1;
+            }
+            else
+            {
+                Index = Sql.Length;
+            }
         }
 
         public ReadOnlySpan<char> AdvanceUntil(Func<char, bool> predicate)
