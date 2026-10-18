@@ -83,6 +83,25 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
         [InlineData("""
         BEGIN;
 
+        WITH ActiveUsers AS
+        (
+            SELECT Id
+            FROM Users
+            WHERE Active = 1
+        )
+        UPDATE Test
+        SET LastLogin = 12.34
+        WHERE Id IN
+        (
+            SELECT Id
+            FROM ActiveUsers
+        );
+
+        COMMIT;
+        """, "Test")]
+        [InlineData("""
+        BEGIN;
+
         DO $$
         DECLARE
             UserId INT := 1;
