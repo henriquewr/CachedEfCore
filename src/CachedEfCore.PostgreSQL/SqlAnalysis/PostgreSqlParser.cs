@@ -39,25 +39,36 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             return _tablesIdentifiers.ToHashSet(ReadOnlyMemoryCharComparer.OrdinalIgnoreCase);
         }
 
-        private void PushInsideStringScope(bool insideUnicodeEscapedString, bool isSingleQuoted, ReadOnlyMemory<char>? dollarQuotedStringTag)
+        private InsideStringScope PushInsideStringScope(bool insideUnicodeEscapedString, bool isSingleQuoted, ReadOnlyMemory<char>? dollarQuotedStringTag)
         {
             string? singleQuotedStringDelimiter;
 
-            if (_insideStringScopes.TryPeek(out var previosScope) && isSingleQuoted)
+            if (isSingleQuoted)
             {
-                singleQuotedStringDelimiter = previosScope.SingleQuotedStringDelimiter + previosScope.SingleQuotedStringDelimiter;
+                if (_insideStringScopes.TryPeek(out var previosScope))
+                {
+                    singleQuotedStringDelimiter = previosScope.SingleQuotedStringDelimiter + previosScope.SingleQuotedStringDelimiter;
+                }
+                else
+                {
+                    singleQuotedStringDelimiter = "'";
+                }
             }
             else
             {
                 singleQuotedStringDelimiter = null;
             }
 
-            _insideStringScopes.Push(new InsideStringScope
+            var newScope = new InsideStringScope
             {
                 DollarQuotedStringTag = dollarQuotedStringTag,
                 SingleQuotedStringDelimiter = singleQuotedStringDelimiter,
                 InsideUnicodeEscapedString = insideUnicodeEscapedString,
-            });
+            };
+
+            _insideStringScopes.Push(newScope);
+
+            return newScope;
         }
 
         private readonly Stack<InsideStringScope> _insideStringScopes = new Stack<InsideStringScope>(0);
@@ -69,7 +80,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             public required ReadOnlyMemory<char>? DollarQuotedStringTag { get; set; }
         }
 
-        private readonly static FrozenSet<string> StateChangingKeywords = new[] { "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "COPY", "DO" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+        private readonly static FrozenSet<string> StateChangingKeywords = new[] { "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "COPY", "DO", "EXECUTE" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
         private readonly static FrozenSet<string>.AlternateLookup<ReadOnlySpan<char>> StateChangingKeywordsSpanLookup = StateChangingKeywords.GetAlternateLookup<ReadOnlySpan<char>>();
         private static bool IsAnyStateChangingKeyword(scoped in ReadOnlySpan<char> value)
         {
@@ -111,6 +122,11 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                         case 'd' or 'D'
                             when IsOnlyText("DO"):
                             ParseDo();
+                            break;
+
+                        case 'e' or 'E'
+                            when IsOnlyText("EXECUTE"):
+                            ParseExecute();
                             break;
 
                         case 'i' or 'I'
@@ -422,27 +438,68 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 AdvanceSeparators();
             }
 
-            _insideStringScopes.TryPeek(out var previousScope);
-
             switch (sqlSourceCode.Current)
             {
                 case '\'':
                     {
+                        var newScope = PushInsideStringScope(false, true, null);
 
-                        var singleQuotes = previousScope?.SingleQuotedStringDelimiter ?? "'";
-                        sqlSourceCode.Expect(singleQuotes);
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
 
-                        PushInsideStringScope(false, true, null);
                         break;
                     }
                 case 'U' or 'u':
                     {
                         sqlSourceCode.Expect("U&");
 
-                        var singleQuotes = previousScope?.SingleQuotedStringDelimiter ?? "'";
-                        sqlSourceCode.Expect(singleQuotes);
+                        var newScope = PushInsideStringScope(true, true, null);
 
-                        PushInsideStringScope(true, true, null);
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
+
+                        break;
+                    }
+                case '$':
+                    var start = sqlSourceCode.Index;
+                    sqlSourceCode.Expect('$');
+                    sqlSourceCode.AdvanceUntilPast('$');
+                    var end = sqlSourceCode.Index;
+
+                    var tag = sqlSourceCode.Sql.AsMemory(start, end - start);
+                    PushInsideStringScope(false, false, tag);
+
+                    break;
+            }
+
+            return true;
+        }
+
+        private bool ParseExecute()
+        {
+            // https://www.postgresql.org/docs/18/sql-execute.html
+            // https://www.postgresql.org/docs/18/plpgsql-statements.html#PLPGSQL-STATEMENTS-EXECUTING-DYN
+
+            var sqlSourceCode = _sqlSourceCode;
+
+            AdvanceSeparators();
+
+            switch (sqlSourceCode.Current)
+            {
+                case '\'':
+                    {
+                        var newScope = PushInsideStringScope(false, true, null);
+
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
+
+                        break;
+                    }
+                case 'U' or 'u':
+                    {
+                        sqlSourceCode.Expect("U&");
+
+                        var newScope = PushInsideStringScope(true, true, null);
+
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
+
                         break;
                     }
                 case '$':
@@ -1304,7 +1361,7 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 var previousSingleQuotedStringDelimiterLength = scope.SingleQuotedStringDelimiter.Length;
 
                 if (remaining.Length > previousSingleQuotedStringDelimiterLength
-                    && remaining[previousSingleQuotedStringDelimiterLength + 1] != '\'')
+                    && remaining[previousSingleQuotedStringDelimiterLength] != '\'')
                 {
                     sqlSourceCode.Index += previousSingleQuotedStringDelimiterLength;
                     _insideStringScopes.Pop();
@@ -1323,7 +1380,9 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 }
             }
 
-            var currentStringDelimiter = scope?.SingleQuotedStringDelimiter ?? "'";
+            var currentStringDelimiter = scope?.SingleQuotedStringDelimiter is not null 
+                ? scope.SingleQuotedStringDelimiter + scope.SingleQuotedStringDelimiter
+                : "'";
 
             sqlSourceCode.Expect(currentStringDelimiter);
 

@@ -148,7 +148,6 @@ END;';
             Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
         }
 
-
         [Theory]
         [InlineData("""
 DO U&'
