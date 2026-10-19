@@ -512,6 +512,9 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     PushInsideStringScope(false, false, tag);
 
                     break;
+
+                default:
+                    return false;
             }
 
             return true;
