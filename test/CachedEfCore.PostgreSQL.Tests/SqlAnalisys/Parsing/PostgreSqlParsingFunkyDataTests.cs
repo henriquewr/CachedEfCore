@@ -142,6 +142,35 @@ namespace CachedEfCore.PostgreSQL.Tests.SqlAnalisys.Parsing
             Assert.Equal("Test", Assert.Single(identifiers).ToString());
         }
 
+        [Theory]
+        [InlineData("""
+            "Value2" = 'test'  
+                'asd'  
+                'test3'  
+            """)]
+        [InlineData("""
+            "Value2" = 'test'  /* why somebody would do this */
+                'asd'
+            """)]
+        [InlineData("""
+            "Value2" = 'test'  -- why somebody would do this
+                'asd'
+            """)]
+        public void NewLine_String(string newLineString)
+        {
+            var sql = $"""
+                UPDATE "Test"
+                SET
+                    "Value" = 1,
+                    {newLineString}
+                WHERE "Id" = 1;
+                """;
+
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal("Test", Assert.Single(identifiers).ToString());
+        }
+
         [Fact]
         public void Unicode_String()
         {

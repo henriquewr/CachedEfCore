@@ -137,6 +137,36 @@ END;';
 
         [Theory]
         [InlineData("""
+DO E'
+BEGIN
+    EXECUTE E''
+        UPDATE "Test"
+        SET "Value" = ''''nested string''''
+    '';
+
+    EXECUTE E''
+        UPDATE "Test2"
+        SET "Value" = ''''nested string''''
+    '';
+END;
+';
+""")]
+        [InlineData("""
+DO E'BEGIN
+    EXECUTE e''UPDATE "Test" SET "Value" = ''''It''''''''s a nested string'''''';
+
+    EXECUTE e''UPDATE "Test2" SET "Value" = ''''It''''''''s a nested string'''''';
+END;';
+""")]
+        public void Single_Quoted_Escaped_String_Execute(string sql)
+        {
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
 DO U&'
 BEGIN
     EXECUTE ''UPDATE "Test" SET "Value" = ''''nested string'''''';

@@ -150,6 +150,61 @@ END;';
 
         [Theory]
         [InlineData("""
+DO e'
+BEGIN
+    UPDATE "Test"
+    SET "Value" = e''nested string'';
+
+    UPDATE "Test2"
+    SET "Value" = ''nested string'';
+END;
+';
+""")]
+        [InlineData("""
+DO e'BEGIN
+    UPDATE "Test"
+    SET "Value" = e''It''''s a nested string'';
+
+    UPDATE "Test2"
+    SET "Value" = e''It''''s a nested string'';
+END;';
+""")]
+        [InlineData("""
+DO e'BEGIN
+    UPDATE "Test"
+    SET "Value" = e''It''''s a ''''nested'''' string'';
+
+    UPDATE "Test2"
+    SET "Value" = e''It''''s a ''''nested'''' string'';
+END;';
+""")]
+        [InlineData("""
+DO e'BEGIN
+    UPDATE "Test"
+    SET "Value" = e''contains ''''another string'''' inside'';
+
+    UPDATE "Test2"
+    SET "Value" = e''contains ''''another string'''' inside'';
+END;';
+""")]
+        [InlineData("""
+DO LANGUAGE plpgsql E'BEGIN
+    UPDATE "Test"
+    SET "Value" = e''nested string'';
+
+    UPDATE "Test2"
+    SET "Value" = e''nested string'';
+END;';
+""")]
+        public void Single_Quoted_Escaped_String(string sql)
+        {
+            var identifiers = _postgreSqlParser.Parse(sql);
+
+            Assert.Equal(["Test", "Test2"], identifiers.Select(x => x.ToString()).Order());
+        }
+
+        [Theory]
+        [InlineData("""
 DO U&'
 BEGIN
     UPDATE "Test"

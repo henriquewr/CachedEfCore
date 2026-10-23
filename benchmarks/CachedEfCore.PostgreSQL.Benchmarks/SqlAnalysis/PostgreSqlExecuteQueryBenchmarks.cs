@@ -78,6 +78,28 @@ namespace CachedEfCore.PostgreSQL.Benchmarks.SqlAnalysis
         }
 
         [Benchmark]
+        public HashSet<ReadOnlyMemory<char>> Single_Quoted_Escaped_String_Execute()
+        {
+            var identifiers = _postgreSqlParser.Parse("""
+            DO E'
+            BEGIN
+                EXECUTE E''
+                    UPDATE "Test"
+                    SET "Value" = ''''nested string''''
+                '';
+            
+                EXECUTE E''
+                    UPDATE "Test2"
+                    SET "Value" = ''''nested string''''
+                '';
+            END;
+            ';
+            """);
+
+            return identifiers;
+        }
+
+        [Benchmark]
         public HashSet<ReadOnlyMemory<char>> Unicode_Escaped_With_Single_Quoted_String_Execute()
         {
             var identifiers = _postgreSqlParser.Parse("""

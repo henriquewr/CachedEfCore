@@ -163,6 +163,11 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                             ParseUnicodeEscapedStringLiteral();
                             AdvanceSeparators();
                             break;
+                        case 'E' or 'e'
+                        when sqlSourceCode.Remaining.StartsWith("E'", StringComparison.OrdinalIgnoreCase):
+                            ParseEscapedStringLiteral();
+                            AdvanceSeparators();
+                            break;
                         case '$':
                             ParseDollarStringLiteral();
                             AdvanceSeparators();
@@ -458,6 +463,16 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
                         break;
                     }
+                case 'E' or 'e':
+                    {
+                        sqlSourceCode.Advance();
+
+                        var newScope = PushInsideStringScope(false, true, null);
+
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
+
+                        break;
+                    }
                 case '$':
                     var start = sqlSourceCode.Index;
                     sqlSourceCode.Expect('$');
@@ -497,6 +512,16 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                         sqlSourceCode.Expect("U&");
 
                         var newScope = PushInsideStringScope(true, true, null);
+
+                        sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
+
+                        break;
+                    }
+                case 'E' or 'e':
+                    {
+                        sqlSourceCode.Advance();
+
+                        var newScope = PushInsideStringScope(false, true, null);
 
                         sqlSourceCode.Expect(newScope.SingleQuotedStringDelimiter);
 
@@ -1092,6 +1117,10 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                         when sqlSourceCode.Remaining.StartsWith("U&'", StringComparison.OrdinalIgnoreCase):
                         ParseUnicodeEscapedStringLiteral();
                         break;
+                    case 'E' or 'e'
+                        when sqlSourceCode.Remaining.StartsWith("E'", StringComparison.OrdinalIgnoreCase):
+                        ParseEscapedStringLiteral();
+                        break;
                     case '$':
                         ParseDollarStringLiteral();
                         break;
@@ -1245,6 +1274,10 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                         when sqlSourceCode.Remaining.StartsWith("U&'", StringComparison.OrdinalIgnoreCase):
                         ParseUnicodeEscapedStringLiteral();
                         break;
+                    case 'E' or 'e'
+                        when sqlSourceCode.Remaining.StartsWith("E'", StringComparison.OrdinalIgnoreCase):
+                        ParseEscapedStringLiteral();
+                        break;
                     case '$':
                         ParseDollarStringLiteral();
                         break;
@@ -1292,6 +1325,8 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private void ParseStringLiteral()
         {
+            // https://www.postgresql.org/docs/18/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS
+
             var sqlSourceCode = _sqlSourceCode;
 
             switch (sqlSourceCode.Current)
@@ -1301,6 +1336,9 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                     break;
                 case 'U' or 'u':
                     ParseUnicodeEscapedStringLiteral();
+                    break;
+                case 'E' or 'e':
+                    ParseEscapedStringLiteral();
                     break;
                 case '$':
                     ParseDollarStringLiteral();
@@ -1353,6 +1391,15 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
             }
         }
 
+        private void ParseEscapedStringLiteral()
+        {
+            _sqlSourceCode.Expect("E");
+
+            ParseSingleQuoteStringLiteral();
+
+            AdvanceSeparators();
+        }
+
         private void ParseSingleQuoteStringLiteral()
         {
             var sqlSourceCode = _sqlSourceCode;
@@ -1389,27 +1436,43 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
                 ? scope.SingleQuotedStringDelimiter + scope.SingleQuotedStringDelimiter
                 : "'";
 
-            sqlSourceCode.Expect(currentStringDelimiter);
+            bool hasAtLeastOneNewLine;
 
-            var characterCount = 1;
-
-            while (sqlSourceCode.HasCurrent())
+            do
             {
-                sqlSourceCode.AdvanceUntilPast(currentStringDelimiter);
-                ++characterCount;
+                hasAtLeastOneNewLine = false;
+                ParseString(sqlSourceCode, currentStringDelimiter);
 
-                if (!sqlSourceCode.HasCurrent())
+                while (sqlSourceCode.HasCurrent() && (sqlSourceCode.AdvanceIf(PostgreSqlSyntaxFacts.IsWhiteSpace) || (hasAtLeastOneNewLine |= sqlSourceCode.AdvanceIf(PostgreSqlSyntaxFacts.IsNewLine)) || TryParseMultiLineComment() || TryParseSingleLineComment()))
                 {
-                    return;
                 }
+            } while (hasAtLeastOneNewLine && sqlSourceCode.Current == '\'');
 
-                if (sqlSourceCode.TryAdvanceText(currentStringDelimiter))
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static void ParseString(SqlSourceCode sqlSourceCode, scoped in ReadOnlySpan<char> stringDelimiter)
+            {
+                sqlSourceCode.Expect(stringDelimiter);
+
+                var characterCount = 1;
+
+                while (sqlSourceCode.HasCurrent())
                 {
+                    sqlSourceCode.AdvanceUntilPast(stringDelimiter);
                     ++characterCount;
-                }
-                else if ((characterCount & 1) == 0)
-                {
-                    break;
+
+                    if (!sqlSourceCode.HasCurrent())
+                    {
+                        return;
+                    }
+
+                    if (sqlSourceCode.TryAdvanceText(stringDelimiter))
+                    {
+                        ++characterCount;
+                    }
+                    else if ((characterCount & 1) == 0)
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -1443,6 +1506,10 @@ namespace CachedEfCore.PostgreSQL.SqlAnalysis
 
         private static class PostgreSqlSyntaxFacts
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool IsWhiteSpace(char c)
+                => char.IsWhiteSpace(c);
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool IsSeparator(char c)
                 => char.IsWhiteSpace(c) || c == ';';
