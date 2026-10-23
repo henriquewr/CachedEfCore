@@ -19,8 +19,14 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 
             options.UseCachedEfCore(cachedEfCoreOptions =>
             {
-                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                // SQL Server 
                 cachedEfCoreOptions.UseSqlServer();
+
+                // PostgreSQL
+                // cachedEfCoreOptions.UsePostgreSql();
+
+                // Any other database
+                // cachedEfCoreOptions.UseGenericProvider()
 
                 cachedEfCoreOptions.UseInMemoryCacheStore();
 
@@ -42,8 +48,14 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 
             options.UseCachedEfCore(cachedEfCoreOptions =>
             {
-                // currently only SQL Server has a dedicated implementation, you can use UseGenericProvider for other database providers
+                // SQL Server 
                 cachedEfCoreOptions.UseSqlServer();
+
+                // PostgreSQL
+                // cachedEfCoreOptions.UsePostgreSql();
+
+                // Any other database
+                // cachedEfCoreOptions.UseGenericProvider()
                 
                 cachedEfCoreOptions.UseInMemoryCacheStore();
 
@@ -68,17 +80,17 @@ The cache of CachedEfCore is always the lastest version of the object cached, th
 ```
 
 ## **Usage**
-```
-public IEnumerable<TResult> SelectMany<TResult>(Expression<Func<T, bool>> where, Expression<Func<T, TResult>> selector)
+```csharp
+public IEnumerable<TResult> WhereSelect<TResult>(Expression<Func<T, bool>> where, Expression<Func<T, TResult>> selector)
 {
     var result = _dbQueryCacheHelper.GetOrAdd<IEnumerable<TResult>, T>(_dbContext, () => _dbContext.Entity.Where(where).Select(selector).ToList(), [where, selector]);
     return result;
 }
 
-public async Task<IEnumerable<TResult>> SelectManyAsync<TResult>(Expression<Func<T, bool>> where, Expression<Func<T, TResult>> selector)
+public async Task<IEnumerable<TResult>> WhereSelectAsync<TResult>(Expression<Func<T, bool>> where, Expression<Func<T, TResult>> selector)
 {
     var result = await _dbQueryCacheHelper.GetOrAddAsync<IEnumerable<TResult>, T>(_dbContext, async () => await _dbContext.Entity.Where(where).Select(selector).ToListAsync(), [where, selector]);
-    return result!;
+    return result;
 }
 ```
 
