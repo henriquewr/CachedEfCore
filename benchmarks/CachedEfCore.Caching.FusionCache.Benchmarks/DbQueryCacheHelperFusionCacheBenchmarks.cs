@@ -17,8 +17,7 @@ namespace CachedEfCore.Caching.FusionCache.Benchmarks
 {
     [CPUUsageDiagnoser]
     [MemoryDiagnoser(true)]
-    [ShortRunJob]
-    public class DbQueryCacheHelperBenchmarks
+    public class DbQueryCacheHelperFusionCacheBenchmarks
     {
         protected IServiceProvider CreateProvider(string connectionString)
         {
