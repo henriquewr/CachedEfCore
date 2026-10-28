@@ -64,7 +64,16 @@ namespace CachedEfCore.Caching.FusionCache.Store
             GC.SuppressFinalize(this);
         }
 
-        ~DbQueryCacheFusionCacheStore() => Reset();
+        ~DbQueryCacheFusionCacheStore()
+        {
+            try
+            {
+                Reset();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
 
         public void ResetState() => Reset();
 
