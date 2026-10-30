@@ -141,6 +141,45 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
         }
 
         [Fact]
+        public async Task Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction()
+        {
+            var memoryBackplane = new MemoryBackplane(Options.Create(new MemoryBackplaneOptions()));
+            var distributedCache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+            var provider1 = CreateProvider(true, distributedCache, memoryBackplane, false);
+
+            var dbContext1 = provider1.GetRequiredService<TestDbContext>();
+
+            var cacheKey = new TestCacheKey
+            {
+                Key = $"{nameof(Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction)}BackplaneCacheKeyAddToCache",
+            };
+
+            using (var transaction = await dbContext1.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
+            {
+                var dbQueryCacheStore1 = dbContext1.GetService<IDbQueryCacheStore>();
+                dbQueryCacheStore1.RemoveAll();
+
+                string valueToCache = nameof(Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction);
+                
+                var rootType = typeof(object); // any type
+
+                dbQueryCacheStore1.AddToCache(rootType, cacheKey, valueToCache);
+
+                var cached = dbQueryCacheStore1.GetCached<string>(cacheKey);
+                Assert.Same(valueToCache, cached);
+            }
+
+            var provider2 = CreateProvider(true, distributedCache, memoryBackplane, true);
+
+            var dbContext2 = provider2.GetRequiredService<TestDbContext>();
+
+            var dbQueryCacheStore2 = dbContext2.GetService<IDbQueryCacheStore>();
+
+            var cached2 = dbQueryCacheStore2.GetCached<string>(cacheKey);
+            Assert.Null(cached2);
+        }
+
+        [Fact]
         public async Task Should_Not_Get_From_Distributed_Cache_When_Is_DbContext_Dependent()
         {
             var memoryBackplane = new MemoryBackplane(Options.Create(new MemoryBackplaneOptions()));

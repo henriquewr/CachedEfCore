@@ -13,12 +13,13 @@ namespace CachedEfCore.Cache.Store
         event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
+        void RemoveAllByTransactionId(Guid transactionId);
         void RemoveAllDbContextDependent(DbContextId dbContextId);
         void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
         void RemoveAll();
 
-        void AddToCache(Type rootEntityType, IDbQueryCacheKey key, object? dataToCache);
+        void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache);
         T? GetCached<T>(IDbQueryCacheKey key);
 
         T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create);
