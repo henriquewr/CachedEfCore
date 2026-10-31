@@ -61,7 +61,7 @@ namespace CachedEfCore.Interceptors
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void TrySetTransactionState(DbContext? dbContext, DbTransaction transaction, in Guid transactionId)
+        private void TrySetTransactionState(DbContext? dbContext, DbTransaction? transaction, in Guid transactionId)
         {
             if (dbContext is not null)
             {
@@ -69,7 +69,7 @@ namespace CachedEfCore.Interceptors
                 {
                     StateChangingEntities = new HashSet<IEntityType>(8),
                     TransactionId = transactionId,
-                    CanHaveDirtyReads = transaction.IsolationLevel == IsolationLevel.ReadUncommitted,
+                    CanHaveDirtyReads = transaction?.IsolationLevel == IsolationLevel.ReadUncommitted,
                 };
 
                 _conditionalWeakTable.AddOrUpdate(dbContext, state);

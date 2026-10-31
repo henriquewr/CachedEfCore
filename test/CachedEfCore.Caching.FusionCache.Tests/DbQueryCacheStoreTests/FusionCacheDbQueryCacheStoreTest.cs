@@ -3,7 +3,7 @@ using CachedEfCore.Caching.FusionCache.Configuration;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.Caching.Specification.Tests.DbQueryCacheStoreTests;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlServer.Configuration;
+using CachedEfCore.PostgreSQL.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
@@ -20,16 +20,16 @@ using ZiggyCreatures.Caching.Fusion.Backplane.Memory;
 
 namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 {
-    public class FusionCacheDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
+    public class FusionCacheDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<PostgreSqlTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
-        private readonly SqlServerTestContainer _sqlServerTestContainer;
+        private readonly PostgreSqlTestContainer _postgreSqlTestContainer;
 
         public FusionCacheDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture,
-            SqlServerTestContainer sqlServerTestContainer)
+            PostgreSqlTestContainer postgreSqlTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
-            _sqlServerTestContainer = sqlServerTestContainer;
+            _postgreSqlTestContainer = postgreSqlTestContainer;
         }
 
         protected override IServiceProvider CreateProvider(bool withLazyLoading)
@@ -48,7 +48,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 
                        options.UseLazyLoadingProxies(withLazyLoading);
 
-                       options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
+                       options.UseNpgsql(_postgreSqlTestContainer.ConnectionString);
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
@@ -60,7 +60,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                                });
                            });
 
-                           cachedEfCoreOptions.UseSqlServer();
+                           cachedEfCoreOptions.UsePostgreSql();
                        });
                    });
                });
@@ -76,7 +76,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 
                    options.UseLazyLoadingProxies(withLazyLoading);
 
-                   options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
+                   options.UseNpgsql(_postgreSqlTestContainer.ConnectionString);
 
                    options.UseCachedEfCore(cachedEfCoreOptions =>
                    {
@@ -92,7 +92,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                            });
                        });
 
-                       cachedEfCoreOptions.UseSqlServer();
+                       cachedEfCoreOptions.UsePostgreSql();
                    });
                });
            });
