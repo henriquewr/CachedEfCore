@@ -10,7 +10,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 {
     public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
     {
-        private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
+        private readonly DbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly IDbQueryCacheMetrics _metrics;
         private readonly DbContextId _dbContextId;
@@ -28,7 +28,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
-            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            _dbQueryCacheStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             _metrics = dbContext.GetService<IDbQueryCacheMetrics>();
             _dbContext = dbContext;
             _dbContextId = dbContext.ContextId;

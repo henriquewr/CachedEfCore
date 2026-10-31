@@ -12,7 +12,7 @@ using System.Runtime.InteropServices;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
+    public class DbQueryCacheInMemoryInternalStore
     {
         internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
         internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();

@@ -87,7 +87,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
             var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
             var dbQueryCacheMetrics = serviceProvider.GetRequiredService<IDbQueryCacheMetrics>();
             var dbQueryCacheHelper = serviceProvider.GetRequiredService<IDbQueryCacheHelper>();
-            var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
 
             dbQueryCacheInternalStore._dbContextDependentKeys.Clear();
             dbQueryCacheInternalStore._typeKeys.Clear();

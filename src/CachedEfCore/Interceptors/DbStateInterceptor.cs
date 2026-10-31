@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -29,6 +30,7 @@ namespace CachedEfCore.Interceptors
         {
             public required Guid TransactionId { get; init; }
             public required HashSet<IEntityType> StateChangingEntities { get; init; }
+            public required bool CanHaveDirtyReads { get; init; }
         }
 
         private readonly ConditionalWeakTable<DbContext, TransactionState> _conditionalWeakTable = new ConditionalWeakTable<DbContext, TransactionState>();
@@ -37,11 +39,12 @@ namespace CachedEfCore.Interceptors
         {
             if (dbContext is not null && _conditionalWeakTable.Remove(dbContext, out var transactionData))
             {
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+                dbQueryCacheStore.RemoveAllByTransactionId(transactionData.TransactionId);
+
                 if (transactionData.StateChangingEntities.Count != 0)
                 {
-                    var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
-
-                    dbQueryCacheStore.RemoveAllByTransactionId(transactionData.TransactionId);
                     dbQueryCacheStore.RemoveRootEntities(transactionData.StateChangingEntities);
                 }
             }
@@ -51,31 +54,31 @@ namespace CachedEfCore.Interceptors
         {
             if (dbContext is not null && _conditionalWeakTable.Remove(dbContext, out var transactionData))
             {
-                if (transactionData.StateChangingEntities.Count != 0)
-                {
-                    var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
-                    dbQueryCacheStore.RemoveAllByTransactionId(transactionData.TransactionId);
-                }
+                dbQueryCacheStore.RemoveAllByTransactionId(transactionData.TransactionId);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SetTransactionState(DbContext? dbContext, in Guid transactionId)
+        private void TrySetTransactionState(DbContext? dbContext, DbTransaction transaction, in Guid transactionId)
         {
             if (dbContext is not null)
             {
-                _conditionalWeakTable.AddOrUpdate(dbContext, new TransactionState
+                var state = new TransactionState
                 {
                     StateChangingEntities = new HashSet<IEntityType>(8),
-                    TransactionId = transactionId
-                });
+                    TransactionId = transactionId,
+                    CanHaveDirtyReads = transaction.IsolationLevel == IsolationLevel.ReadUncommitted,
+                };
+
+                _conditionalWeakTable.AddOrUpdate(dbContext, state);
             }
         }
 
         public DbTransaction TransactionStarted(DbConnection connection, TransactionEndEventData eventData, DbTransaction result)
         {
-            SetTransactionState(eventData.Context, eventData.TransactionId);
+            TrySetTransactionState(eventData.Context, eventData.Transaction, eventData.TransactionId);
 
             return result;
         }
@@ -85,14 +88,14 @@ namespace CachedEfCore.Interceptors
             DbTransaction result,
             CancellationToken cancellationToken = default)
         {
-            SetTransactionState(eventData.Context, eventData.TransactionId);
+            TrySetTransactionState(eventData.Context, eventData.Transaction, eventData.TransactionId);
 
             return new(result);
         }
 
         public DbTransaction TransactionUsed(DbConnection connection, TransactionEventData eventData, DbTransaction result)
         {
-            SetTransactionState(eventData.Context, eventData.TransactionId);
+            TrySetTransactionState(eventData.Context, eventData.Transaction, eventData.TransactionId);
 
             return result;
         }
@@ -102,7 +105,7 @@ namespace CachedEfCore.Interceptors
             DbTransaction result,
             CancellationToken cancellationToken = default)
         {
-            SetTransactionState(eventData.Context, eventData.TransactionId);
+            TrySetTransactionState(eventData.Context, eventData.Transaction, eventData.TransactionId);
 
             return new(result);
         }
@@ -224,17 +227,8 @@ namespace CachedEfCore.Interceptors
                       .Select(static e => e.Metadata)
                       .ToHashSet();
 
-                    if (modifiedEntitiesTypes.Count != 0)
-                    {
-                        if (_conditionalWeakTable.TryGetValue(context, out var transactionState))
-                        {
-                            transactionState.StateChangingEntities.UnionWith(modifiedEntitiesTypes);
-                        }
+                    Invalidate(_conditionalWeakTable, context, modifiedEntitiesTypes);
 
-                        var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
-
-                        dbQueryCacheStore.RemoveRootEntities(modifiedEntitiesTypes);
-                    }
                     return;
 
                 case CommandSource.ExecuteUpdate:
@@ -245,19 +239,36 @@ namespace CachedEfCore.Interceptors
                     var tableEntityMapping = context.GetService<TableEntityMapping>();
 
                     var stateChangingEntities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntityMapping, command).ToHashSet();
+                    Invalidate(_conditionalWeakTable, context, stateChangingEntities);
+                return;
+            }
 
-                    if (stateChangingEntities.Count != 0)
+            static void Invalidate(
+                ConditionalWeakTable<DbContext, TransactionState> conditionalWeakTable, 
+                DbContext dbContext,
+                HashSet<IEntityType> stateChangingEntities)
+            {
+                if (stateChangingEntities.Count == 0)
+                {
+                    return;
+                }
+
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+                if (conditionalWeakTable.TryGetValue(dbContext, out var transactionState))
+                {
+                    transactionState.StateChangingEntities.UnionWith(stateChangingEntities);
+                    dbQueryCacheStore.RemoveAllByTransactionId(transactionState.TransactionId);
+
+                    if (transactionState.CanHaveDirtyReads)
                     {
-                        if (_conditionalWeakTable.TryGetValue(context, out var transactionState))
-                        {
-                            transactionState.StateChangingEntities.UnionWith(stateChangingEntities);
-                        }
-
-                        var dbQueryCacheStore = context.GetService<IDbQueryCacheStore>();
-
                         dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
                     }
-                return;
+                }
+                else
+                {
+                    dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
+                }
             }
         }
     }

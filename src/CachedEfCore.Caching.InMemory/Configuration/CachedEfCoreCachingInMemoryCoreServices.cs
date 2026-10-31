@@ -27,7 +27,7 @@ namespace CachedEfCore.Caching.InMemory.Configuration
 
             yield return new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Singleton<IDbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(),
+                ServiceDescriptor = ServiceDescriptor.Singleton<DbQueryCacheInMemoryInternalStore, DbQueryCacheInMemoryInternalStore>(),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,
                 Options = null,

@@ -2,9 +2,13 @@
 using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Data;
+using System.Data.Common;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
@@ -69,63 +73,41 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
         }
 
         [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public virtual async Task Should_Be_Transaction_Aware_On_Commit(bool async)
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Commit_When_Calling_UseTransaction(bool async, bool dirtyReads)
         {
-            var serviceProvider = CreatePooledProvider(true);
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
 
-            var entities = Enumerable.Range(0, 2000).Select(static x => new NonLazyLoadEntity
-            {
-                StringData = $"Test-{x}",
-                Value = 0,
-            }).ToArray();
-
-            using (var scope = serviceProvider.CreateScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
-                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-
-                dbContext.NonLazyLoadEntity.AddRange(entities);
-
-                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
-            }
-
-            await Parallel.ForEachAsync(entities, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 4, CancellationToken = TestContext.Current.CancellationToken }, async (savedEntity, cancellationToken) =>
-            {
-                using var scope1 = serviceProvider.CreateScope();
-                using var scope2 = serviceProvider.CreateScope();
-
-                var dbContext1 = scope1.ServiceProvider.GetRequiredService<TestDbContext>();
-                var dbContext2 = scope2.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                var dbQueryCacheHelper1 = scope1.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-                var dbQueryCacheHelper2 = scope2.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-
-                using (var transaction = async ? await dbContext1.Database.BeginTransactionAsync(cancellationToken) : dbContext1.Database.BeginTransaction())
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
                 {
-                    var entity = await dbContext1.NonLazyLoadEntity.FirstAsync(x => x.Id == savedEntity.Id, cancellationToken: cancellationToken);
+                    DbConnection connection = dbContext.Database.GetDbConnection();
 
-                    Assert.Equal(0, entity.Value);
+                    await connection.OpenAsync();
 
-                    entity.Value++;
+                    var dbTransaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
 
-                    await AssertEntity();
+                    var transaction = async ? (await dbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken))! : dbContext.Database.UseTransaction(dbTransaction)!;
 
+                    return transaction;
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
                     if (async)
                     {
-                        await dbContext1.SaveChangesAsync(cancellationToken);
+                        await dbContext.SaveChangesAsync(cancellationToken);
                     }
                     else
                     {
-                        dbContext1.SaveChanges();
+                        dbContext.SaveChanges();
                     }
-
-                    await AssertEntity();
-                    await AssertEntity();
-
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
                     if (async)
                     {
                         await transaction.CommitAsync(cancellationToken);
@@ -134,99 +116,45 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.Commit();
                     }
-
-                    await AssertEntity();
-                    await AssertEntity();
-
-                    async Task AssertEntity()
-                    {
-                        var entitiesFromContext1 = await GetEntityFrom(dbQueryCacheHelper1, dbContext1);
-                        Assert.Equal(entitiesFromContext1.FromDb.Value, entitiesFromContext1.FromCache.Value);
-
-                        var entitiesFromContext2 = await GetEntityFrom(dbQueryCacheHelper2, dbContext2);
-                        Assert.Equal(entitiesFromContext2.FromDb.Value, entitiesFromContext2.FromCache.Value);
-                    }
-
-                    async Task<(NonLazyLoadEntity FromCache, NonLazyLoadEntity FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
-                    {
-                        var cacheKey = $"cacheKeyAddToCache-{savedEntity.Id}";
-
-                        var cachedEntity = async
-                            ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
-                            {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
-                            }, cacheKey)
-                            : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
-                            {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().First(x => x.Id == savedEntity.Id);
-                            }, cacheKey);
-
-                        var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
-
-                        return (cachedEntity, fromDb);
-                    }
-                }
-            });
+                }, async);
         }
 
         [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public virtual async Task Should_Be_Transaction_Aware_On_Rollback(bool async)
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Rollback_When_Calling_UseTransaction(bool async, bool dirtyReads)
         {
-            var serviceProvider = CreatePooledProvider(true);
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
 
-            var entities = Enumerable.Range(0, 2000).Select(static x => new NonLazyLoadEntity
-            {
-                StringData = $"Test-{x}",
-                Value = 0,
-            }).ToArray();
-
-            using (var scope = serviceProvider.CreateScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
-                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-
-                dbContext.NonLazyLoadEntity.AddRange(entities);
-
-                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
-            }
-
-            await Parallel.ForEachAsync(entities, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 4, CancellationToken = TestContext.Current.CancellationToken }, async (savedEntity, cancellationToken) =>
-            {
-                using var scope1 = serviceProvider.CreateScope();
-                using var scope2 = serviceProvider.CreateScope();
-
-                var dbContext1 = scope1.ServiceProvider.GetRequiredService<TestDbContext>();
-                var dbContext2 = scope2.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                var dbQueryCacheHelper1 = scope1.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-                var dbQueryCacheHelper2 = scope2.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-
-                using (var transaction = async ? await dbContext1.Database.BeginTransactionAsync(cancellationToken) : dbContext1.Database.BeginTransaction())
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
                 {
-                    var entity = await dbContext1.NonLazyLoadEntity.FirstAsync(x => x.Id == savedEntity.Id, cancellationToken: cancellationToken);
+                    DbConnection connection = dbContext.Database.GetDbConnection();
 
-                    Assert.Equal(0, entity.Value);
+                    await connection.OpenAsync();
 
-                    entity.Value++;
+                    var dbTransaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
 
-                    await AssertEntity();
+                    var transaction = async ? (await dbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken))! : dbContext.Database.UseTransaction(dbTransaction)!;
 
+                    return transaction;
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
                     if (async)
                     {
-                        await dbContext1.SaveChangesAsync(cancellationToken);
+                        await dbContext.SaveChangesAsync(cancellationToken);
                     }
                     else
                     {
-                        dbContext1.SaveChanges();
+                        dbContext.SaveChanges();
                     }
-
-                    await AssertEntity();
-                    await AssertEntity();
-
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
                     if (async)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -235,104 +163,52 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.Rollback();
                     }
-
-                    await AssertEntity();
-                    await AssertEntity();
-
-                    async Task AssertEntity()
-                    {
-                        var entitiesFromContext1 = await GetEntityFrom(dbQueryCacheHelper1, dbContext1);
-                        Assert.Equal(entitiesFromContext1.FromDb.Value, entitiesFromContext1.FromCache.Value);
-
-                        var entitiesFromContext2 = await GetEntityFrom(dbQueryCacheHelper2, dbContext2);
-                        Assert.Equal(entitiesFromContext2.FromDb.Value, entitiesFromContext2.FromCache.Value);
-                    }
-
-                    async Task<(NonLazyLoadEntity FromCache, NonLazyLoadEntity FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
-                    {
-                        var cacheKey = $"cacheKeyAddToCache-{savedEntity.Id}";
-
-                        var cachedEntity = async
-                            ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
-                            {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
-                            }, cacheKey)
-                            : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
-                            {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().First(x => x.Id == savedEntity.Id);
-                            }, cacheKey);
-
-                        var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
-
-                        return (cachedEntity, fromDb);
-                    }
-                }
-            });
+                }, async);
         }
 
         [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public virtual async Task Should_Be_Transaction_Aware_On_RollbackToSavepoint(bool async)
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_RollbackToSavepoint_When_Calling_UseTransaction(bool async, bool dirtyReads)
         {
-            var serviceProvider = CreatePooledProvider(true);
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
 
-            var entities = Enumerable.Range(0, 2000).Select(static x => new NonLazyLoadEntity
-            {
-                StringData = $"Test-{x}",
-                Value = 0,
-            }).ToArray();
-
-            using (var scope = serviceProvider.CreateScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
-                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-
-                dbContext.NonLazyLoadEntity.AddRange(entities);
-
-                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
-            }
-
-            await Parallel.ForEachAsync(entities, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 4, CancellationToken = TestContext.Current.CancellationToken }, async (savedEntity, cancellationToken) =>
-            {
-                using var scope1 = serviceProvider.CreateScope();
-                using var scope2 = serviceProvider.CreateScope();
-
-                var dbContext1 = scope1.ServiceProvider.GetRequiredService<TestDbContext>();
-                var dbContext2 = scope2.ServiceProvider.GetRequiredService<TestDbContext>();
-
-                var dbQueryCacheHelper1 = scope1.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-                var dbQueryCacheHelper2 = scope2.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
-
-                using (var transaction = async ? await dbContext1.Database.BeginTransactionAsync(cancellationToken) : dbContext1.Database.BeginTransaction())
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
                 {
-                    var entity = await dbContext1.NonLazyLoadEntity.FirstAsync(x => x.Id == savedEntity.Id, cancellationToken: cancellationToken);
+                    DbConnection connection = dbContext.Database.GetDbConnection();
 
-                    Assert.Equal(0, entity.Value);
+                    await connection.OpenAsync();
 
-                    entity.Value++;
+                    var dbTransaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
 
-                    await AssertEntity();
+                    var transaction = async ? (await dbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken))! : dbContext.Database.UseTransaction(dbTransaction)!;
 
-                    var savepointName = $"Savepoint-{savedEntity.Id}";
+                    return transaction;
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    var savepointName = transaction.TransactionId.ToString("N");
 
                     if (async)
                     {
                         await transaction.CreateSavepointAsync(savepointName, cancellationToken);
 
-                        await dbContext1.SaveChangesAsync(cancellationToken);
+                        await dbContext.SaveChangesAsync(cancellationToken);
                     }
                     else
                     {
                         transaction.CreateSavepoint(savepointName);
 
-                        dbContext1.SaveChanges();
+                        dbContext.SaveChanges();
                     }
-
-                    await AssertEntity();
-                    await AssertEntity();
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var savepointName = transaction.TransactionId.ToString("N");
 
                     if (async)
                     {
@@ -343,33 +219,329 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                         transaction.RollbackToSavepoint(savepointName);
                     }
 
-                    await AssertEntity();
-                    await AssertEntity();
+                }, async);
+        }
 
-                    async Task AssertEntity()
+        [Theory]
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Dispose_When_Calling_UseTransaction(bool async, bool dirtyReads)
+        {
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
+
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
+                {
+                    DbConnection connection = dbContext.Database.GetDbConnection();
+
+                    await connection.OpenAsync();
+
+                    var dbTransaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
+
+                    var transaction = async ? (await dbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken))! : dbContext.Database.UseTransaction(dbTransaction)!;
+
+                    return transaction;
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    if (async)
                     {
-                        var entitiesFromContext1 = await GetEntityFrom(dbQueryCacheHelper1, dbContext1);
-                        Assert.Equal(entitiesFromContext1.FromDb.Value, entitiesFromContext1.FromCache.Value);
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        dbContext.SaveChanges();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var dbTransaction = transaction.GetDbTransaction();
 
-                        var entitiesFromContext2 = await GetEntityFrom(dbQueryCacheHelper2, dbContext2);
-                        Assert.Equal(entitiesFromContext2.FromDb.Value, entitiesFromContext2.FromCache.Value);
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                        await dbTransaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                        dbTransaction.Dispose();
+                    }
+                }, async);
+        }
+
+
+        [Theory]
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Commit(bool async, bool dirtyReads)
+        {
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
+
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
+                {
+                    return async
+                        ? await dbContext.Database.BeginTransactionAsync(isolationLevel, cancellationToken)
+                        : dbContext.Database.BeginTransaction(isolationLevel);
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        dbContext.SaveChanges();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        transaction.Commit();
+                    }
+                }, async);
+        }
+
+        [Theory]
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Rollback(bool async, bool dirtyReads)
+        {
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
+
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
+                {
+                    return async
+                        ? await dbContext.Database.BeginTransactionAsync(isolationLevel, cancellationToken)
+                        : dbContext.Database.BeginTransaction(isolationLevel);
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        dbContext.SaveChanges();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        transaction.Rollback();
+                    }
+                }, async);
+        }
+
+        [Theory]
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_RollbackToSavepoint(bool async, bool dirtyReads)
+        {
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
+
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
+                {
+                    return async
+                        ? await dbContext.Database.BeginTransactionAsync(isolationLevel, cancellationToken)
+                        : dbContext.Database.BeginTransaction(isolationLevel);
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    var savepointName = transaction.TransactionId.ToString("N");
+
+                    if (async)
+                    {
+                        await transaction.CreateSavepointAsync(savepointName, cancellationToken);
+
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        transaction.CreateSavepoint(savepointName);
+
+                        dbContext.SaveChanges();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var savepointName = transaction.TransactionId.ToString("N");
+
+                    if (async)
+                    {
+                        await transaction.RollbackToSavepointAsync(savepointName, cancellationToken);
+                    }
+                    else
+                    {
+                        transaction.RollbackToSavepoint(savepointName);
                     }
 
-                    async Task<(NonLazyLoadEntity FromCache, NonLazyLoadEntity FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                }, async);
+        }
+
+        [Theory]
+        [InlineData(true, true)]
+        [InlineData(false, true)]
+
+        [InlineData(true, false)]
+        [InlineData(false, false)]
+        public virtual async Task Should_Be_Transaction_Aware_On_Dispose(bool async, bool dirtyReads)
+        {
+            var configuration = ShouldBeTransactionAwareOnFuncConfiguration.Create(dirtyReads);
+
+            await ShouldBeTransactionAwareOnFunc(configuration,
+                async static (dbContext, isolationLevel, async, cancellationToken) =>
+                {
+                    return async
+                        ? await dbContext.Database.BeginTransactionAsync(isolationLevel, cancellationToken)
+                        : dbContext.Database.BeginTransaction(isolationLevel);
+                },
+                async static (dbContext, entity, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        dbContext.SaveChanges();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                    }
+                }, async);
+        }
+
+
+        protected record struct ShouldBeTransactionAwareOnFuncConfiguration(int Iterations, int MaxDegreeOfParallelism, IsolationLevel IsolationLevel)
+        {
+            public static ShouldBeTransactionAwareOnFuncConfiguration Create(bool dirtyReads)
+            {
+                var configuration = dirtyReads
+                   ? new ShouldBeTransactionAwareOnFuncConfiguration(50, 1, IsolationLevel.ReadUncommitted)
+                   : new ShouldBeTransactionAwareOnFuncConfiguration(2000, Environment.ProcessorCount * 2, IsolationLevel.ReadCommitted);
+
+                return configuration;
+            }
+        }
+
+        protected virtual async Task ShouldBeTransactionAwareOnFunc(
+            ShouldBeTransactionAwareOnFuncConfiguration configuration,
+            Func<TestDbContext, IsolationLevel, bool, CancellationToken, Task<IDbContextTransaction>> createTransaction,
+            Func<TestDbContext, NonLazyLoadEntity, IDbContextTransaction, bool, CancellationToken, Task> saveFunction,
+            Func<TestDbContext, IDbContextTransaction, bool, CancellationToken, Task> function,
+            bool async)
+        {
+            var serviceProvider = CreatePooledProvider(true);
+
+            var entities = Enumerable.Range(0, configuration.Iterations).Select(static x => new NonLazyLoadEntity
+            {
+                StringData = $"Test-{x}",
+                Value = 0,
+            }).ToArray();
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+                dbContext.NonLazyLoadEntity.AddRange(entities);
+
+                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+            }
+
+            await Parallel.ForEachAsync(entities, new ParallelOptions { MaxDegreeOfParallelism = configuration.MaxDegreeOfParallelism, CancellationToken = TestContext.Current.CancellationToken }, async (savedEntity, cancellationToken) =>
+            {
+                using var scope1 = serviceProvider.CreateScope();
+                using var scope2 = serviceProvider.CreateScope();
+
+                var dbContext1 = scope1.ServiceProvider.GetRequiredService<TestDbContext>();
+                var dbContext2 = scope2.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper1 = scope1.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+                var dbQueryCacheHelper2 = scope2.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                using (var transaction = await createTransaction(dbContext1, configuration.IsolationLevel, async, cancellationToken))
+                {
+                    var entity = await dbContext1.NonLazyLoadEntity.FirstAsync(x => x.Id == savedEntity.Id, cancellationToken: cancellationToken);
+
+                    Assert.Equal(0, entity.Value);
+
+                    entity.Value++;
+
+                    await AssertEntity();
+
+                    await saveFunction(dbContext1, entity, transaction, async, cancellationToken);
+
+                    await AssertEntity();
+                    await AssertEntity();
+
+                    await function(dbContext1, transaction, async, cancellationToken);
+
+                    await AssertEntity();
+                    await AssertEntity();
+                }
+
+                async Task AssertEntity()
+                {
+                    var entitiesFromContext1 = await GetEntityFrom(dbQueryCacheHelper1, dbContext1);
+                    Assert.Equal(entitiesFromContext1.FromDb, entitiesFromContext1.FromCache);
+
+                    var entitiesFromContext2 = await GetEntityFrom(dbQueryCacheHelper2, dbContext2);
+                    Assert.Equal(entitiesFromContext2.FromDb, entitiesFromContext2.FromCache);
+
+                    async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
                     {
                         var cacheKey = $"cacheKeyAddToCache-{savedEntity.Id}";
 
                         var cachedEntity = async
                             ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
                             {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
+                                return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
                             }, cacheKey)
                             : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
                             {
-                                return dbContext.NonLazyLoadEntity.AsNoTracking().First(x => x.Id == savedEntity.Id);
+                                return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
                             }, cacheKey);
 
-                        var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().FirstAsync(x => x.Id == savedEntity.Id);
+                        var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
 
                         return (cachedEntity, fromDb);
                     }
