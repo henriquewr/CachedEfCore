@@ -162,9 +162,9 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheStoreTests
         {
             return new TheoryData<Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask>>
             {
-                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<object>(key)) },
-                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<object>(rootEntityType, key, () => default!)) },
-                { async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<object>(rootEntityType, key, () => Task.FromResult<object>(default!)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetCached<LazyLoadEntity>(key)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await ValueTask.FromResult(store.GetOrAdd<LazyLoadEntity>(rootEntityType, key, () => default!)) },
+                { async (cachedDbContext, store, key, rootEntityType) => await store.GetOrAddAsync<LazyLoadEntity>(rootEntityType, key, () => Task.FromResult<LazyLoadEntity>(default!)) },
             };
         }
         public virtual async Task Reports_Cache_Metrics(Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)

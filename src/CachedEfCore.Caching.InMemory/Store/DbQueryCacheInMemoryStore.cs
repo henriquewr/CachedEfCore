@@ -10,7 +10,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 {
     public class DbQueryCacheInMemoryStore : IDbQueryCacheStore
     {
-        private readonly IDbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
+        private readonly DbQueryCacheInMemoryInternalStore _dbQueryCacheStore;
         private readonly DbContext _dbContext;
         private readonly IDbQueryCacheMetrics _metrics;
         private readonly DbContextId _dbContextId;
@@ -28,7 +28,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
         public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
-            _dbQueryCacheStore = dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            _dbQueryCacheStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             _metrics = dbContext.GetService<IDbQueryCacheMetrics>();
             _dbContext = dbContext;
             _dbContextId = dbContext.ContextId;
@@ -68,6 +68,10 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAllByTransactionId(Guid transactionId)
+            => _dbQueryCacheStore.RemoveAllByTransactionId(transactionId);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllDbContextDependent(DbContextId dbContextId)
             => _dbQueryCacheStore.RemoveAllDbContextDependent(dbContextId);
 
@@ -84,12 +88,12 @@ namespace CachedEfCore.Caching.InMemory.Store
             => _dbQueryCacheStore.RemoveAll();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
+        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
             => _dbQueryCacheStore.AddToCache(_dbContext, rootEntityType, key, dataToCache);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
-            => _dbQueryCacheStore.GetCached<T>(key, _metrics);
+            => _dbQueryCacheStore.GetCached<T>(_dbContext, key, _metrics);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)

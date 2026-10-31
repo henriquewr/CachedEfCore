@@ -9,7 +9,8 @@ namespace CachedEfCore.Tests.Common.TestContainers
     public class PostgreSqlTestContainer : IAsyncLifetime
     {
         private static readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18").Build();
-
+        private bool _isInitialized = false;
+        private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
         private static uint _dbs = 0;
 
         private readonly string _databaseName = $"postgre_sql_db_{Interlocked.Increment(ref _dbs)}";
@@ -28,7 +29,33 @@ namespace CachedEfCore.Tests.Common.TestContainers
 
         public async ValueTask InitializeAsync()
         {
-            await _container.StartAsync();
+            if (!Volatile.Read(ref _isInitialized))
+            {
+                try
+                {
+                    await _semaphoreSlim.WaitAsync().ConfigureAwait(false);
+
+                    if (!_isInitialized)
+                    {
+                        await _container.StartAsync();
+
+                        await using var connection = new NpgsqlConnection(ConnectionStringForDatabase("postgres"));
+
+                        await connection.OpenAsync();
+
+                        await using var command = connection.CreateCommand();
+                        command.CommandText = $"CREATE DATABASE \"{_databaseName}\"";
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+
+                    _isInitialized = true;
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+            }
 
             ConnectionString = ConnectionStringForDatabase(_databaseName);
         }

@@ -41,5 +41,6 @@ namespace CachedEfCore.Caching.Specification.Tests.Common
         public int Id { get; set; }
 
         public string? StringData { get; set; }
+        public int Value { get; set; }
     }
 }

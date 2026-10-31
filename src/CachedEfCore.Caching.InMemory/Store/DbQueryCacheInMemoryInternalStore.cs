@@ -7,15 +7,16 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
-    public class DbQueryCacheInMemoryInternalStore : IDbQueryCacheInMemoryInternalStore
+    public class DbQueryCacheInMemoryInternalStore
     {
-        internal readonly ConcurrentDictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new();
-        internal readonly ConcurrentDictionary<Type, CancellationTokenSource> _typeKeys = new();
+        internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
+        internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();
+        internal readonly object _transactions = new();
 
         private readonly IMemoryCache _cache;
 
@@ -24,36 +25,81 @@ namespace CachedEfCore.Caching.InMemory.Store
             _cache = cache;
         }
 
+        private record class TransactionKey(Guid TransactionId);
+
+        private readonly static MemoryCacheEntryOptions _transactionCacheEntryOptions = new MemoryCacheEntryOptions
+        {
+            SlidingExpiration = TimeSpan.FromMinutes(5),
+            Priority = CacheItemPriority.High,
+            Size = 0,
+        };
+
+        private sealed record class InMemoryKeyWithTransaction(IDbQueryCacheKey Key, Guid TransactionId);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static object GetKey(IDbQueryCacheKey existingKey, Guid? transactionId)
+        {
+            return transactionId.HasValue
+                ? new InMemoryKeyWithTransaction(existingKey, transactionId.Value)
+                : existingKey;
+        }
+
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
 
         public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
+        public void RemoveAllByTransactionId(Guid transactionId)
+        {
+            var key = new TransactionKey(transactionId);
+
+            lock (_transactions)
+            {
+                if (_cache.TryGetValue<CancellationTokenSource>(key, out var cts) && cts is not null)
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+
+                    _cache.Remove(key);
+                }
+            }
+        }
+
         public void RemoveAllDbContextDependent(DbContextId dbContextId)
         {
-            if (_dbContextDependentKeys.TryRemove(dbContextId, out var keys))
+            lock (_dbContextDependentKeys)
             {
-                keys.Cancel();
-                keys.Dispose();
+                if (_dbContextDependentKeys.Remove(dbContextId, out var cts))
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+                }
             }
         }
 
         public void RemoveAll()
         {
-            var l_cacheKeysByContextId = _dbContextDependentKeys;
-            foreach (var item in l_cacheKeysByContextId)
+            lock (_typeKeys)
             {
-                item.Value.Cancel();
-                item.Value.Dispose();
+                foreach (var item in _typeKeys)
+                {
+                    item.Value.Cancel();
+                    item.Value.Dispose();
+                }
+                _typeKeys.Clear();
             }
-            l_cacheKeysByContextId.Clear();
 
-            var l_cacheKeysByType = _typeKeys;
-            foreach (var item in l_cacheKeysByType)
+            lock (_dbContextDependentKeys)
             {
-                item.Value.Cancel();
-                item.Value.Dispose();
+                foreach (var item in _dbContextDependentKeys)
+                {
+                    if (_dbContextDependentKeys.Remove(item.Key))
+                    {
+                        item.Value.Cancel();
+                        item.Value.Dispose();
+                    }
+                }
+                _dbContextDependentKeys.Clear();
             }
-            l_cacheKeysByType.Clear();
         }
 
         public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true)
@@ -90,23 +136,31 @@ namespace CachedEfCore.Caching.InMemory.Store
                 });
             }
 
+            var l_typeKeys = _typeKeys;
+
             foreach (var item in entitiesToRemove)
             {
-                if (_typeKeys.TryRemove(item.ClrType, out var keysWithType))
+                lock (_typeKeys)
                 {
-                    keysWithType.Cancel();
-                    keysWithType.Dispose();
+                    if (l_typeKeys.Remove(item.ClrType, out var cts))
+                    {
+                        cts.Cancel();
+                        cts.Dispose();
+                    }
                 }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T? GetCached<T>(IDbQueryCacheKey key, IDbQueryCacheMetrics metrics)
+        public T? GetCached<T>(DbContext dbContext, IDbQueryCacheKey key, IDbQueryCacheMetrics metrics)
         {
-            if (_cache.TryGetValue<T>(key, out var cached))
+            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
+            var inMemoryKey = GetKey(key, transactionId);
+
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
-                return cached;
+                return cachedValue!;
             }
 
             metrics.ReportCacheMiss();
@@ -115,50 +169,74 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
+        public void AddToCache<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
         {
-            InternalAddToCache(dbContext, rootEntityType, key, dataToCache);
+            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
+            var inMemoryKey = GetKey(key, transactionId);
+
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InternalAddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey cacheKey, object? dataToCache)
+        private void InternalAddToCache<T>(DbContext dbContext,
+            Type rootEntityType, 
+            object cacheKey,
+            DbContextId? dependentDbContext, 
+            Guid? transactionId, 
+            T? dataToCache)
         {
             var dbQueryCacheInMemoryCache = dbContext.GetService<DbQueryCacheStoreInMemoryCacheEntryOptions>();
 
             using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(dbQueryCacheInMemoryCache.EntryOptions);
             cacheEntry.Value = dataToCache;
 
-            if (dataToCache is not null && cacheKey.DependentDbContext.HasValue)
+            lock (_typeKeys)
+            {
+                ref var cts = ref CollectionsMarshal.GetValueRefOrAddDefault(_typeKeys, rootEntityType, out var exists);
+                if (!exists)
+                {
+                    cts = new CancellationTokenSource();
+                }
+                cacheEntry.AddExpirationToken(new CancellationChangeToken(cts!.Token));
+            }
+
+            if (dataToCache is not null && dependentDbContext.HasValue)
             {
                 // if dataToCache is null the object is not really dependent to the DbContext instance
-                CancellationTokenSource dbContextDependentCts;
 
                 var dbContextId = dbContext.ContextId;
-
-                if (!_dbContextDependentKeys.TryGetValue(dbContextId, out dbContextDependentCts!))
+                lock (_dbContextDependentKeys)
                 {
-                    dbContextDependentCts = new CancellationTokenSource();
-                    _dbContextDependentKeys.TryAdd(dbContextId, dbContextDependentCts);
+                    ref var cts = ref CollectionsMarshal.GetValueRefOrAddDefault(_dbContextDependentKeys, dbContextId, out var exists);
+                    if (!exists)
+                    {
+                        cts = new CancellationTokenSource();
+                    }
+                    cacheEntry.AddExpirationToken(new CancellationChangeToken(cts!.Token));
                 }
-
-                cacheEntry.AddExpirationToken(new CancellationChangeToken(dbContextDependentCts.Token));
             }
 
-            CancellationTokenSource ctsByType;
-
-            if (!_typeKeys.TryGetValue(rootEntityType, out ctsByType!))
+            if (transactionId.HasValue)
             {
-                ctsByType = new CancellationTokenSource();
-                _typeKeys.TryAdd(rootEntityType, ctsByType);
-            }
+                var transactionIdVal = transactionId.Value;
+                var transactionKey = new TransactionKey(transactionIdVal);
 
-            cacheEntry.AddExpirationToken(new CancellationChangeToken(ctsByType.Token));
+                lock (_transactions)
+                {
+                    var cts = _cache.GetOrCreate(transactionKey, static entry => new CancellationTokenSource(), _transactionCacheEntryOptions)!;
+
+                    cacheEntry.AddExpirationToken(new CancellationChangeToken(cts.Token));
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create, IDbQueryCacheMetrics metrics)
         {
-            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
+            var inMemoryKey = GetKey(key, transactionId);
+
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
@@ -166,7 +244,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var createdValue = create();
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, key, createdValue);
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
 
             return createdValue;
         }
@@ -174,7 +252,10 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
         {
-            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
+            var inMemoryKey = GetKey(key, transactionId);
+
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
@@ -182,7 +263,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, key, createdValue);
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
 
             return createdValue;
         }

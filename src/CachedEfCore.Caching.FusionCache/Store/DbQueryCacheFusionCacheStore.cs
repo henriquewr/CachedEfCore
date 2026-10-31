@@ -5,6 +5,8 @@ using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -21,6 +23,8 @@ namespace CachedEfCore.Caching.FusionCache.Store
         public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
         public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
+        private static string GetTransactionCacheTag(in Guid transactionId)
+            => $"Tran:{transactionId}";
         private static string GetDbContextCacheTag(in DbContextId dbContextId)
             => $"DbCtx:{dbContextId}";
 
@@ -38,6 +42,43 @@ namespace CachedEfCore.Caching.FusionCache.Store
             _dbContext = dbContext;
             _dbContextCacheTag = GetDbContextCacheTag(dbContext.ContextId);
             _metrics = metrics;
+        }
+
+        private sealed record class FusionCacheKey(IDbQueryCacheKey Key, Guid TransactionId)
+        {
+            public override string ToString()
+            {
+                var keyString = Key.Stringify();
+
+                var keyStringLength = keyString.Length;
+                var lengthDigits = keyStringLength == 0 ? 1 : (int)Math.Log10(keyStringLength) + 1;
+
+                var createdKey = string.Create(
+                    36 + 1 + lengthDigits + 1 + keyString.Length,
+                    (TransactionId, KeyString: keyString),
+                    static (span, state) =>
+                    {
+                        var written = 0;
+                        state.TransactionId.TryFormat(span, out written);
+                        span[written++] = '|';
+                        state.KeyString.Length.TryFormat(span.Slice(written), out var keyStringLengthWritten, provider: CultureInfo.InvariantCulture);
+                        written += keyStringLengthWritten;
+                        span[written++] = '|';
+                        state.KeyString.AsSpan().CopyTo(span.Slice(written));
+                    });
+
+                Debug.Assert(createdKey == $"{TransactionId}|{keyString.Length}|{keyString}");
+
+                return createdKey;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static string GetKey(IDbQueryCacheKey existingKey, Guid? transactionId)
+        {
+            return transactionId.HasValue
+                ? new FusionCacheKey(existingKey, transactionId.Value).ToString()
+                : existingKey.Stringify();
         }
 
         // we skip distributed cache and notifications, as no value dependending on the DbContext reaches L2
@@ -83,9 +124,21 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAllByTransactionId(Guid transactionId)
+        {
+            _fusionCache.RemoveByTag(GetTransactionCacheTag(transactionId));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllDbContextDependent(DbContextId dbContextId)
         {
             _fusionCache.RemoveByTag(GetDbContextCacheTag(dbContextId));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll()
+        {
+            _fusionCache.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -129,18 +182,18 @@ namespace CachedEfCore.Caching.FusionCache.Store
             _fusionCache.RemoveByTag(tags);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll()
-        {
-            _fusionCache.Clear();
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private (bool SkipDistributedAndNotifications, string[] Tags) GetMetadata(Type rootEntityType, IDbQueryCacheKey cacheKey)
+        private (bool SkipDistributedAndNotifications, string[] Tags) GetMetadata(Type rootEntityType, Guid? transactionId, DbContextId? dependentDbContext)
         {
-            if (ShoudSkipDistributed(cacheKey))
+            if (ShoudSkipDistributed(transactionId, dependentDbContext))
             {
                 // we don't bother to check if dataToCache is null to prevent calling l2 cache on every dispose/reset
+
+                if (transactionId.HasValue)
+                {
+                    return (true, [_dbContextCacheTag, GetTransactionCacheTag(transactionId.Value), GetTypeCacheTag(rootEntityType)]);
+                }
 
                 return (true, [_dbContextCacheTag, GetTypeCacheTag(rootEntityType)]);
             }
@@ -151,35 +204,39 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool ShoudSkipDistributed(IDbQueryCacheKey cacheKey)
-            => cacheKey.DependentDbContext.HasValue;
+        private static bool ShoudSkipDistributed(Guid? transactionId, DbContextId? dependentDbContext)
+            => transactionId.HasValue || dependentDbContext.HasValue;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache(Type rootEntityType, IDbQueryCacheKey key, object? dataToCache)
+        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
         {
-            var stringKey = key.Stringify();
+            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
 
-            var metadata = GetMetadata(rootEntityType, key);
+            var stringKey = GetKey(key, transactionId);
+
+            var metadata = GetMetadata(rootEntityType, transactionId, key.DependentDbContext);
 
             if (metadata.SkipDistributedAndNotifications)
             {
-                _fusionCache.Set(stringKey, dataToCache, options =>
+                _fusionCache.Set<T?>(stringKey, dataToCache, options =>
                 {
                     options.SetSkipDistributedCache(true, true);
                 }, tags: metadata.Tags);
             }
             else
             {
-                _fusionCache.Set(stringKey, dataToCache, tags: metadata.Tags);
+                _fusionCache.Set<T?>(stringKey, dataToCache, tags: metadata.Tags);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
         {
-            var stringKey = key.Stringify();
+            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
 
-            var maybeFromCache = ShoudSkipDistributed(key) 
+            var stringKey = GetKey(key, transactionId);
+
+            var maybeFromCache = ShoudSkipDistributed(transactionId, key.DependentDbContext)
                 ? _fusionCache.TryGet<T>(stringKey, options => options.SetSkipDistributedCache(true, true))
                 : _fusionCache.TryGet<T>(stringKey);
 
@@ -196,11 +253,13 @@ namespace CachedEfCore.Caching.FusionCache.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
         {
-            var stringKey = key.Stringify();
+            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
+
+            var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;
 
-            var metadata = GetMetadata(rootEntityType, key);
+            var metadata = GetMetadata(rootEntityType, transactionId, key.DependentDbContext);
 
             var result = metadata.SkipDistributedAndNotifications
                 ? _fusionCache.GetOrSet<T>(stringKey, CreateFunc, options => options.SetSkipDistributedCache(true, true), tags: metadata.Tags)
@@ -227,15 +286,17 @@ namespace CachedEfCore.Caching.FusionCache.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
         {
-            var stringKey = key.Stringify();
+            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
+
+            var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;
 
-            var metadata = GetMetadata(rootEntityType, key);
+            var metadata = GetMetadata(rootEntityType, transactionId, key.DependentDbContext);
 
             var result = metadata.SkipDistributedAndNotifications
-                ? await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, options => options.SetSkipDistributedCache(true, true), tags: metadata.Tags)
-                : await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, tags: metadata.Tags);
+                ? await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, options => options.SetSkipDistributedCache(true, true), tags: metadata.Tags).ConfigureAwait(false)
+                : await _fusionCache.GetOrSetAsync<T>(stringKey, CreateFunc, tags: metadata.Tags).ConfigureAwait(false);
 
             if (isCacheHit)
             {

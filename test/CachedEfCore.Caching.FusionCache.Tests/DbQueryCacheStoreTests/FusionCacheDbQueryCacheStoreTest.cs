@@ -3,7 +3,7 @@ using CachedEfCore.Caching.FusionCache.Configuration;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.Caching.Specification.Tests.DbQueryCacheStoreTests;
 using CachedEfCore.DependencyInjection;
-using CachedEfCore.SqlServer.Configuration;
+using CachedEfCore.PostgreSQL.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
 using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
@@ -20,16 +20,16 @@ using ZiggyCreatures.Caching.Fusion.Backplane.Memory;
 
 namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 {
-    public class FusionCacheDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
+    public class FusionCacheDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<PostgreSqlTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
-        private readonly SqlServerTestContainer _sqlServerTestContainer;
+        private readonly PostgreSqlTestContainer _postgreSqlTestContainer;
 
         public FusionCacheDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture,
-            SqlServerTestContainer sqlServerTestContainer)
+            PostgreSqlTestContainer postgreSqlTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
-            _sqlServerTestContainer = sqlServerTestContainer;
+            _postgreSqlTestContainer = postgreSqlTestContainer;
         }
 
         protected override IServiceProvider CreateProvider(bool withLazyLoading)
@@ -48,7 +48,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 
                        options.UseLazyLoadingProxies(withLazyLoading);
 
-                       options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
+                       options.UseNpgsql(_postgreSqlTestContainer.ConnectionString);
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
@@ -60,7 +60,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                                });
                            });
 
-                           cachedEfCoreOptions.UseSqlServer();
+                           cachedEfCoreOptions.UsePostgreSql();
                        });
                    });
                });
@@ -76,7 +76,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
 
                    options.UseLazyLoadingProxies(withLazyLoading);
 
-                   options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
+                   options.UseNpgsql(_postgreSqlTestContainer.ConnectionString);
 
                    options.UseCachedEfCore(cachedEfCoreOptions =>
                    {
@@ -92,7 +92,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                            });
                        });
 
-                       cachedEfCoreOptions.UseSqlServer();
+                       cachedEfCoreOptions.UsePostgreSql();
                    });
                });
            });
@@ -138,6 +138,45 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
         public override async Task Reports_Cache_Metrics(Func<DbContext, IDbQueryCacheStore, IDbQueryCacheKey, Type, ValueTask> getFromCache)
         {
             await base.Reports_Cache_Metrics(getFromCache);
+        }
+
+        [Fact]
+        public async Task Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction()
+        {
+            var memoryBackplane = new MemoryBackplane(Options.Create(new MemoryBackplaneOptions()));
+            var distributedCache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+            var provider1 = CreateProvider(true, distributedCache, memoryBackplane, false);
+
+            var dbContext1 = provider1.GetRequiredService<TestDbContext>();
+
+            var cacheKey = new TestCacheKey
+            {
+                Key = $"{nameof(Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction)}BackplaneCacheKeyAddToCache",
+            };
+
+            using (var transaction = await dbContext1.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
+            {
+                var dbQueryCacheStore1 = dbContext1.GetService<IDbQueryCacheStore>();
+                dbQueryCacheStore1.RemoveAll();
+
+                string valueToCache = nameof(Should_Not_Get_From_Distributed_Cache_When_Is_Inside_Transaction);
+                
+                var rootType = typeof(object); // any type
+
+                dbQueryCacheStore1.AddToCache(rootType, cacheKey, valueToCache);
+
+                var cached = dbQueryCacheStore1.GetCached<string>(cacheKey);
+                Assert.Same(valueToCache, cached);
+            }
+
+            var provider2 = CreateProvider(true, distributedCache, memoryBackplane, true);
+
+            var dbContext2 = provider2.GetRequiredService<TestDbContext>();
+
+            var dbQueryCacheStore2 = dbContext2.GetService<IDbQueryCacheStore>();
+
+            var cached2 = dbQueryCacheStore2.GetCached<string>(cacheKey);
+            Assert.Null(cached2);
         }
 
         [Fact]

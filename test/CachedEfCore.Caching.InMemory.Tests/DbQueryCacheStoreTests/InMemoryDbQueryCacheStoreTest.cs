@@ -65,7 +65,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
 
-            var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             dbQueryCacheStore.RemoveAll();
@@ -102,7 +102,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-            var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             dbQueryCacheStore.RemoveAll();
@@ -145,7 +145,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-            var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
@@ -182,7 +182,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             using var scope = serviceProvider.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
-            var dbQueryCacheInternalStore = (DbQueryCacheInMemoryInternalStore)dbContext.GetService<IDbQueryCacheInMemoryInternalStore>();
+            var dbQueryCacheInternalStore = dbContext.GetService<DbQueryCacheInMemoryInternalStore>();
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
             var dataToCache = new LazyLoadEntity();
