@@ -8,6 +8,7 @@ using System;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,8 +16,8 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 {
     public abstract class DbQueryCacheHelperSpecificationTest
     {
-        protected abstract IServiceProvider CreatePooledProvider(bool withLazyLoading);
-        protected abstract IServiceProvider CreateProvider(bool withLazyLoading);
+        protected abstract IServiceProvider CreatePooledProvider(bool withLazyLoading, [CallerMemberName] string caller = "");
+        protected abstract IServiceProvider CreateProvider(bool withLazyLoading, [CallerMemberName] string caller = "");
 
         public abstract Task GetOrAdd_Adds_And_Gets_From_Cache(object valueToCache, bool isDbContextDependent);
 
@@ -465,9 +466,10 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
             Func<TestDbContext, IsolationLevel, bool, CancellationToken, Task<IDbContextTransaction>> createTransaction,
             Func<TestDbContext, NonLazyLoadEntity, IDbContextTransaction, bool, CancellationToken, Task> saveFunction,
             Func<TestDbContext, IDbContextTransaction, bool, CancellationToken, Task> function,
-            bool async)
+            bool async,
+            [CallerMemberName] string caller = "")
         {
-            var serviceProvider = CreatePooledProvider(true);
+            var serviceProvider = CreatePooledProvider(true, caller);
 
             var entities = Enumerable.Range(0, configuration.Iterations).Select(static x => new NonLazyLoadEntity
             {

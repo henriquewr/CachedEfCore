@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace CachedEfCore.Caching.FusionCache.Benchmarks
 {
@@ -24,9 +25,12 @@ namespace CachedEfCore.Caching.FusionCache.Benchmarks
             var services = new ServiceCollection();
 
             services.AddCachedEfCore();
+            services.AddFusionCache();
 
-            services.AddDbContext<TestDbContext>(options =>
+            services.AddDbContext<TestDbContext>((serviceProvider, options) =>
             {
+                var fusionCache = serviceProvider.GetRequiredService<IFusionCache>();
+
                 options.UseSqlServer(connectionString);
 
                 options.UseCachedEfCore(cachedEfCoreOptions =>
@@ -34,10 +38,7 @@ namespace CachedEfCore.Caching.FusionCache.Benchmarks
                     cachedEfCoreOptions.UseSqlServer();
                     cachedEfCoreOptions.UseFusionCacheStore(conf =>
                     {
-                        conf.ConfigureRegistration(fusionCacheServices =>
-                        {
-                            fusionCacheServices.AddFusionCache();
-                        });
+                        conf.UseInstance(fusionCache);
                     });
                 });
             });

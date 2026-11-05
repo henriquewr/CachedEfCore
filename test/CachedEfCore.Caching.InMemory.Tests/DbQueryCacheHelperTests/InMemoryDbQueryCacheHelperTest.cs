@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -29,7 +30,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
             _sqlServerTestContainer = sqlServerTestContainer;
         }
 
-        protected override IServiceProvider CreateProvider(bool withLazyLoading)
+        protected override IServiceProvider CreateProvider(bool withLazyLoading, [CallerMemberName] string caller = "")
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
@@ -49,7 +50,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheHelperTests
                 });
             });
 
-        protected override IServiceProvider CreatePooledProvider(bool withLazyLoading)
+        protected override IServiceProvider CreatePooledProvider(bool withLazyLoading, [CallerMemberName] string caller = "")
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
