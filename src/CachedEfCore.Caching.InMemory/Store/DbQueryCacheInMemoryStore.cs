@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Cache.EventData;
-using CachedEfCore.Cache.Metrics;
+﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -14,17 +13,6 @@ namespace CachedEfCore.Caching.InMemory.Store
         private readonly DbContext _dbContext;
         private readonly IDbQueryCacheMetrics _metrics;
         private readonly DbContextId _dbContextId;
-
-        public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities
-        {
-            add => _dbQueryCacheStore.OnInvalidatingRootEntities += value;
-            remove => _dbQueryCacheStore.OnInvalidatingRootEntities -= value;
-        }
-        public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities
-        {
-            add => _dbQueryCacheStore.OnInvalidatingDependentEntities += value;
-            remove => _dbQueryCacheStore.OnInvalidatingDependentEntities -= value;
-        }
 
         public DbQueryCacheInMemoryStore(DbContext dbContext)
         {
@@ -70,22 +58,52 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllByTransactionId(Guid transactionId)
             => _dbQueryCacheStore.RemoveAllByTransactionId(transactionId);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllByTransactionIdAsync(Guid transactionId)
+        {
+            _dbQueryCacheStore.RemoveAllByTransactionId(transactionId);
+            return ValueTask.CompletedTask;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllDbContextDependent(DbContextId dbContextId)
             => _dbQueryCacheStore.RemoveAllDbContextDependent(dbContextId);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllDbContextDependentAsync(DbContextId dbContextId)
+        {
+            _dbQueryCacheStore.RemoveAllDbContextDependent(dbContextId);
+            return ValueTask.CompletedTask;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true) 
-            => _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, _dbContext, fireEvent);
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove) 
+            => _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, _dbContext);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveRootEntitiesAsync(HashSet<IEntityType> entitiesToRemove)
+        {
+            _dbQueryCacheStore.RemoveRootEntities(entitiesToRemove, _dbContext);
+            return ValueTask.CompletedTask;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
-            => _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove, _dbContext, fireEvent);
+        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
+            => _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveDependentEntitiesAsync(HashSet<IEntityType> entitiesToRemove)
+        {
+            _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove);
+            return ValueTask.CompletedTask;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll()
             => _dbQueryCacheStore.RemoveAll();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllAsync()
+        {
+            _dbQueryCacheStore.RemoveAll();
+            return ValueTask.CompletedTask;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
