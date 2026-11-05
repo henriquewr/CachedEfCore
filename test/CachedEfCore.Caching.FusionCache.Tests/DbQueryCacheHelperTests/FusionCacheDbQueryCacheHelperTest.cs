@@ -10,8 +10,12 @@ using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
+using ZiggyCreatures.Caching.Fusion;
+using ZiggyCreatures.Caching.Fusion.Backplane.Memory;
 
 namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
 {
@@ -27,10 +31,34 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
             _postgreSqlTestContainer = postgreSqlTestContainer;
         }
 
-        protected override IServiceProvider CreateProvider(bool withLazyLoading)
+        private static readonly ConcurrentDictionary<string, IFusionCache> _fusionCacheInstances = new();
+
+        private static IFusionCache GetInstance(string key)
+        {
+            var fusionCache = _fusionCacheInstances.GetOrAdd(key, static key =>
+            {
+                var cache = new ZiggyCreatures.Caching.Fusion.FusionCache(new FusionCacheOptions
+                {
+                    CacheName = key,
+                    RemoveByTagBehavior = RemoveByTagBehavior.Remove,
+                });
+                var backplane = new MemoryBackplane(new MemoryBackplaneOptions());
+
+                cache.SetupBackplane(backplane);
+                return cache;
+            });
+
+            fusionCache.Clear();
+
+            return fusionCache;
+        }
+
+        protected override IServiceProvider CreateProvider(bool withLazyLoading, [CallerMemberName] string caller = "")
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
+
+                var fusionCache = GetInstance(caller);
 
                 services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                 {
@@ -42,11 +70,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                     {
                         cachedEfCoreOptions.UseFusionCacheStore(options =>
                         {
-                            options.ConfigureRegistration(fusionCacheServices =>
-                            {
-                                fusionCacheServices.AddFusionCache();
-                                fusionCacheServices.AddFusionCacheMemoryBackplane();
-                            });
+                            options.UseInstance(fusionCache);
                         });
 
                         cachedEfCoreOptions.UsePostgreSql();
@@ -54,10 +78,12 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                 });
             });
 
-        protected override IServiceProvider CreatePooledProvider(bool withLazyLoading)
+        protected override IServiceProvider CreatePooledProvider(bool withLazyLoading, [CallerMemberName] string caller = "")
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
+
+                var fusionCache = GetInstance(caller);
 
                 services.AddDbContextPool<TestDbContext>((serviceProvider, options) =>
                 {
@@ -69,12 +95,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                     {
                         cachedEfCoreOptions.UseFusionCacheStore(options =>
                         {
-                            options.ConfigureRegistration(fusionCacheServices =>
-                            {
-                                fusionCacheServices.AddFusionCache();
-
-                                fusionCacheServices.AddFusionCacheMemoryBackplane();
-                            });
+                            options.UseInstance(fusionCache);
                         });
 
                         cachedEfCoreOptions.UsePostgreSql();
@@ -96,6 +117,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
         public override async Task GetOrAdd_Adds_And_Gets_From_Cache(object valueToCache, bool isDbContextDependent)
         {
             var serviceProvider = CreateProvider(true);
+            var serviceProvider2 = CreateProvider(true);
 
             var dbContext = serviceProvider.GetRequiredService<TestDbContext>();
 
@@ -137,8 +159,6 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
             Assert.Same(valueToCache, cached);
 
             {
-                var serviceProvider2 = CreateProvider(true);
-
                 var dbContext2 = serviceProvider2.GetRequiredService<TestDbContext>();
 
                 var dbQueryCacheHelper2 = serviceProvider2.GetRequiredService<IDbQueryCacheHelper>();

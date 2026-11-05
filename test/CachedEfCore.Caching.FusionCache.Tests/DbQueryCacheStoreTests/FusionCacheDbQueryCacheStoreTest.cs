@@ -54,10 +54,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                        {
                            cachedEfCoreOptions.UseFusionCacheStore(options =>
                            {
-                               options.ConfigureRegistration(fusionCacheServices =>
-                               {
-                                   fusionCacheServices.AddSingleton<IFusionCache>(efCache);
-                               });
+                               options.UseInstance(efCache);
                            });
 
                            cachedEfCoreOptions.UsePostgreSql();
@@ -69,9 +66,16 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
            => _serviceProviderFixture.CreateProvider(services =>
            {
                services.AddCachedEfCore();
+               services.AddFusionCache()
+                .WithBackplane(memoryBackplane)
+                .WithDistributedCache(distributedCache)
+                .WithSystemTextJsonSerializer()
+                .WithDefaultEntryOptions(x => x.SetSkipMemoryCache(skipMemoryCache));
 
                services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                {
+                   var fusionCache = serviceProvider.GetRequiredService<IFusionCache>();
+
                    options.EnableServiceProviderCaching(false);
 
                    options.UseLazyLoadingProxies(withLazyLoading);
@@ -82,14 +86,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                    {
                        cachedEfCoreOptions.UseFusionCacheStore(options =>
                        {
-                           options.ConfigureRegistration(fusionCacheServices =>
-                           {
-                               fusionCacheServices.AddFusionCache()
-                                .WithBackplane(memoryBackplane)
-                                .WithDistributedCache(distributedCache)
-                                .WithSystemTextJsonSerializer()
-                                .WithDefaultEntryOptions(x => x.SetSkipMemoryCache(skipMemoryCache));
-                           });
+                           options.UseInstance(fusionCache);
                        });
 
                        cachedEfCoreOptions.UsePostgreSql();
