@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Cache.EventData;
-using CachedEfCore.Cache.Metrics;
+﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
@@ -43,10 +42,6 @@ namespace CachedEfCore.Caching.InMemory.Store
                 ? new InMemoryKeyWithTransaction(existingKey, transactionId.Value)
                 : existingKey;
         }
-
-        public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
-
-        public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
         public void RemoveAllByTransactionId(Guid transactionId)
         {
@@ -102,18 +97,9 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
         }
 
-        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true)
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext)
         {
-            if (fireEvent && OnInvalidatingRootEntities is not null)
-            {
-                OnInvalidatingRootEntities.Invoke(new OnInvalidatingRootEntities
-                {
-                    Entities = entitiesToRemove,
-                    DbContext = dbContext
-                });
-            }
-
-            var typesToRemove = new HashSet<IEntityType>();
+            var typesToRemove = new HashSet<IEntityType>(32);
 
             var dependencyManager = dbContext.GetService<EntityDependency>();
 
@@ -122,20 +108,11 @@ namespace CachedEfCore.Caching.InMemory.Store
                 typesToRemove.UnionWith(dependencyManager.GetUpperRelatedEntities(typeToRemove));
             }
 
-            RemoveDependentEntities(typesToRemove, dbContext, fireEvent);
+            RemoveDependentEntities(typesToRemove);
         }
 
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, DbContext dbContext, bool fireEvent = true)
+        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
         {
-            if (fireEvent && OnInvalidatingDependentEntities is not null)
-            {
-                OnInvalidatingDependentEntities.Invoke(new OnInvalidatingDependentEntities
-                {
-                    Entities = entitiesToRemove,
-                    DbContext = dbContext
-                });
-            }
-
             var l_typeKeys = _typeKeys;
 
             foreach (var item in entitiesToRemove)

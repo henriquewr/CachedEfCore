@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -49,6 +50,20 @@ namespace CachedEfCore.Interceptors
                 }
             }
         }
+        private async ValueTask TryRemoveCommitedTransactionDataAsync(DbContext? dbContext)
+        {
+            if (dbContext is not null && _conditionalWeakTable.Remove(dbContext, out var transactionData))
+            {
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+                await dbQueryCacheStore.RemoveAllByTransactionIdAsync(transactionData.TransactionId).ConfigureAwait(false);
+
+                if (transactionData.StateChangingEntities.Count != 0)
+                {
+                    await dbQueryCacheStore.RemoveRootEntitiesAsync(transactionData.StateChangingEntities).ConfigureAwait(false);
+                }
+            }
+        }
 
         private void TryRemoveUncommitedTransactionData(DbContext? dbContext)
         {
@@ -57,6 +72,15 @@ namespace CachedEfCore.Interceptors
                 var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
 
                 dbQueryCacheStore.RemoveAllByTransactionId(transactionData.TransactionId);
+            }
+        }
+        private async ValueTask TryRemoveUncommitedTransactionDataAsync(DbContext? dbContext)
+        {
+            if (dbContext is not null && _conditionalWeakTable.Remove(dbContext, out var transactionData))
+            {
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+                await dbQueryCacheStore.RemoveAllByTransactionIdAsync(transactionData.TransactionId).ConfigureAwait(false);
             }
         }
 
@@ -114,56 +138,48 @@ namespace CachedEfCore.Interceptors
         {
             TryRemoveCommitedTransactionData(eventData.Context);
         }
-        public Task TransactionCommittedAsync(
+        public async Task TransactionCommittedAsync(
             DbTransaction transaction,
             TransactionEndEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            TryRemoveCommitedTransactionData(eventData.Context);
-
-            return Task.CompletedTask;
+            await TryRemoveCommitedTransactionDataAsync(eventData.Context).ConfigureAwait(false);
         }
 
         public void TransactionRolledBack(DbTransaction transaction, TransactionEndEventData eventData)
         {
             TryRemoveUncommitedTransactionData(eventData.Context);
         }
-        public Task TransactionRolledBackAsync(
+        public async Task TransactionRolledBackAsync(
             DbTransaction transaction,
             TransactionEndEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            TryRemoveUncommitedTransactionData(eventData.Context);
-
-            return Task.CompletedTask;
+            await TryRemoveUncommitedTransactionDataAsync(eventData.Context).ConfigureAwait(false);
         }
 
         public void RolledBackToSavepoint(DbTransaction transaction, TransactionEventData eventData)
         {
             TryRemoveUncommitedTransactionData(eventData.Context);
         }
-        public Task RolledBackToSavepointAsync(
+        public async Task RolledBackToSavepointAsync(
             DbTransaction transaction,
             TransactionEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            TryRemoveUncommitedTransactionData(eventData.Context);
-
-            return Task.CompletedTask;
+            await TryRemoveUncommitedTransactionDataAsync(eventData.Context).ConfigureAwait(false);
         }
 
         public void TransactionFailed(DbTransaction transaction, TransactionErrorEventData eventData)
         {
             TryRemoveUncommitedTransactionData(eventData.Context);
         }
-        public Task TransactionFailedAsync(
+        public async Task TransactionFailedAsync(
             DbTransaction transaction,
             TransactionErrorEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            TryRemoveUncommitedTransactionData(eventData.Context);
-
-            return Task.CompletedTask;
+            await TryRemoveUncommitedTransactionDataAsync(eventData.Context).ConfigureAwait(false);
         }
 
         #endregion Transactions
@@ -174,11 +190,11 @@ namespace CachedEfCore.Interceptors
 
             return result;
         }
-        public ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+        public async ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
         {
-            CommandExecuted(command.CommandText, eventData.Context, eventData.CommandSource);
+            await CommandExecutedAsync(command.CommandText, eventData.Context, eventData.CommandSource).ConfigureAwait(false);
 
-            return new(result);
+            return result;
         }
 
         public DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
@@ -187,11 +203,11 @@ namespace CachedEfCore.Interceptors
 
             return result;
         }
-        public ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+        public async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
         {
-            CommandExecuted(command.CommandText, eventData.Context, eventData.CommandSource);
+            await CommandExecutedAsync(command.CommandText, eventData.Context, eventData.CommandSource).ConfigureAwait(false);
 
-            return new(result);
+            return result;
         }
 
         public object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
@@ -200,18 +216,20 @@ namespace CachedEfCore.Interceptors
 
             return result;
         }
-        public ValueTask<object?> ScalarExecutedAsync(DbCommand command, CommandExecutedEventData eventData, object? result, CancellationToken cancellationToken = default)
+        public async ValueTask<object?> ScalarExecutedAsync(DbCommand command, CommandExecutedEventData eventData, object? result, CancellationToken cancellationToken = default)
         {
-            CommandExecuted(command.CommandText, eventData.Context, eventData.CommandSource);
+            await CommandExecutedAsync(command.CommandText, eventData.Context, eventData.CommandSource).ConfigureAwait(false);
 
-            return new(result);
+            return result;
         }
 
-        private void CommandExecuted(string command, DbContext? context, CommandSource commandSource)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryGetStateChangingEntities(string command, [NotNullWhen(true)] DbContext? context, CommandSource commandSource, [NotNullWhen(true)] out HashSet<IEntityType>? stateChangingEntities)
         {
             if (context is null)
             {
-                return;
+                stateChangingEntities = null;
+                return false;
             }
 
             switch (commandSource)
@@ -219,28 +237,41 @@ namespace CachedEfCore.Interceptors
                 case CommandSource.Migrations:
                 case CommandSource.Unknown:
                 case CommandSource.LinqQuery:
-                    return;
+                    {
+                        stateChangingEntities = null;
+                        return false;
+                    }
 
                 case CommandSource.SaveChanges:
-                    var modifiedEntities = context.ChangeTracker.Entries().Where(static x => x.State != EntityState.Unchanged);
-                    var modifiedEntitiesTypes = modifiedEntities
-                      .Select(static e => e.Metadata)
-                      .ToHashSet();
+                    {
+                        var modifiedEntities = context.ChangeTracker.Entries().Where(static x => x.State != EntityState.Unchanged);
+                        stateChangingEntities = modifiedEntities
+                          .Select(static e => e.Metadata)
+                          .ToHashSet();
 
-                    Invalidate(_conditionalWeakTable, context, modifiedEntitiesTypes);
-
-                    return;
+                        return stateChangingEntities.Count != 0;
+                    }
 
                 case CommandSource.ExecuteUpdate:
                 case CommandSource.ExecuteDelete:
                 case CommandSource.ExecuteSqlRaw:
                 case CommandSource.FromSqlQuery:
                 default:
-                    var tableEntityMapping = context.GetService<TableEntityMapping>();
+                    {
+                        var tableEntityMapping = context.GetService<TableEntityMapping>();
 
-                    var stateChangingEntities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntityMapping, command).ToHashSet();
-                    Invalidate(_conditionalWeakTable, context, stateChangingEntities);
-                return;
+                        stateChangingEntities = _sqlQueryEntityExtractor.GetStateChangingEntityTypesFromSql(tableEntityMapping, command).ToHashSet();
+
+                        return stateChangingEntities.Count != 0;
+                    }
+            }
+        }
+
+        private void CommandExecuted(string command, DbContext? context, CommandSource commandSource)
+        {
+            if (TryGetStateChangingEntities(command, context, commandSource, out var stateChangingEntities))
+            {
+                Invalidate(_conditionalWeakTable, context, stateChangingEntities);
             }
 
             static void Invalidate(
@@ -268,6 +299,43 @@ namespace CachedEfCore.Interceptors
                 else
                 {
                     dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
+                }
+            }
+        }
+
+        private async ValueTask CommandExecutedAsync(string command, DbContext? context, CommandSource commandSource)
+        {
+            if (TryGetStateChangingEntities(command, context, commandSource, out var stateChangingEntities))
+            {
+                await InvalidateAsync(_conditionalWeakTable, context, stateChangingEntities).ConfigureAwait(false);
+            }
+
+            static async ValueTask InvalidateAsync(
+                ConditionalWeakTable<DbContext, TransactionState> conditionalWeakTable, 
+                DbContext dbContext,
+                HashSet<IEntityType> stateChangingEntities)
+            {
+                if (stateChangingEntities.Count == 0)
+                {
+                    return;
+                }
+
+                var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
+
+                if (conditionalWeakTable.TryGetValue(dbContext, out var transactionState))
+                {
+                    transactionState.StateChangingEntities.UnionWith(stateChangingEntities);
+
+                    await dbQueryCacheStore.RemoveAllByTransactionIdAsync(transactionState.TransactionId).ConfigureAwait(false);
+
+                    if (transactionState.CanHaveDirtyReads)
+                    {
+                        await dbQueryCacheStore.RemoveRootEntitiesAsync(stateChangingEntities).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    await dbQueryCacheStore.RemoveRootEntitiesAsync(stateChangingEntities).ConfigureAwait(false);
                 }
             }
         }

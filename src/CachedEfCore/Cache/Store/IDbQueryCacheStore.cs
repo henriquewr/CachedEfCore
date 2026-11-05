@@ -1,4 +1,3 @@
-using CachedEfCore.Cache.EventData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -10,14 +9,20 @@ namespace CachedEfCore.Cache.Store
 {
     public interface IDbQueryCacheStore : IResettableService, IDisposable, IAsyncDisposable
     {
-        event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
-        event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
-
         void RemoveAllByTransactionId(Guid transactionId);
+        ValueTask RemoveAllByTransactionIdAsync(Guid transactionId);
+
         void RemoveAllDbContextDependent(DbContextId dbContextId);
-        void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
-        void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true);
+        ValueTask RemoveAllDbContextDependentAsync(DbContextId dbContextId);
+
+        void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove);
+        ValueTask RemoveRootEntitiesAsync(HashSet<IEntityType> entitiesToRemove);
+
+        void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove);
+        ValueTask RemoveDependentEntitiesAsync(HashSet<IEntityType> entitiesToRemove);
+
         void RemoveAll();
+        ValueTask RemoveAllAsync();
 
         void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache);
         T? GetCached<T>(IDbQueryCacheKey key);

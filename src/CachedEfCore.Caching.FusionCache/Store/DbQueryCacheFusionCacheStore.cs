@@ -1,5 +1,4 @@
-﻿using CachedEfCore.Cache.EventData;
-using CachedEfCore.Cache.Metrics;
+﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +18,6 @@ namespace CachedEfCore.Caching.FusionCache.Store
         private readonly IDbQueryCacheMetrics _metrics;
 
         private readonly string _dbContextCacheTag;
-
-        public event Action<IOnInvalidatingRootEntities>? OnInvalidatingRootEntities;
-        public event Action<IOnInvalidatingDependentEntities>? OnInvalidatingDependentEntities;
 
         private static string GetTransactionCacheTag(in Guid transactionId)
             => $"Tran:{transactionId}";
@@ -128,11 +124,21 @@ namespace CachedEfCore.Caching.FusionCache.Store
         {
             _fusionCache.RemoveByTag(GetTransactionCacheTag(transactionId));
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllByTransactionIdAsync(Guid transactionId)
+        {
+            return _fusionCache.RemoveByTagAsync(GetTransactionCacheTag(transactionId));
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllDbContextDependent(DbContextId dbContextId)
         {
             _fusionCache.RemoveByTag(GetDbContextCacheTag(dbContextId));
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllDbContextDependentAsync(DbContextId dbContextId)
+        {
+            return _fusionCache.RemoveByTagAsync(GetDbContextCacheTag(dbContextId));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -140,20 +146,16 @@ namespace CachedEfCore.Caching.FusionCache.Store
         {
             _fusionCache.Clear();
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveAllAsync()
+        {
+            return _fusionCache.ClearAsync();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
+        public void RemoveRootEntities(HashSet<IEntityType> entitiesToRemove)
         {
-            if (fireEvent && OnInvalidatingRootEntities is not null)
-            {
-                OnInvalidatingRootEntities.Invoke(new OnInvalidatingRootEntities
-                {
-                    Entities = entitiesToRemove,
-                    DbContext = _dbContext
-                });
-            }
-
-            var typesToRemove = new HashSet<IEntityType>();
+            var typesToRemove = new HashSet<IEntityType>(32);
 
             var dependencyManager = _dbContext.GetService<EntityDependency>();
 
@@ -162,24 +164,36 @@ namespace CachedEfCore.Caching.FusionCache.Store
                 typesToRemove.UnionWith(dependencyManager.GetUpperRelatedEntities(typeToRemove));
             }
 
-            RemoveDependentEntities(typesToRemove, fireEvent);
+            RemoveDependentEntities(typesToRemove);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveRootEntitiesAsync(HashSet<IEntityType> entitiesToRemove)
+        {
+            var typesToRemove = new HashSet<IEntityType>(32);
+
+            var dependencyManager = _dbContext.GetService<EntityDependency>();
+
+            foreach (var typeToRemove in entitiesToRemove)
+            {
+                typesToRemove.UnionWith(dependencyManager.GetUpperRelatedEntities(typeToRemove));
+            }
+
+            return RemoveDependentEntitiesAsync(typesToRemove);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove, bool fireEvent = true)
+        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
         {
-            if (fireEvent && OnInvalidatingDependentEntities is not null)
-            {
-                OnInvalidatingDependentEntities.Invoke(new OnInvalidatingDependentEntities
-                {
-                    Entities = entitiesToRemove,
-                    DbContext = _dbContext
-                });
-            }
-
             var tags = entitiesToRemove.Select(GetEntityCacheTag);
 
             _fusionCache.RemoveByTag(tags);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask RemoveDependentEntitiesAsync(HashSet<IEntityType> entitiesToRemove)
+        {
+            var tags = entitiesToRemove.Select(GetEntityCacheTag);
+
+            return _fusionCache.RemoveByTagAsync(tags);
         }
 
 
