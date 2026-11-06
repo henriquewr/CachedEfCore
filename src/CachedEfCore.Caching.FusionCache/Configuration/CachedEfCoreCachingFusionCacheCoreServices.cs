@@ -1,10 +1,10 @@
 ﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.FusionCache.DbContextOptionExtensions;
 using CachedEfCore.Caching.FusionCache.Store;
 using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using ZiggyCreatures.Caching.Fusion;
 
 namespace CachedEfCore.Caching.FusionCache.Configuration
 {
@@ -14,13 +14,15 @@ namespace CachedEfCore.Caching.FusionCache.Configuration
         {
             yield return new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Scoped<IDbQueryCacheStore>(sp =>
+                ServiceDescriptor = ServiceDescriptor.Scoped<IDbQueryCacheStore>(static sp =>
                 {
                     var dbContext = sp.GetRequiredService<ICurrentDbContext>().Context;
-                    var fusionCache = dbContext.GetService<IFusionCache>();
                     var metrics = dbContext.GetService<IDbQueryCacheMetrics>();
 
-                    return new DbQueryCacheFusionCacheStore(dbContext, fusionCache, metrics);
+                    var fusionCacheExtension = dbContext.GetService<IDbContextOptions>()
+                        .FindExtension<CachedEfCoreFusionCacheExtension>()!;
+
+                    return new DbQueryCacheFusionCacheStore(dbContext, fusionCacheExtension.FusionCache, metrics);
                 }),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,

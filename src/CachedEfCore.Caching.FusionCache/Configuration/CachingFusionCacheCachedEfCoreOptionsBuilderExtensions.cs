@@ -1,4 +1,6 @@
-﻿using CachedEfCore.Configuration;
+﻿using CachedEfCore.Caching.FusionCache.DbContextOptionExtensions;
+using CachedEfCore.Configuration;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace CachedEfCore.Caching.FusionCache.Configuration
 {
@@ -8,15 +10,12 @@ namespace CachedEfCore.Caching.FusionCache.Configuration
         {
             public CachedEfCoreOptionsBuilder UseFusionCacheStore(Action<CachedEfCoreCachingFusionCacheOptionsBuilder>? configure = null)
             {
-                foreach (var item in CachedEfCoreCachingFusionCacheCoreServices.GetCoreServices())
-                {
-                    builder.CachedEfCoreExtension.AddService(item);
-                }
+                var extension = new CachedEfCoreFusionCacheExtension(builder.DbContextOptionsBuilder);
 
-                var optionsBuilder = new CachedEfCoreCachingFusionCacheOptionsBuilder(builder.CachedEfCoreExtension);
+                var optionsBuilder = new CachedEfCoreCachingFusionCacheOptionsBuilder(extension);
                 configure?.Invoke(optionsBuilder);
 
-                optionsBuilder.Validate();
+                ((IDbContextOptionsBuilderInfrastructure)builder.DbContextOptionsBuilder).AddOrUpdateExtension(extension);
 
                 return builder;
             }

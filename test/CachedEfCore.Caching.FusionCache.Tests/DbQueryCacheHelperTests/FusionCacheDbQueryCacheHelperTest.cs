@@ -31,9 +31,9 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
             _postgreSqlTestContainer = postgreSqlTestContainer;
         }
 
-        private static readonly ConcurrentDictionary<string, IFusionCache> _fusionCacheInstances = new();
+        private readonly ConcurrentDictionary<string, IFusionCache> _fusionCacheInstances = new();
 
-        private static IFusionCache GetInstance(string key)
+        private IFusionCache GetInstance(string key)
         {
             var fusionCache = _fusionCacheInstances.GetOrAdd(key, static key =>
             {

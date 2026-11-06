@@ -73,10 +73,6 @@ namespace CachedEfCore.DbContextOptionExtensions
 
         public void Validate(IDbContextOptions options)
         {
-            if (_services.Any(x => x.ServiceDescriptor.ServiceType == typeof(IDbQueryCacheStore)) == false)
-            {
-                throw new InvalidOperationException($"The service {nameof(IDbQueryCacheStore)} is required. A common cause is that you did not call any cache provider, e.g., {nameof(CachedEfCoreOptionsBuilder)}.UseInMemoryCacheStore()");
-            }
         }
 
         private sealed class ExtensionInfo : DbContextOptionsExtensionInfo
