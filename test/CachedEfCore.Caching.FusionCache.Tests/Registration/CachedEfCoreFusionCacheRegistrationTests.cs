@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Caching.FusionCache.Configuration;
+using CachedEfCore.Caching.FusionCache.DbContextOptionExtensions;
 using CachedEfCore.Caching.Specification.Tests.Common;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.PostgreSQL.Configuration;
@@ -13,7 +14,6 @@ namespace CachedEfCore.Caching.FusionCache.Tests.Registration
 {
     public class CachedEfCoreFusionCacheRegistrationTests
     {
-
         private static IServiceProvider Register(IFusionCache fusionCache)
         {
             var services = new ServiceCollection();
@@ -59,8 +59,11 @@ namespace CachedEfCore.Caching.FusionCache.Tests.Registration
                 var firstDbContext = firstProviderScope.ServiceProvider.GetRequiredService<TestDbContext>();
                 var secondDbContext = secondProviderScope.ServiceProvider.GetRequiredService<TestDbContext>();
 
-                var firstDbContextCache = firstDbContext.GetService<IFusionCache>();
-                var secondDbContextCache = secondDbContext.GetService<IFusionCache>();
+                var firstDbContextCache = firstDbContext.GetService<IDbContextOptions>()
+                        .FindExtension<CachedEfCoreFusionCacheExtension>()!.FusionCache;
+
+                var secondDbContextCache = secondDbContext.GetService<IDbContextOptions>()
+                        .FindExtension<CachedEfCoreFusionCacheExtension>()!.FusionCache;
 
                 Assert.Same(firstCache, firstDbContextCache);
                 Assert.Same(secondCache, secondDbContextCache);

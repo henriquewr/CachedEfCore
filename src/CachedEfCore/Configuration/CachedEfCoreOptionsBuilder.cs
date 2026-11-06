@@ -1,5 +1,6 @@
 ﻿using CachedEfCore.DbContextOptionExtensions;
 using CachedEfCore.SqlAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Linq;
@@ -9,10 +10,12 @@ namespace CachedEfCore.Configuration
     public class CachedEfCoreOptionsBuilder
     {
         public CachedEfCoreDbContextOptionExtension CachedEfCoreExtension { get; }
+        public DbContextOptionsBuilder DbContextOptionsBuilder { get; }
 
-        public CachedEfCoreOptionsBuilder(CachedEfCoreDbContextOptionExtension cachedEfCoreExtension)
+        public CachedEfCoreOptionsBuilder(CachedEfCoreDbContextOptionExtension cachedEfCoreExtension, DbContextOptionsBuilder dbContextOptionsBuilder)
         {
             CachedEfCoreExtension = cachedEfCoreExtension;
+            DbContextOptionsBuilder = dbContextOptionsBuilder;
         }
 
         public virtual CachedEfCoreOptionsBuilder ConfigureKeyGeneration(Action<CachedEfCoreKeyGenerationOptionsBuilder> configure)
