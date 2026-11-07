@@ -1,10 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
+﻿using CachedEfCore.EntityMapping;
+using Microsoft.EntityFrameworkCore.Metadata;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
 namespace CachedEfCore.DependencyManager
@@ -18,20 +18,24 @@ namespace CachedEfCore.DependencyManager
             return _entityDependencyCache.GetOrAdd(model, key => new(model));
         }
 
-        private readonly FrozenDictionary<Type, IEntityType> _typeEntity;
+        private readonly TypeEntityMapping _typeEntityMapping;
 
         public EntityDependency(IModel dbModel)
         {
-            _typeEntity = dbModel.GetEntityTypes().Select(x => new KeyValuePair<Type, IEntityType>(x.ClrType, x)).DistinctBy(x => x.Key).ToFrozenDictionary();
+            _typeEntityMapping = TypeEntityMapping.GetOrAdd(dbModel);
         }
 
         private IEnumerable<IEntityType> GetAllEntitiesByType(HashSet<Type> propsTypes)
         {
+            var mapping = _typeEntityMapping.Mapping;
             foreach (var item in propsTypes)
             {
-                if (_typeEntity.TryGetValue(item, out var entityType))
+                if (mapping.TryGetValue(item, out var entityType))
                 {
-                    yield return entityType;
+                    foreach (var entity in entityType)
+                    {
+                        yield return entity;
+                    }
                 }
             }
         }
@@ -43,7 +47,7 @@ namespace CachedEfCore.DependencyManager
 
         private static HashSet<Type> GetShallowTypes(Type type)
         {
-            return TypeScanner.GetShallowReferencedTypes(type).ToHashSet();
+            return TypeScanner.GetShallowReferencedTypes(type);
         }
 
         private static FrozenSet<IEntityType> GetEntities(IEnumerable<IEntityType> entities, Func<IEntityType, IEnumerable<IEntityType>> getEntities)
@@ -59,11 +63,11 @@ namespace CachedEfCore.DependencyManager
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryGetIEntityType(Type type, [NotNullWhen(true)] out IEntityType? entityType)
+        private bool TryGetIEntityTypes(Type type, out ImmutableArray<IEntityType> entityTypes)
         {
-            var success = _typeEntity.TryGetValue(type, out entityType) ||
+            var success = _typeEntityMapping.Mapping.TryGetValue(type, out entityTypes) ||
                 //Probably Lazy load proxies
-                (type.BaseType is not null && _typeEntity.TryGetValue(type.BaseType, out entityType));
+                (type.BaseType is not null && _typeEntityMapping.Mapping.TryGetValue(type.BaseType, out entityTypes));
 
             return success;
         }

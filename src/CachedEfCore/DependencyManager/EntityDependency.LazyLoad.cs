@@ -22,9 +22,9 @@ namespace CachedEfCore.DependencyManager
 
             bool result;
 
-            if (TryGetIEntityType(rootType, out var fastEntityType))
+            if (TryGetIEntityTypes(rootType, out var fastEntitiesTypes))
             {
-                result = HasLazyLoad(fastEntityType);
+                result = fastEntitiesTypes.Any(HasLazyLoad);
             }
             else
             {

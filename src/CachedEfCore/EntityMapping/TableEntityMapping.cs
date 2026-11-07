@@ -14,7 +14,7 @@ namespace CachedEfCore.EntityMapping
 
         public static TableEntityMapping GetOrAdd(IModel model)
         {
-            return _tableEntityCache.GetOrAdd(model, key => new(model));
+            return _tableEntityCache.GetOrAdd(model, static (key, model) => new(model), model);
         }
 
         public FrozenDictionary<string, ImmutableArray<IEntityType>> Mapping { get; }
@@ -26,7 +26,7 @@ namespace CachedEfCore.EntityMapping
 
         private static FrozenDictionary<string, ImmutableArray<IEntityType>> GetTableEntity(IModel model)
         {
-            var tableEntity = model.GetEntityTypes().GroupBy(x => x.GetTableName() ?? x.GetViewName()!, StringComparer.OrdinalIgnoreCase).ToFrozenDictionary(k => k.Key, v => v.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
+            var tableEntity = model.GetEntityTypes().GroupBy(static x => x.GetTableName() ?? x.GetViewName()!, StringComparer.OrdinalIgnoreCase).ToFrozenDictionary(static k => k.Key, static v => v.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
             return tableEntity;
         }
     }
