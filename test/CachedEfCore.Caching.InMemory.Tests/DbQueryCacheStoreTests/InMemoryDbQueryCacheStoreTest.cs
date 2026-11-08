@@ -6,6 +6,7 @@ using CachedEfCore.Caching.Specification.Tests.DbQueryCacheStoreTests;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
+using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,13 +17,15 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 {
-    public class InMemoryDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>
+    public class InMemoryDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
+        private readonly SqlServerTestContainer _sqlServerTestContainer;
 
-        public InMemoryDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture)
+        public InMemoryDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture, SqlServerTestContainer sqlServerTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
+            _sqlServerTestContainer = sqlServerTestContainer;
         }
 
         protected override IServiceProvider CreateProvider(bool withLazyLoading)
@@ -34,7 +37,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
                    {
                        options.UseLazyLoadingProxies(withLazyLoading);
 
-                       options.UseInMemoryDatabase("test");
+                       options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
@@ -77,7 +80,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             };
             var rootType = typeof(object); // any type
 
-            dbQueryCacheStore.AddToCache(rootType, cacheKey, valueToCache);
+            dbQueryCacheStore.AddToCache(rootType, cacheKey, null, valueToCache);
 
             if (isDbContextDependent)
             {
@@ -118,7 +121,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             object dbContextDependentValue = "someValue";
 
-            dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, dbContextDependentValue);
+            dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, null, dbContextDependentValue);
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
 
@@ -164,7 +167,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             Parallel.ForEach(keys, parallelOptions, key =>
             {
-                dbQueryCacheStore.AddToCache(rootType, key, dataToCache);
+                dbQueryCacheStore.AddToCache(rootType, key, null, dataToCache);
             });
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
@@ -195,7 +198,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             foreach (var key in keys)
             {
-                dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, dataToCache);
+                dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, null, dataToCache);
             }
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);

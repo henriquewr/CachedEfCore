@@ -106,19 +106,19 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
-            => _dbQueryCacheStore.AddToCache(_dbContext, rootEntityType, key, dataToCache);
+        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, T? dataToCache)
+            => _dbQueryCacheStore.AddToCache(_dbContext, rootEntityType, key, transactionId, dataToCache);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(IDbQueryCacheKey key)
             => _dbQueryCacheStore.GetCached<T>(_dbContext, key, _metrics);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
-            => _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, create, _metrics);
+        public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create)
+            => _dbQueryCacheStore.GetOrAdd(_dbContext, rootEntityType, key, transactionId, create, _metrics);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
-            => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, create, _metrics);
+        public ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create)
+            => _dbQueryCacheStore.GetOrAddAsync(_dbContext, rootEntityType, key, transactionId, create, _metrics);
     }
 }

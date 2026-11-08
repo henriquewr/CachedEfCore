@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Cache.Store;
+using CachedEfCore.DependencyManager;
 using CachedEfCore.EntityMapping;
 using CachedEfCore.SqlAnalysis;
 using Microsoft.EntityFrameworkCore;
@@ -27,14 +28,37 @@ namespace CachedEfCore.Interceptors
 
         #region Transactions
 
-        private class TransactionState
+        public sealed class TransactionState
         {
             public required Guid TransactionId { get; init; }
+            /// <summary>
+            /// This isn't root entities, but every upper related entity from the root entities that are being changed in the transaction.
+            /// </summary>
             public required HashSet<IEntityType> StateChangingEntities { get; init; }
             public required bool CanHaveDirtyReads { get; init; }
         }
 
         private readonly ConditionalWeakTable<DbContext, TransactionState> _conditionalWeakTable = new ConditionalWeakTable<DbContext, TransactionState>();
+
+        public bool TryGetTransactionState([NotNullWhen(true)] DbContext? dbContext, [NotNullWhen(true)] out TransactionState? transactionState)
+        {
+            if (dbContext is not null && _conditionalWeakTable.TryGetValue(dbContext, out var state))
+            {
+                if (dbContext.Database.CurrentTransaction is null)
+                {
+                    // Transaction was disposed
+                    // When disposing transactions, there's no way to properly remove the state
+                    _conditionalWeakTable.Remove(dbContext);
+                    transactionState = null;
+                    return false;
+                }
+
+                transactionState = state;
+                return true;
+            }
+            transactionState = null;
+            return false;
+        }
 
         private void TryRemoveCommitedTransactionData(DbContext? dbContext)
         {
@@ -46,7 +70,7 @@ namespace CachedEfCore.Interceptors
 
                 if (transactionData.StateChangingEntities.Count != 0)
                 {
-                    dbQueryCacheStore.RemoveRootEntities(transactionData.StateChangingEntities);
+                    dbQueryCacheStore.RemoveDependentEntities(transactionData.StateChangingEntities);
                 }
             }
         }
@@ -60,7 +84,7 @@ namespace CachedEfCore.Interceptors
 
                 if (transactionData.StateChangingEntities.Count != 0)
                 {
-                    await dbQueryCacheStore.RemoveRootEntitiesAsync(transactionData.StateChangingEntities).ConfigureAwait(false);
+                    await dbQueryCacheStore.RemoveDependentEntitiesAsync(transactionData.StateChangingEntities).ConfigureAwait(false);
                 }
             }
         }
@@ -91,7 +115,7 @@ namespace CachedEfCore.Interceptors
             {
                 var state = new TransactionState
                 {
-                    StateChangingEntities = new HashSet<IEntityType>(8),
+                    StateChangingEntities = new HashSet<IEntityType>(32),
                     TransactionId = transactionId,
                     CanHaveDirtyReads = transaction?.IsolationLevel == IsolationLevel.ReadUncommitted,
                 };
@@ -288,13 +312,22 @@ namespace CachedEfCore.Interceptors
 
                 if (conditionalWeakTable.TryGetValue(dbContext, out var transactionState))
                 {
-                    transactionState.StateChangingEntities.UnionWith(stateChangingEntities);
                     dbQueryCacheStore.RemoveAllByTransactionId(transactionState.TransactionId);
 
                     if (transactionState.CanHaveDirtyReads)
                     {
                         dbQueryCacheStore.RemoveRootEntities(stateChangingEntities);
                     }
+
+                    var entityDependency = dbContext.GetService<EntityDependency>();
+
+                    foreach (var rootEntity in stateChangingEntities)
+                    {
+                        var upperRelatedEntities = entityDependency.GetUpperRelatedEntities(rootEntity);
+
+                        transactionState.StateChangingEntities.UnionWith(upperRelatedEntities);
+                    }
+
                 }
                 else
                 {
@@ -324,13 +357,20 @@ namespace CachedEfCore.Interceptors
 
                 if (conditionalWeakTable.TryGetValue(dbContext, out var transactionState))
                 {
-                    transactionState.StateChangingEntities.UnionWith(stateChangingEntities);
-
                     await dbQueryCacheStore.RemoveAllByTransactionIdAsync(transactionState.TransactionId).ConfigureAwait(false);
 
                     if (transactionState.CanHaveDirtyReads)
                     {
                         await dbQueryCacheStore.RemoveRootEntitiesAsync(stateChangingEntities).ConfigureAwait(false);
+                    }
+
+                    var entityDependency = dbContext.GetService<EntityDependency>();
+
+                    foreach (var rootEntity in stateChangingEntities)
+                    {
+                        var upperRelatedEntities = entityDependency.GetUpperRelatedEntities(rootEntity);
+
+                        transactionState.StateChangingEntities.UnionWith(upperRelatedEntities);
                     }
                 }
                 else

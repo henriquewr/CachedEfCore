@@ -160,7 +160,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
                 
                 var rootType = typeof(object); // any type
 
-                dbQueryCacheStore1.AddToCache(rootType, cacheKey, valueToCache);
+                dbQueryCacheStore1.AddToCache(rootType, cacheKey, transaction.TransactionId, valueToCache);
 
                 var cached = dbQueryCacheStore1.GetCached<string>(cacheKey);
                 Assert.Same(valueToCache, cached);
@@ -197,7 +197,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
             };
             var rootType = typeof(object); // any type
 
-            dbQueryCacheStore1.AddToCache(rootType, cacheKey, valueToCache);
+            dbQueryCacheStore1.AddToCache(rootType, cacheKey, null, valueToCache);
 
             var cached = dbQueryCacheStore1.GetCached<string>(cacheKey);
             Assert.Same(valueToCache, cached);
@@ -235,7 +235,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheStoreTests
             };
             var rootType = typeof(NonLazyLoadEntity);
 
-            dbQueryCacheStore1.AddToCache(rootType, cacheKey, valueToCache);
+            dbQueryCacheStore1.AddToCache(rootType, cacheKey, null, valueToCache);
 
             var cached = dbQueryCacheStore1.GetCached<string>(cacheKey);
             Assert.Same(valueToCache, cached);

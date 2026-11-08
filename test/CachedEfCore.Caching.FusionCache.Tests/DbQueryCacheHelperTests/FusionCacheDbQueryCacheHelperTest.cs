@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using Xunit;
 using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.Memory;
+using ZiggyCreatures.Caching.Fusion.NullObjects;
 
 namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
 {
@@ -41,8 +42,13 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                 {
                     CacheName = key,
                     RemoveByTagBehavior = RemoveByTagBehavior.Remove,
+                    DefaultEntryOptions = new FusionCacheEntryOptions()
+                    {
+                        Duration = TimeSpan.FromMinutes(5),
+                    }
                 });
-                var backplane = new MemoryBackplane(new MemoryBackplaneOptions());
+
+                var backplane = new MemoryBackplane(new MemoryBackplaneOptions() { ConnectionId = key });
 
                 cache.SetupBackplane(backplane);
                 return cache;

@@ -42,7 +42,7 @@ namespace CachedEfCore.SqlServer.Tests.Caching
 
             var valueToCache = "ValueToCache";
 
-            cacheStore.AddToCache(typeof(TestEntity), cacheKey, valueToCache);
+            cacheStore.AddToCache(typeof(TestEntity), cacheKey, null, valueToCache);
 
             var cachedValue = cacheStore.GetCached<string>(cacheKey);
 
@@ -73,7 +73,7 @@ namespace CachedEfCore.SqlServer.Tests.Caching
 
             var valueToCache = "ValueToCache";
 
-            cacheStore.AddToCache(typeof(TestEntity), cacheKey, valueToCache);
+            cacheStore.AddToCache(typeof(TestEntity), cacheKey, null, valueToCache);
 
             var cachedValue = cacheStore.GetCached<string>(cacheKey);
 
