@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
 
@@ -18,16 +19,16 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetUpperRelatedEntities(Type rootType)
         {
-            if (TryGetIEntityType(rootType, out var fastEntityType))
+            if (TryGetIEntityTypes(rootType, out var fastEntityTypes))
             {
-                return GetUpperRelatedEntitiesImpl(fastEntityType);
+                return GetUpperRelatedEntitiesMultipleImpl(fastEntityTypes);
             }
 
             if (!_allEntitiesUpperRelatedCache.TryGetValue(rootType, out var underRelatedEntities))
             {
                 var entities = GetAllEntitiesByType(GetShallowTypes(rootType));
 
-                underRelatedEntities = GetEntities(entities, GetUpperRelatedEntitiesImpl);
+                underRelatedEntities = GetEntities(entities, GetUpperRelatedEntitiesSingleImpl);
 
                 _allEntitiesUpperRelatedCache[rootType] = underRelatedEntities;
             }
@@ -37,10 +38,41 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetUpperRelatedEntities(IEntityType rootEntityType)
         {
-            return GetUpperRelatedEntitiesImpl(rootEntityType);
+            return GetUpperRelatedEntitiesSingleImpl(rootEntityType);
         }
 
-        private FrozenSet<IEntityType> GetUpperRelatedEntitiesImpl(IEntityType rootEntityType)
+        private FrozenSet<IEntityType> GetUpperRelatedEntitiesMultipleImpl(ImmutableArray<IEntityType> rootEntityTypes)
+        {
+            if (rootEntityTypes.Length == 1)
+            {
+                return GetUpperRelatedEntitiesSingleImpl(rootEntityTypes[0]);
+            }
+
+            var entities = string.Join(',', rootEntityTypes.Select(x => x.Name));
+
+            var key = new UpperRelatedCacheKey(entities);
+
+            if (_upperRelatedCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var visited = new HashSet<IEntityType>();
+
+            foreach (var rootEntityType in rootEntityTypes)
+            {
+                var upperRelated = GetUpperRelatedEntitiesSingleImpl(rootEntityType);
+                visited.UnionWith(upperRelated);
+            }
+
+            var cache = visited.ToFrozenSet();
+
+            _upperRelatedCache[key] = cache;
+
+            return cache;
+        }
+
+        private FrozenSet<IEntityType> GetUpperRelatedEntitiesSingleImpl(IEntityType rootEntityType)
         {
             var key = new UpperRelatedCacheKey(rootEntityType.Name);
 
@@ -158,7 +190,7 @@ namespace CachedEfCore.DependencyManager
 
         private IEnumerable<IEntityType> GetEntitiesReferencingTypeInDependentOnEntityAttribute(Type typeInAttribute)
         {
-            var typesWithAttr = _typeEntity.Where(x => x.Key.GetCustomAttribute<DependentOnEntityAttribute>()?.DependentEntities.Contains(typeInAttribute) == true).Select(x => x.Value);
+            var typesWithAttr = _typeEntityMapping.Mapping.Where(x => x.Key.GetCustomAttribute<DependentOnEntityAttribute>()?.DependentEntities.Contains(typeInAttribute) == true).SelectMany(x => x.Value);
 
             return typesWithAttr;
         }

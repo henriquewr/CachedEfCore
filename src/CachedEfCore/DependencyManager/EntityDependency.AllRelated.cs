@@ -3,6 +3,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 
 namespace CachedEfCore.DependencyManager
 {
@@ -15,9 +17,9 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetAllRelatedEntities(Type rootType, bool underRelatedIncludingFks)
         {
-            if (TryGetIEntityType(rootType, out var fastEntityType))
+            if (TryGetIEntityTypes(rootType, out var fastEntityType))
             {
-                return GetAllRelatedEntitiesImpl(fastEntityType, underRelatedIncludingFks);
+                return GetAllRelatedEntitiesMultipleImpl(fastEntityType, underRelatedIncludingFks);
             }
 
             var cacheKey = new AllEntitiesAllRelatedCacheKey(rootType, underRelatedIncludingFks);
@@ -36,17 +38,52 @@ namespace CachedEfCore.DependencyManager
 
         public FrozenSet<IEntityType> GetAllRelatedEntities(IEntityType rootEntityType, bool underRelatedIncludingFks)
         {
-            return GetAllRelatedEntitiesImpl(rootEntityType, underRelatedIncludingFks);
-        }
-
-        private FrozenSet<IEntityType> GetAllRelatedEntitiesImpl(IEntityType rootEntityType, bool underRelatedIncludingFks)
-        {
             var key = $"{underRelatedIncludingFks}.{rootEntityType.Name}";
             if (_allRelatedCache.TryGetValue(key, out var cached))
             {
                 return cached;
             }
 
+            var visited = GetAllRelatedEntitiesSingleImpl(rootEntityType, underRelatedIncludingFks);
+
+            var cache = visited.ToFrozenSet();
+
+            _allRelatedCache[key] = cache;
+
+            return cache;
+        }
+
+        private FrozenSet<IEntityType> GetAllRelatedEntitiesMultipleImpl(ImmutableArray<IEntityType> rootEntityTypes, bool underRelatedIncludingFks)
+        {
+            if (rootEntityTypes.Length == 1)
+            {
+                return GetAllRelatedEntities(rootEntityTypes[0], underRelatedIncludingFks).ToFrozenSet();
+            }
+
+            var entities = string.Join(',', rootEntityTypes.Select(x => x.Name));
+            var key = $"{underRelatedIncludingFks}.[{entities}]";
+            if (_allRelatedCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var allVisited = new HashSet<IEntityType>();
+
+            foreach (var rootEntityType in rootEntityTypes)
+            {
+                var visited = GetAllRelatedEntitiesSingleImpl(rootEntityType, underRelatedIncludingFks);
+                allVisited.UnionWith(visited);
+            }
+
+            var cache = allVisited.ToFrozenSet();
+
+            _allRelatedCache[key] = cache;
+
+            return cache;
+        }
+
+        private HashSet<IEntityType> GetAllRelatedEntitiesSingleImpl(IEntityType rootEntityType, bool underRelatedIncludingFks)
+        {
             var visited = new HashSet<IEntityType>();
             var stack = new Stack<IEntityType>();
 
@@ -68,7 +105,7 @@ namespace CachedEfCore.DependencyManager
                     stack.Push(upperRelatedEntity);
                 }
 
-                var underRelated = GetShallowUnderRelatedEntities(currentEntity, underRelatedIncludingFks, false);
+                var underRelated = GetShallowUnderRelatedEntities(currentEntity, underRelatedIncludingFks);
 
                 foreach (var underRelatedEntity in underRelated)
                 {
@@ -76,11 +113,7 @@ namespace CachedEfCore.DependencyManager
                 }
             }
 
-            var cache = visited.ToFrozenSet();
-
-            _allRelatedCache[key] = cache;
-
-            return cache;
+            return visited;
         }
     }
 }
