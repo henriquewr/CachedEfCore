@@ -77,7 +77,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
             };
             var rootType = typeof(object); // any type
 
-            dbQueryCacheStore.AddToCache(rootType, cacheKey, valueToCache);
+            dbQueryCacheStore.AddToCache(rootType, cacheKey, null, valueToCache);
 
             if (isDbContextDependent)
             {
@@ -118,7 +118,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             object dbContextDependentValue = "someValue";
 
-            dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, dbContextDependentValue);
+            dbQueryCacheStore.AddToCache(rootType, dependentCacheKey, null, dbContextDependentValue);
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
 
@@ -164,7 +164,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             Parallel.ForEach(keys, parallelOptions, key =>
             {
-                dbQueryCacheStore.AddToCache(rootType, key, dataToCache);
+                dbQueryCacheStore.AddToCache(rootType, key, null, dataToCache);
             });
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);
@@ -195,7 +195,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 
             foreach (var key in keys)
             {
-                dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, dataToCache);
+                dbQueryCacheStore.AddToCache(typeof(object) /* any type */, key, null, dataToCache);
             }
 
             Assert.Single(dbQueryCacheInternalStore._dbContextDependentKeys);

@@ -15,7 +15,7 @@ namespace CachedEfCore.Caching.InMemory.Store
     {
         internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
         internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();
-        internal readonly object _transactions = new();
+        private readonly object _transactions = new();
 
         private readonly IMemoryCache _cache;
 
@@ -87,11 +87,8 @@ namespace CachedEfCore.Caching.InMemory.Store
             {
                 foreach (var item in _dbContextDependentKeys)
                 {
-                    if (_dbContextDependentKeys.Remove(item.Key))
-                    {
-                        item.Value.Cancel();
-                        item.Value.Dispose();
-                    }
+                    item.Value.Cancel();
+                    item.Value.Dispose();
                 }
                 _dbContextDependentKeys.Clear();
             }
@@ -115,9 +112,9 @@ namespace CachedEfCore.Caching.InMemory.Store
         {
             var l_typeKeys = _typeKeys;
 
-            foreach (var item in entitiesToRemove)
+            lock (_typeKeys)
             {
-                lock (_typeKeys)
+                foreach (var item in entitiesToRemove)
                 {
                     if (l_typeKeys.Remove(item.ClrType, out var cts))
                     {
@@ -146,21 +143,20 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
+        public void AddToCache(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, object? dataToCache)
         {
-            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
             var inMemoryKey = GetKey(key, transactionId);
 
             InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InternalAddToCache<T>(DbContext dbContext,
+        private void InternalAddToCache(DbContext dbContext,
             Type rootEntityType, 
             object cacheKey,
             DbContextId? dependentDbContext, 
             Guid? transactionId, 
-            T? dataToCache)
+            object? dataToCache)
         {
             var dbQueryCacheInMemoryCache = dbContext.GetService<DbQueryCacheStoreInMemoryCacheEntryOptions>();
 
@@ -208,9 +204,8 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<T> create, IDbQueryCacheMetrics metrics)
+        public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create, IDbQueryCacheMetrics metrics)
         {
-            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
             var inMemoryKey = GetKey(key, transactionId);
 
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
@@ -227,9 +222,8 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
+        public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
         {
-            var transactionId = dbContext.Database.CurrentTransaction?.TransactionId;
             var inMemoryKey = GetKey(key, transactionId);
 
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))

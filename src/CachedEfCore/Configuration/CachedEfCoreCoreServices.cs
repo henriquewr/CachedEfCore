@@ -156,7 +156,15 @@ namespace CachedEfCore.Configuration
 
             yield return new CachedEfCoreService
             {
-                ServiceDescriptor = ServiceDescriptor.Singleton<IInterceptor, DbStateInterceptor>(),
+                ServiceDescriptor = ServiceDescriptor.Singleton<DbStateInterceptor, DbStateInterceptor>(),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
+            };
+
+            yield return new CachedEfCoreService
+            {
+                ServiceDescriptor = ServiceDescriptor.Singleton<IInterceptor, DbStateInterceptor>(sp => sp.GetRequiredService<DbStateInterceptor>()),
                 GetServiceProviderHashCode = null,
                 ShouldUseSameServiceProvider = null,
                 Options = null,

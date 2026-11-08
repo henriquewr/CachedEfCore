@@ -2,10 +2,13 @@
 using CachedEfCore.Cache.KeyGeneration.ExpressionKeyGen;
 using CachedEfCore.Cache.Store;
 using CachedEfCore.DependencyManager;
+using CachedEfCore.EntityMapping;
+using CachedEfCore.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.ObjectPool;
 using System;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -18,11 +21,33 @@ namespace CachedEfCore.Cache.Helper
         private static readonly AsyncLocal<ValuePrinter> _printerAsyncLocal = new();
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool = new DefaultObjectPoolProvider().CreateStringBuilderPool();
 
-        private static void ResetAsyncLocalPrinter()
+        private static Guid? GetTransactionIdAffectectingQuery(Type rootEntity, DbContext dbContext)
+        {
+            var dbStateInterceptor = dbContext.GetService<DbStateInterceptor>();
+            if (dbStateInterceptor.TryGetTransactionState(dbContext, out var transactionState))
+            {
+                var typeEntityMapping = TypeEntityMapping.GetOrAdd(dbContext.Model);
+
+                if (typeEntityMapping.Mapping.TryGetValue(rootEntity, out var entities))
+                {
+                    var queryCanBeAffectedBecauseTransaction = entities.Any(transactionState.StateChangingEntities.Contains);
+
+                    return queryCanBeAffectedBecauseTransaction
+                        ? transactionState.TransactionId
+                        : null;
+                }
+            }
+
+            return null;
+        }
+
+        private static void ResetAsyncLocalPrinter(DbContext dbContext)
         {
             if (_printerAsyncLocal.Value is null || _printerAsyncLocal.Value.IsDisposed)
             {
-                _printerAsyncLocal.Value = new();
+                var jsonSerializerOptions = dbContext.GetService<KeyGeneratorVisitorJsonSerializerOptions>().Options;
+
+                _printerAsyncLocal.Value = new(jsonSerializerOptions);
             }
             else
             {
@@ -49,7 +74,7 @@ namespace CachedEfCore.Cache.Helper
 
             StringBuilder? stringBuilder = null;
 
-            ResetAsyncLocalPrinter();
+            ResetAsyncLocalPrinter(dbContext);
 
             var keyGeneratorVisitor = dbContext.GetService<KeyGeneratorVisitor>();
             var printabilityChecker = dbContext.GetService<IPrintabilityChecker>();
@@ -101,7 +126,9 @@ namespace CachedEfCore.Cache.Helper
             }
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
+            var transactionIdAffectingQuery = GetTransactionIdAffectectingQuery(rootEntity, dbContext);
+
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, transactionIdAffectingQuery, getDataFromDatabase);
 
             return result;
         }
@@ -131,7 +158,8 @@ namespace CachedEfCore.Cache.Helper
             var expressionKey = new DbQueryCacheKey.ExpressionKey(keyGenerated.Value.Expression);
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, keyGenerated.Value.AdditionalJson, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
+            var transactionIdAffectingQuery = GetTransactionIdAffectectingQuery(rootEntity, dbContext);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, transactionIdAffectingQuery, getDataFromDatabase);
 
             return result;
         }
@@ -185,7 +213,8 @@ namespace CachedEfCore.Cache.Helper
             }
 
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, additionalKey, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
-            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
+            var transactionIdAffectingQuery = GetTransactionIdAffectectingQuery(rootEntity, dbContext);
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, transactionIdAffectingQuery, getDataFromDatabase);
 
             return result;
         }
@@ -207,7 +236,9 @@ namespace CachedEfCore.Cache.Helper
             var cacheKey = new DbQueryCacheKey(rootEntity, expressionKey, null, getDataFromDatabase.Method, DependentDbContext(dbContext, getDataFromDatabase.Method.ReturnType));
             
             var dbQueryCacheStore = dbContext.GetService<IDbQueryCacheStore>();
-            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, getDataFromDatabase);
+            var transactionIdAffectingQuery = GetTransactionIdAffectectingQuery(rootEntity, dbContext);
+
+            var result = dbQueryCacheStore.GetOrAdd(rootEntity, cacheKey, transactionIdAffectingQuery, getDataFromDatabase);
 
             return result;
         }

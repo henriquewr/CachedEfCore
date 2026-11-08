@@ -24,10 +24,10 @@ namespace CachedEfCore.Cache.Store
         void RemoveAll();
         ValueTask RemoveAllAsync();
 
-        void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache);
+        void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, T? dataToCache);
         T? GetCached<T>(IDbQueryCacheKey key);
 
-        T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create);
-        ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create);
+        T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create);
+        ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create);
     }
 }

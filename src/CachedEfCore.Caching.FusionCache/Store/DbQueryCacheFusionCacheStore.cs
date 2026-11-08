@@ -222,10 +222,8 @@ namespace CachedEfCore.Caching.FusionCache.Store
             => transactionId.HasValue || dependentDbContext.HasValue;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, T? dataToCache)
+        public void AddToCache<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, T? dataToCache)
         {
-            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
-
             var stringKey = GetKey(key, transactionId);
 
             var metadata = GetMetadata(rootEntityType, transactionId, key.DependentDbContext);
@@ -265,10 +263,8 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Func<T> create)
+        public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create)
         {
-            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
-
             var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;
@@ -298,10 +294,8 @@ namespace CachedEfCore.Caching.FusionCache.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Func<Task<T>> create)
+        public async ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create)
         {
-            var transactionId = _dbContext.Database.CurrentTransaction?.TransactionId;
-
             var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;

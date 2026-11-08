@@ -21,6 +21,7 @@ namespace CachedEfCore.Caching.Specification.Tests.Common
 
         public DbSet<LazyLoadEntity> LazyLoadEntity { get; set; }
         public DbSet<NonLazyLoadEntity> NonLazyLoadEntity { get; set; }
+        public DbSet<AnotherNonLazyLoadEntity> AnotherNonLazyLoadEntity { get; set; }
     }
 
     public class LazyLoadEntity
@@ -33,9 +34,20 @@ namespace CachedEfCore.Caching.Specification.Tests.Common
 
         [ForeignKey(nameof(LazyLoadPropId))]
         public virtual NonLazyLoadEntity? LazyLoadProp { get; set; }
+
+        public int Value { get; set; }
     }
 
     public class NonLazyLoadEntity
+    {
+        [Key]
+        public int Id { get; set; }
+
+        public string? StringData { get; set; }
+        public int Value { get; set; }
+    }
+
+    public class AnotherNonLazyLoadEntity
     {
         [Key]
         public int Id { get; set; }

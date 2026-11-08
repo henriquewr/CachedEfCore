@@ -24,11 +24,6 @@ namespace CachedEfCore.Cache.KeyGeneration
 
         }
 
-        public ValuePrinter() : this(new JsonSerializerOptions { IncludeFields = true }, new MemoryStream())
-        {
-
-        }
-
         public void ResetState()
         {
             _memoryStream.Position = 0;

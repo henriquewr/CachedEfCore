@@ -531,7 +531,7 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                     async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
                     {
-                        var cacheKey = $"cacheKeyAddToCache-{savedEntity.Id}";
+                        var cacheKey = $"cacheKeyAddToCache-{caller}-{savedEntity.Id}";
 
                         var cachedEntity = async
                             ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
@@ -545,10 +545,185 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                         var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
 
-                        return (cachedEntity, fromDb);
+                        return (fromDb, cachedEntity);
                     }
                 }
             });
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Should_Get_Cache_Inside_Transaction_When_Saving_Doesnt_Impact_Query(bool async)
+        {
+            var serviceProvider = CreatePooledProvider(true);
+
+            using var scope = serviceProvider.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+            await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+            await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+            var createdEntity = new LazyLoadEntity
+            {
+                LazyLoadProp = new NonLazyLoadEntity
+                {
+                    StringData = "Test",
+                    Value = 0,
+                }
+            };
+
+            var anotherNonLazyLoadEntity = new AnotherNonLazyLoadEntity
+            {
+                StringData = "Test",
+                Value = 0,
+            };
+
+            dbContext.AnotherNonLazyLoadEntity.Add(anotherNonLazyLoadEntity);
+            dbContext.LazyLoadEntity.Add(createdEntity);
+
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+            await AssertLazyLoadEntity(null);
+            await AssertLazyLoadEntity(true);
+
+            await AssertNonLazyLoadEntity(null);
+            await AssertNonLazyLoadEntity(true);
+            
+            await AssertAnotherNonLazyLoadEntity(null);
+            await AssertAnotherNonLazyLoadEntity(true);
+
+            using (var transaction = async ? await dbContext.Database.BeginTransactionAsync(TestContext.Current.CancellationToken) : dbContext.Database.BeginTransaction())
+            {
+                await AssertLazyLoadEntity(true);
+                await AssertNonLazyLoadEntity(true);
+                await AssertAnotherNonLazyLoadEntity(true);
+
+                var entity = await dbContext.LazyLoadEntity.FirstAsync(x => x.Id == createdEntity.Id, cancellationToken: TestContext.Current.CancellationToken);
+
+                Assert.Equal(0, entity.Value);
+
+                entity.Value++;
+
+                if (async)
+                {
+                    await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+                }
+                else
+                {
+                    dbContext.SaveChanges();
+                }
+
+                await AssertLazyLoadEntity(null);
+                await AssertLazyLoadEntity(true);
+
+                await AssertNonLazyLoadEntity(null);
+                await AssertNonLazyLoadEntity(true);
+
+                await AssertAnotherNonLazyLoadEntity(true);
+            }
+
+            async Task AssertLazyLoadEntity(bool? cached)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.Equal(entitiesFromContext.FromDb, entitiesFromContext.FromCache);
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var cacheKey = $"entity-{createdEntity.Id}";
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(LazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.LazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(LazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.LazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).First();
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.Equal(!cached.Value, created);
+                    }
+
+                    var fromDb = await dbContext.LazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    return (fromDb, cachedEntity);
+                }
+            }
+
+            async Task AssertNonLazyLoadEntity(bool? cached)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.Equal(entitiesFromContext.FromDb, entitiesFromContext.FromCache);
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var cacheKey = $"entity-{createdEntity.Id}";
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(LazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).First();
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.Equal(!cached.Value, created);
+                    }
+
+                    var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    return (fromDb, cachedEntity);
+                }
+            }
+
+            async Task AssertAnotherNonLazyLoadEntity(bool? cached)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.Equal(entitiesFromContext.FromDb, entitiesFromContext.FromCache);
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var cacheKey = $"entity-{createdEntity.Id}";
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(AnotherNonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.AnotherNonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(AnotherNonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.AnotherNonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).First();
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.Equal(!cached.Value, created);
+                    }
+
+                    var fromDb = await dbContext.AnotherNonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    return (fromDb, cachedEntity);
+                }
+            }
         }
     }
 }
