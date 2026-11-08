@@ -6,6 +6,7 @@ using CachedEfCore.Caching.Specification.Tests.DbQueryCacheStoreTests;
 using CachedEfCore.DependencyInjection;
 using CachedEfCore.SqlServer.Configuration;
 using CachedEfCore.Tests.Common.Fixtures;
+using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,13 +17,15 @@ using Xunit;
 
 namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
 {
-    public class InMemoryDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>
+    public class InMemoryDbQueryCacheStoreTest : DbQueryCacheStoreSpecificationTest, IClassFixture<ServiceProviderFixture>, IClassFixture<SqlServerTestContainer>
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
+        private readonly SqlServerTestContainer _sqlServerTestContainer;
 
-        public InMemoryDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture)
+        public InMemoryDbQueryCacheStoreTest(ServiceProviderFixture serviceProviderFixture, SqlServerTestContainer sqlServerTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
+            _sqlServerTestContainer = sqlServerTestContainer;
         }
 
         protected override IServiceProvider CreateProvider(bool withLazyLoading)
@@ -34,7 +37,7 @@ namespace CachedEfCore.Caching.InMemory.Tests.DbQueryCacheStoreTests
                    {
                        options.UseLazyLoadingProxies(withLazyLoading);
 
-                       options.UseInMemoryDatabase("test");
+                       options.UseSqlServer(_sqlServerTestContainer.ConnectionString);
 
                        options.UseCachedEfCore(cachedEfCoreOptions =>
                        {
