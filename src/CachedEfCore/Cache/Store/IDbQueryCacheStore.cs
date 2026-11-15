@@ -21,6 +21,9 @@ namespace CachedEfCore.Cache.Store
         void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove);
         ValueTask RemoveDependentEntitiesAsync(HashSet<IEntityType> entitiesToRemove);
 
+        IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd);
+        ValueTask<IPendingEntities> AddPendingEntitiesAsync(IEnumerable<IEntityType> entitiesToAdd);
+
         void RemoveAll();
         ValueTask RemoveAllAsync();
 

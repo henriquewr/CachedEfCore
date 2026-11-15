@@ -10,13 +10,10 @@ using CachedEfCore.Tests.Common.TestContainers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
 using ZiggyCreatures.Caching.Fusion;
-using ZiggyCreatures.Caching.Fusion.Backplane.Memory;
-using ZiggyCreatures.Caching.Fusion.NullObjects;
 
 namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
 {
@@ -24,47 +21,29 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
     {
         private readonly ServiceProviderFixture _serviceProviderFixture;
         private readonly PostgreSqlTestContainer _postgreSqlTestContainer;
+        private readonly IFusionCache _fusionCacheInstance;
 
         public FusionCacheDbQueryCacheHelperTest(ServiceProviderFixture serviceProviderFixture,
             PostgreSqlTestContainer postgreSqlTestContainer)
         {
             _serviceProviderFixture = serviceProviderFixture;
             _postgreSqlTestContainer = postgreSqlTestContainer;
-        }
 
-        private readonly ConcurrentDictionary<string, IFusionCache> _fusionCacheInstances = new();
-
-        private IFusionCache GetInstance(string key)
-        {
-            var fusionCache = _fusionCacheInstances.GetOrAdd(key, static key =>
+            _fusionCacheInstance = new ZiggyCreatures.Caching.Fusion.FusionCache(new FusionCacheOptions
             {
-                var cache = new ZiggyCreatures.Caching.Fusion.FusionCache(new FusionCacheOptions
+                CacheName = Guid.NewGuid().ToString(),
+                RemoveByTagBehavior = RemoveByTagBehavior.Remove,
+                DefaultEntryOptions = new FusionCacheEntryOptions()
                 {
-                    CacheName = key,
-                    RemoveByTagBehavior = RemoveByTagBehavior.Remove,
-                    DefaultEntryOptions = new FusionCacheEntryOptions()
-                    {
-                        Duration = TimeSpan.FromMinutes(5),
-                    }
-                });
-
-                var backplane = new MemoryBackplane(new MemoryBackplaneOptions() { ConnectionId = key });
-
-                cache.SetupBackplane(backplane);
-                return cache;
+                    Duration = TimeSpan.FromMinutes(5),
+                }
             });
-
-            fusionCache.Clear();
-
-            return fusionCache;
         }
 
         protected override IServiceProvider CreateProvider(bool withLazyLoading, [CallerMemberName] string caller = "")
             => _serviceProviderFixture.CreateProvider(services =>
             {
                 services.AddCachedEfCore();
-
-                var fusionCache = GetInstance(caller);
 
                 services.AddDbContext<TestDbContext>((serviceProvider, options) =>
                 {
@@ -76,7 +55,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                     {
                         cachedEfCoreOptions.UseFusionCacheStore(options =>
                         {
-                            options.UseInstance(fusionCache);
+                            options.UseInstance(_fusionCacheInstance);
                         });
 
                         cachedEfCoreOptions.UsePostgreSql();
@@ -89,8 +68,6 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
             {
                 services.AddCachedEfCore();
 
-                var fusionCache = GetInstance(caller);
-
                 services.AddDbContextPool<TestDbContext>((serviceProvider, options) =>
                 {
                     options.UseLazyLoadingProxies(withLazyLoading);
@@ -101,7 +78,7 @@ namespace CachedEfCore.Caching.FusionCache.Tests.DbQueryCacheHelperTests
                     {
                         cachedEfCoreOptions.UseFusionCacheStore(options =>
                         {
-                            options.UseInstance(fusionCache);
+                            options.UseInstance(_fusionCacheInstance);
                         });
 
                         cachedEfCoreOptions.UsePostgreSql();

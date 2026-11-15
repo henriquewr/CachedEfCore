@@ -1,4 +1,5 @@
 ﻿using CachedEfCore.Configuration;
+using System;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {

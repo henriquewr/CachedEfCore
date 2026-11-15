@@ -1,13 +1,18 @@
 ﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
@@ -16,12 +21,13 @@ namespace CachedEfCore.Caching.InMemory.Store
         internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
         internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();
         private readonly object _transactions = new();
-
+        private readonly InMemoryPendingEntitiesImplementation _inMemoryPendingEntitiesImplementation;
         private readonly IMemoryCache _cache;
 
-        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache)
+        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, InMemoryPendingEntitiesImplementation inMemoryPendingEntitiesImplementation)
         {
             _cache = cache;
+            _inMemoryPendingEntitiesImplementation = inMemoryPendingEntitiesImplementation;
         }
 
         private record class TransactionKey(Guid TransactionId);
@@ -125,6 +131,9 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
         }
 
+        public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
+            => _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(DbContext dbContext, IDbQueryCacheKey key, IDbQueryCacheMetrics metrics)
         {
@@ -206,8 +215,14 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create, IDbQueryCacheMetrics metrics)
         {
-            var inMemoryKey = GetKey(key, transactionId);
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                metrics.ReportCachePending();
+                var value = create();
+                return value;
+            }
 
+            var inMemoryKey = GetKey(key, transactionId);
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
@@ -224,8 +239,16 @@ namespace CachedEfCore.Caching.InMemory.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
         {
-            var inMemoryKey = GetKey(key, transactionId);
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                var valueTask = create().ConfigureAwait(false);
+                metrics.ReportCachePending();
 
+                var value = await valueTask;
+                return value;
+            }
+
+            var inMemoryKey = GetKey(key, transactionId);
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();

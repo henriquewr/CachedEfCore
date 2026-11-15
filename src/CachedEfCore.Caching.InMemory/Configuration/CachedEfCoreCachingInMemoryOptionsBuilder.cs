@@ -3,6 +3,7 @@ using CachedEfCore.Configuration;
 using CachedEfCore.DbContextOptionExtensions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {

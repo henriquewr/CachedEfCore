@@ -117,6 +117,21 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.Commit();
                     }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var dbTransaction = transaction.GetDbTransaction();
+
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                        await dbTransaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                        dbTransaction.Dispose();
+                    }
                 }, async);
         }
 
@@ -163,6 +178,21 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     else
                     {
                         transaction.Rollback();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var dbTransaction = transaction.GetDbTransaction();
+
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                        await dbTransaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                        dbTransaction.Dispose();
                     }
                 }, async);
         }
@@ -219,7 +249,21 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.RollbackToSavepoint(savepointName);
                     }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    var dbTransaction = transaction.GetDbTransaction();
 
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                        await dbTransaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                        dbTransaction.Dispose();
+                    }
                 }, async);
         }
 
@@ -271,6 +315,9 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                         transaction.Dispose();
                         dbTransaction.Dispose();
                     }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
                 }, async);
         }
 
@@ -313,6 +360,17 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.Commit();
                     }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                    }
                 }, async);
         }
 
@@ -353,6 +411,17 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     else
                     {
                         transaction.Rollback();
+                    }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
                     }
                 }, async);
         }
@@ -403,7 +472,17 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.RollbackToSavepoint(savepointName);
                     }
-
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                    }
                 }, async);
         }
 
@@ -445,6 +524,9 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                     {
                         transaction.Dispose();
                     }
+                },
+                async static (dbContext, transaction, async, cancellationToken) =>
+                {
                 }, async);
         }
 
@@ -466,10 +548,11 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
             Func<TestDbContext, IsolationLevel, bool, CancellationToken, Task<IDbContextTransaction>> createTransaction,
             Func<TestDbContext, NonLazyLoadEntity, IDbContextTransaction, bool, CancellationToken, Task> saveFunction,
             Func<TestDbContext, IDbContextTransaction, bool, CancellationToken, Task> function,
+            Func<TestDbContext, IDbContextTransaction, bool, CancellationToken, Task> dispose,
             bool async,
             [CallerMemberName] string caller = "")
         {
-            var serviceProvider = CreatePooledProvider(true, caller);
+            var serviceProvider = CreatePooledProvider(false, caller);
 
             var entities = Enumerable.Range(0, configuration.Iterations).Select(static x => new NonLazyLoadEntity
             {
@@ -500,8 +583,11 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                 var dbQueryCacheHelper1 = scope1.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
                 var dbQueryCacheHelper2 = scope2.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
 
-                using (var transaction = await createTransaction(dbContext1, configuration.IsolationLevel, async, cancellationToken))
+                await AssertEntity();
+                await AssertEntity();
+
                 {
+                    var transaction = await createTransaction(dbContext1, configuration.IsolationLevel, async, cancellationToken);
                     var entity = await dbContext1.NonLazyLoadEntity.FirstAsync(x => x.Id == savedEntity.Id, cancellationToken: cancellationToken);
 
                     Assert.Equal(0, entity.Value);
@@ -519,7 +605,12 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                     await AssertEntity();
                     await AssertEntity();
+
+                    await dispose(dbContext1, transaction, async, cancellationToken);
                 }
+
+                await AssertEntity();
+                await AssertEntity();
 
                 async Task AssertEntity()
                 {
@@ -545,7 +636,7 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                         var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
 
-                        return (fromDb, cachedEntity);
+                        return (cachedEntity, fromDb);
                     }
                 }
             });
@@ -556,7 +647,7 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
         [InlineData(false)]
         public virtual async Task Should_Get_Cache_Inside_Transaction_When_Saving_Doesnt_Impact_Query(bool async)
         {
-            var serviceProvider = CreatePooledProvider(true);
+            var serviceProvider = CreatePooledProvider(false);
 
             using var scope = serviceProvider.CreateScope();
 
@@ -592,7 +683,7 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
             await AssertNonLazyLoadEntity(null);
             await AssertNonLazyLoadEntity(true);
-            
+
             await AssertAnotherNonLazyLoadEntity(null);
             await AssertAnotherNonLazyLoadEntity(true);
 
@@ -650,12 +741,12 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                     if (cached.HasValue)
                     {
-                        Assert.Equal(!cached.Value, created);
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
                     }
 
                     var fromDb = await dbContext.LazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
 
-                    return (fromDb, cachedEntity);
+                    return (cachedEntity, fromDb);
                 }
             }
 
@@ -683,12 +774,12 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                     if (cached.HasValue)
                     {
-                        Assert.Equal(!cached.Value, created);
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
                     }
 
                     var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
 
-                    return (fromDb, cachedEntity);
+                    return (cachedEntity, fromDb);
                 }
             }
 
@@ -716,12 +807,270 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
 
                     if (cached.HasValue)
                     {
-                        Assert.Equal(!cached.Value, created);
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
                     }
 
                     var fromDb = await dbContext.AnotherNonLazyLoadEntity.AsNoTracking().Where(x => x.Id == createdEntity.Id).Select(x => x.Value).FirstAsync();
 
-                    return (fromDb, cachedEntity);
+                    return (cachedEntity, fromDb);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithreaded_Between_Multiple_Scopes(bool async)
+        {
+            var serviceProvider = CreatePooledProvider(false);
+
+            var savedEntity = new NonLazyLoadEntity
+            {
+                StringData = $"Test",
+                Value = 0,
+            };
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+                dbContext.NonLazyLoadEntity.AddRange(savedEntity);
+
+                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+            }
+
+            await Parallel.ForAsync(0, 5000, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 2, CancellationToken = TestContext.Current.CancellationToken }, async (i, cancellationToken) =>
+            {
+                using var scope = serviceProvider.CreateScope();
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+
+                await dbContext.NonLazyLoadEntity.Where(x => x.Id == savedEntity.Id).ExecuteUpdateAsync(p => p.SetProperty(x => x.Value, x => x.Value + 1), cancellationToken: cancellationToken);
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+            });
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+            }
+
+            async Task AssertEntity(bool? cached, IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.True(entitiesFromContext.FromDb <= entitiesFromContext.FromCache, $"Expected FromDb ({entitiesFromContext.FromDb}) to be less than or equal to FromCache ({entitiesFromContext.FromCache})");
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    var cacheKey = $"{nameof(Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithreaded_Between_Multiple_Scopes)}-cacheKeyAddToCache-{savedEntity.Id}";
+
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
+                    }
+
+                    return (cachedEntity, fromDb);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction_On_Commit(bool async)
+        {
+            await Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction(async,
+                async (async, dbContext, transaction) =>
+                {
+                    if (async)
+                    {
+                        await transaction.CommitAsync(TestContext.Current.CancellationToken);
+                    }
+                    else
+                    {
+                        transaction.Commit();
+                    }
+                });
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction_On_Rollback(bool async)
+        {
+            await Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction(async,
+                async (async, dbContext, transaction) =>
+                {
+                    if (async)
+                    {
+                        await transaction.RollbackAsync(TestContext.Current.CancellationToken);
+                    }
+                    else
+                    {
+                        transaction.Rollback();
+                    }
+                });
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction_On_Dispose(bool async)
+        {
+            await Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction(async,
+                async (async, dbContext, transaction) =>
+                {
+                    if (async)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                    else
+                    {
+                        transaction.Dispose();
+                    }
+                });
+        }
+
+        protected virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction(bool async, Func<bool, DbContext, IDbContextTransaction, Task> transactionFunc, [CallerMemberName] string caller = "")
+        {
+            var serviceProvider = CreatePooledProvider(false, caller);
+            var savedEntity = new NonLazyLoadEntity
+            {
+                StringData = $"Test",
+                Value = 0,
+            };
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+                dbContext.NonLazyLoadEntity.Add(savedEntity);
+
+                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+            }
+
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var readTask = Parallel.ForAsync(0, 2000, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = TestContext.Current.CancellationToken }, async (i, cancellationToken) =>
+            {
+                await start.Task.WaitAsync(cancellationToken);
+
+                using var scope = serviceProvider.CreateScope();
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+
+                await dbContext.NonLazyLoadEntity.Where(x => x.Id == savedEntity.Id).ExecuteUpdateAsync(p => p.SetProperty(x => x.Value, x => x.Value + 1), cancellationToken: cancellationToken);
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+            });
+
+            var transactionTask = Parallel.ForAsync(0, 2000, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = TestContext.Current.CancellationToken }, async (i, cancellationToken) =>
+            {
+                await start.Task.WaitAsync(cancellationToken);
+
+                using var scope = serviceProvider.CreateScope();
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+
+                using (var transaction = async ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : dbContext.Database.BeginTransaction())
+                {
+                    await dbContext.NonLazyLoadEntity.Where(x => x.Id == savedEntity.Id).ExecuteUpdateAsync(p => p.SetProperty(x => x.Value, x => x.Value + 1), cancellationToken: cancellationToken);
+                    
+                    await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                    await AssertEntity(null, dbQueryCacheHelper, dbContext);
+
+                    await transactionFunc(async, dbContext, transaction).ConfigureAwait(false);
+
+                    await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                    await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                }
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+            });
+
+            start.SetResult();
+
+            await Task.WhenAll(transactionTask, readTask);
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+            }
+
+            async Task AssertEntity(bool? cached, IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.True(entitiesFromContext.FromDb <= entitiesFromContext.FromCache, $"Expected FromDb ({entitiesFromContext.FromDb}) to be less than or equal to FromCache ({entitiesFromContext.FromCache})");
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    var cacheKey = $"{nameof(Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction)}-cacheKeyAddToCache-{caller}-{savedEntity.Id}";
+
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
+                    }
+
+                    return (cachedEntity, fromDb);
                 }
             }
         }

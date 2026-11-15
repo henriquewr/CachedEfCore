@@ -1,12 +1,19 @@
 ﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.Caching.Memory;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace CachedEfCore.Caching.FusionCache.Store
@@ -16,6 +23,7 @@ namespace CachedEfCore.Caching.FusionCache.Store
         private readonly DbContext _dbContext;
         private readonly IFusionCache _fusionCache;
         private readonly IDbQueryCacheMetrics _metrics;
+        private readonly InMemoryPendingEntitiesImplementation _inMemoryPendingEntitiesImplementation;
 
         private readonly string _dbContextCacheTag;
 
@@ -30,17 +38,19 @@ namespace CachedEfCore.Caching.FusionCache.Store
         private static string GetTypeCacheTag(Type type)
             => $"T:{type.AssemblyQualifiedName}";
 
-        public DbQueryCacheFusionCacheStore(DbContext dbContext, 
+        public DbQueryCacheFusionCacheStore(DbContext dbContext,
             IFusionCache fusionCache,
-            IDbQueryCacheMetrics metrics)
+            IDbQueryCacheMetrics metrics,
+            InMemoryPendingEntitiesImplementation inMemoryPendingEntitiesImplementation)
         {
             _fusionCache = fusionCache;
             _dbContext = dbContext;
             _dbContextCacheTag = GetDbContextCacheTag(dbContext.ContextId);
             _metrics = metrics;
+            _inMemoryPendingEntitiesImplementation = inMemoryPendingEntitiesImplementation;
         }
 
-        private sealed record class FusionCacheKey(IDbQueryCacheKey Key, Guid TransactionId)
+        private sealed record class FusionCacheKeyWithTransaction(IDbQueryCacheKey Key, Guid TransactionId)
         {
             public override string ToString()
             {
@@ -73,7 +83,7 @@ namespace CachedEfCore.Caching.FusionCache.Store
         private static string GetKey(IDbQueryCacheKey existingKey, Guid? transactionId)
         {
             return transactionId.HasValue
-                ? new FusionCacheKey(existingKey, transactionId.Value).ToString()
+                ? new FusionCacheKeyWithTransaction(existingKey, transactionId.Value).ToString()
                 : existingKey.Stringify();
         }
 
@@ -141,12 +151,10 @@ namespace CachedEfCore.Caching.FusionCache.Store
             return _fusionCache.RemoveByTagAsync(GetDbContextCacheTag(dbContextId));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll()
         {
             _fusionCache.Clear();
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask RemoveAllAsync()
         {
             return _fusionCache.ClearAsync();
@@ -196,6 +204,15 @@ namespace CachedEfCore.Caching.FusionCache.Store
             return _fusionCache.RemoveByTagAsync(tags);
         }
 
+        public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
+        {
+            return _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
+        }
+
+        public ValueTask<IPendingEntities> AddPendingEntitiesAsync(IEnumerable<IEntityType> entitiesToAdd)
+        {
+            return new(AddPendingEntities(entitiesToAdd));
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private (bool SkipDistributedAndNotifications, string[] Tags) GetMetadata(Type rootEntityType, Guid? transactionId, DbContextId? dependentDbContext)
@@ -265,6 +282,13 @@ namespace CachedEfCore.Caching.FusionCache.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create)
         {
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                _metrics.ReportCachePending();
+                var value = create();
+                return value;
+            }
+
             var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;
@@ -296,6 +320,15 @@ namespace CachedEfCore.Caching.FusionCache.Store
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<T> GetOrAddAsync<T>(Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create)
         {
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                var valueTask = create().ConfigureAwait(false);
+                _metrics.ReportCachePending();
+
+                var value = await valueTask;
+
+                return value;
+            }
             var stringKey = GetKey(key, transactionId);
 
             var isCacheHit = true;

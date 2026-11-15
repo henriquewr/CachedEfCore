@@ -3,7 +3,11 @@ using CachedEfCore.Cache.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
@@ -93,6 +97,14 @@ namespace CachedEfCore.Caching.InMemory.Store
         {
             _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove);
             return ValueTask.CompletedTask;
+        }
+
+        public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
+            => _dbQueryCacheStore.AddPendingEntities(entitiesToAdd);
+        public ValueTask<IPendingEntities> AddPendingEntitiesAsync(IEnumerable<IEntityType> entitiesToAdd)
+        {
+            var pendingEntities = _dbQueryCacheStore.AddPendingEntities(entitiesToAdd);
+            return new(pendingEntities);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

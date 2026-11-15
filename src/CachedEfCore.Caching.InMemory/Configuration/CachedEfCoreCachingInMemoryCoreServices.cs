@@ -1,8 +1,11 @@
 ﻿using CachedEfCore.Cache.Store;
 using CachedEfCore.Caching.InMemory.Store;
+using CachedEfCore.Caching.Store;
 using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {
@@ -24,6 +27,18 @@ namespace CachedEfCore.Caching.InMemory.Configuration
                     Options = null,
                 };
             }
+
+            yield return new CachedEfCoreService
+            {
+                ServiceDescriptor = ServiceDescriptor.Singleton<InMemoryPendingEntitiesImplementation, InMemoryPendingEntitiesImplementation>(static sp =>
+                {
+                    var memoryCache = sp.GetRequiredService<IMemoryCache>();
+                    return new InMemoryPendingEntitiesImplementation(memoryCache, new object());
+                }),
+                GetServiceProviderHashCode = null,
+                ShouldUseSameServiceProvider = null,
+                Options = null,
+            };
 
             yield return new CachedEfCoreService
             {
