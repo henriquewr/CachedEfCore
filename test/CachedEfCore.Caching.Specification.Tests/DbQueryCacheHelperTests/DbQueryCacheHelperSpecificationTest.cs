@@ -1048,22 +1048,23 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
                 async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
                 {
                     var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+                    var cachedEntity = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
 
                     var cacheKey = $"{nameof(Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction)}-cacheKeyAddToCache-{caller}-{savedEntity.Id}";
 
                     bool created = false;
 
-                    var cachedEntity = async
-                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
-                        {
-                            created = true;
-                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
-                        }, cacheKey)
-                        : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
-                        {
-                            created = true;
-                            return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
-                        }, cacheKey);
+                    //var cachedEntity = async
+                    //    ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, () =>
+                    //    {
+                    //        created = true;
+                    //        return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+                    //    }, cacheKey)
+                    //    : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
+                    //    {
+                    //        created = true;
+                    //        return dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
+                    //    }, cacheKey);
 
                     if (cached.HasValue)
                     {
