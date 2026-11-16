@@ -131,37 +131,10 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
         }
 
-        private sealed class InMemoryPendingEntities : IPendingEntities
-        {
-            private readonly IPendingEntities _pendingEntities;
-            private readonly DbQueryCacheInMemoryInternalStore _dbQueryCacheInMemoryInternalStore;
-            public InMemoryPendingEntities(IPendingEntities pendingEntities, DbQueryCacheInMemoryInternalStore dbQueryCacheInMemoryInternalStore)
-            {
-                _pendingEntities = pendingEntities;
-                _dbQueryCacheInMemoryInternalStore = dbQueryCacheInMemoryInternalStore;
-            }
-
-            public IReadOnlyList<IEntityType> EntityTypes { get => _pendingEntities.EntityTypes; }
-
-            public void Dispose()
-            {
-                _dbQueryCacheInMemoryInternalStore.RemoveDependentEntities(_pendingEntities.EntityTypes);
-                _pendingEntities.Dispose();
-            }
-
-            public ValueTask DisposeAsync()
-            {
-                _dbQueryCacheInMemoryInternalStore.RemoveDependentEntities(_pendingEntities.EntityTypes);
-                return _pendingEntities.DisposeAsync();
-            }
-        }
-
         public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
         {
             var pendingEntities = _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
-
-            var inMemoryPendingEntities = new InMemoryPendingEntities(pendingEntities, this);
-            return inMemoryPendingEntities;
+            return pendingEntities;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

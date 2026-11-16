@@ -204,36 +204,10 @@ namespace CachedEfCore.Caching.FusionCache.Store
             return _fusionCache.RemoveByTagAsync(tags);
         }
 
-        private sealed class FusionCachePendingEntities : IPendingEntities
-        {
-            private readonly IPendingEntities _pendingEntities;
-            private readonly DbQueryCacheFusionCacheStore _dbQueryCacheFusionCacheStore;
-            public FusionCachePendingEntities(IPendingEntities pendingEntities, DbQueryCacheFusionCacheStore dbQueryCacheFusionCacheStore)
-            {
-                _pendingEntities = pendingEntities;
-                _dbQueryCacheFusionCacheStore = dbQueryCacheFusionCacheStore;
-            }
-
-            public IReadOnlyList<IEntityType> EntityTypes { get => _pendingEntities.EntityTypes; }
-
-            public void Dispose()
-            {
-                _dbQueryCacheFusionCacheStore.RemoveDependentEntities(_pendingEntities.EntityTypes);
-                _pendingEntities.Dispose();
-            }
-
-            public async ValueTask DisposeAsync()
-            {
-                await _dbQueryCacheFusionCacheStore.RemoveDependentEntitiesAsync(_pendingEntities.EntityTypes);
-                await _pendingEntities.DisposeAsync();
-            }
-        }
         public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
         {
             var pendingEntities = _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
-
-            var fusionCachePendingEntities = new FusionCachePendingEntities(pendingEntities, this);
-            return fusionCachePendingEntities;
+            return pendingEntities;
         }
 
         public ValueTask<IPendingEntities> AddPendingEntitiesAsync(IEnumerable<IEntityType> entitiesToAdd)
