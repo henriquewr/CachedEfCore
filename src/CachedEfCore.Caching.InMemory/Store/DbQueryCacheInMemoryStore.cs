@@ -90,10 +90,10 @@ namespace CachedEfCore.Caching.InMemory.Store
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
+        public void RemoveDependentEntities(IEnumerable<IEntityType> entitiesToRemove)
             => _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask RemoveDependentEntitiesAsync(HashSet<IEntityType> entitiesToRemove)
+        public ValueTask RemoveDependentEntitiesAsync(IEnumerable<IEntityType> entitiesToRemove)
         {
             _dbQueryCacheStore.RemoveDependentEntities(entitiesToRemove);
             return ValueTask.CompletedTask;

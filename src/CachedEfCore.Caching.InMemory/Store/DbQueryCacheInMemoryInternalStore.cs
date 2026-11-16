@@ -114,7 +114,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             RemoveDependentEntities(typesToRemove);
         }
 
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
+        public void RemoveDependentEntities(IEnumerable<IEntityType> entitiesToRemove)
         {
             var l_typeKeys = _typeKeys;
 
@@ -131,8 +131,38 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
         }
 
+        private sealed class InMemoryPendingEntities : IPendingEntities
+        {
+            private readonly IPendingEntities _pendingEntities;
+            private readonly DbQueryCacheInMemoryInternalStore _dbQueryCacheInMemoryInternalStore;
+            public InMemoryPendingEntities(IPendingEntities pendingEntities, DbQueryCacheInMemoryInternalStore dbQueryCacheInMemoryInternalStore)
+            {
+                _pendingEntities = pendingEntities;
+                _dbQueryCacheInMemoryInternalStore = dbQueryCacheInMemoryInternalStore;
+            }
+
+            public IReadOnlyList<IEntityType> EntityTypes { get => _pendingEntities.EntityTypes; }
+
+            public void Dispose()
+            {
+                _dbQueryCacheInMemoryInternalStore.RemoveDependentEntities(_pendingEntities.EntityTypes);
+                _pendingEntities.Dispose();
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                _dbQueryCacheInMemoryInternalStore.RemoveDependentEntities(_pendingEntities.EntityTypes);
+                return _pendingEntities.DisposeAsync();
+            }
+        }
+
         public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
-            => _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
+        {
+            var pendingEntities = _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
+
+            var inMemoryPendingEntities = new InMemoryPendingEntities(pendingEntities, this);
+            return inMemoryPendingEntities;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? GetCached<T>(DbContext dbContext, IDbQueryCacheKey key, IDbQueryCacheMetrics metrics)
@@ -231,10 +261,7 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var createdValue = create();
             metrics.ReportCacheMiss();
-            if (!_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
-            {
-                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
-            }
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
             return createdValue;
         }
 
@@ -260,10 +287,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
 
-            if (!_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
-            {
-                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
-            }
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
             return createdValue;
         }
     }
