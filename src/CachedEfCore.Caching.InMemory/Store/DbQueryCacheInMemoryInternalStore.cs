@@ -231,8 +231,10 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var createdValue = create();
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
-
+            if (!_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+            }
             return createdValue;
         }
 
@@ -257,8 +259,11 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
 
+            if (!_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+            }
             return createdValue;
         }
     }
