@@ -18,6 +18,5 @@ namespace CachedEfCore.Caching.FusionCache.Configuration
 
             return this;
         }
-
     }
 }

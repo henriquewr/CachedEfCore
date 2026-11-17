@@ -25,37 +25,6 @@ namespace CachedEfCore.Caching.FusionCache.DbContextOptionExtensions
 
         private IEnumerable<CachedEfCoreService> _orderedServices => _services.OrderBy(x => x.ServiceDescriptor.ServiceKey);
 
-        public void AddService(CachedEfCoreService cachedEfCoreService)
-        {
-            _services.Add(cachedEfCoreService);
-        }
-
-        public void ReplaceService(CachedEfCoreService cachedEfCoreService)
-        {
-            var index = _services.FindIndex(x => x.ServiceDescriptor.ServiceType == cachedEfCoreService.ServiceDescriptor.ServiceType);
-            if (index != -1)
-            {
-                _services[index] = cachedEfCoreService;
-            }
-            else
-            {
-                throw new InvalidOperationException($"Service {cachedEfCoreService.ServiceDescriptor.ServiceType} not found to replace.");
-            }
-        }
-
-        public void AddOrReplaceService(CachedEfCoreService cachedEfCoreService)
-        {
-            var index = _services.FindIndex(x => x.ServiceDescriptor.ServiceType == cachedEfCoreService.ServiceDescriptor.ServiceType);
-            if (index != -1)
-            {
-                _services[index] = cachedEfCoreService;
-            }
-            else
-            {
-                _services.Add(cachedEfCoreService);
-            }
-        }
-
         public DbContextOptionsExtensionInfo Info { get; }
 
         public CachedEfCoreFusionCacheExtension(DbContextOptionsBuilder dbContextOptionsBuilder)
@@ -96,13 +65,13 @@ namespace CachedEfCore.Caching.FusionCache.DbContextOptionExtensions
 
             public override string LogFragment => " CachedEfCore FusionCache ";
 
-            private int? HashCodetServiceProvider;
+            private int? HashCodeServiceProvider;
 
             public override int GetServiceProviderHashCode()
             {
-                if (HashCodetServiceProvider.HasValue)
+                if (HashCodeServiceProvider.HasValue)
                 {
-                    return HashCodetServiceProvider.Value;
+                    return HashCodeServiceProvider.Value;
                 }
 
                 var extension = (CachedEfCoreFusionCacheExtension)this.Extension;
@@ -119,9 +88,9 @@ namespace CachedEfCore.Caching.FusionCache.DbContextOptionExtensions
                     hashCode.Add(item.GetServiceProviderHashCode(item));
                 }
 
-                HashCodetServiceProvider = hashCode.ToHashCode();
+                HashCodeServiceProvider = hashCode.ToHashCode();
 
-                return HashCodetServiceProvider.Value;
+                return HashCodeServiceProvider.Value;
             }
 
             public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)

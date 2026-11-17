@@ -23,11 +23,15 @@ namespace CachedEfCore.Caching.InMemory.Store
         private readonly object _transactions = new();
         private readonly InMemoryPendingEntitiesImplementation _inMemoryPendingEntitiesImplementation;
         private readonly IMemoryCache _cache;
+        private readonly MemoryCacheEntryOptions _memoryCacheEntryOptions;
 
-        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, InMemoryPendingEntitiesImplementation inMemoryPendingEntitiesImplementation)
+        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, 
+            InMemoryPendingEntitiesImplementation inMemoryPendingEntitiesImplementation, 
+            MemoryCacheEntryOptions memoryCacheEntryOptions)
         {
             _cache = cache;
             _inMemoryPendingEntitiesImplementation = inMemoryPendingEntitiesImplementation;
+            _memoryCacheEntryOptions = memoryCacheEntryOptions;
         }
 
         private record class TransactionKey(Guid TransactionId);
@@ -170,9 +174,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             Guid? transactionId, 
             object? dataToCache)
         {
-            var dbQueryCacheInMemoryCache = dbContext.GetService<DbQueryCacheStoreInMemoryCacheEntryOptions>();
-
-            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(dbQueryCacheInMemoryCache.EntryOptions);
+            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_memoryCacheEntryOptions);
             cacheEntry.Value = dataToCache;
 
             lock (_typeKeys)
@@ -189,7 +191,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             {
                 // if dataToCache is null the object is not really dependent to the DbContext instance
 
-                var dbContextId = dbContext.ContextId;
+                var dbContextId = dependentDbContext.Value;
                 lock (_dbContextDependentKeys)
                 {
                     ref var cts = ref CollectionsMarshal.GetValueRefOrAddDefault(_dbContextDependentKeys, dbContextId, out var exists);
