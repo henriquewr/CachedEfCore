@@ -1,13 +1,19 @@
 ﻿using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Cache.Store;
+using CachedEfCore.Caching.Store;
 using CachedEfCore.DependencyManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CachedEfCore.Caching.InMemory.Store
 {
@@ -15,13 +21,20 @@ namespace CachedEfCore.Caching.InMemory.Store
     {
         internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
         internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();
+        private readonly ConcurrentDictionary<Type, StrongBox<uint>> _typeVersions = new();
+
         private readonly object _transactions = new();
-
+        private readonly InMemoryPendingEntitiesImplementation _inMemoryPendingEntitiesImplementation;
         private readonly IMemoryCache _cache;
+        private readonly MemoryCacheEntryOptions _memoryCacheEntryOptions;
 
-        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache)
+        public DbQueryCacheInMemoryInternalStore(IMemoryCache cache, 
+            InMemoryPendingEntitiesImplementation inMemoryPendingEntitiesImplementation, 
+            MemoryCacheEntryOptions memoryCacheEntryOptions)
         {
             _cache = cache;
+            _inMemoryPendingEntitiesImplementation = inMemoryPendingEntitiesImplementation;
+            _memoryCacheEntryOptions = memoryCacheEntryOptions;
         }
 
         private record class TransactionKey(Guid TransactionId);
@@ -81,6 +94,8 @@ namespace CachedEfCore.Caching.InMemory.Store
                     item.Value.Dispose();
                 }
                 _typeKeys.Clear();
+
+                _typeVersions.Clear();
             }
 
             lock (_dbContextDependentKeys)
@@ -108,9 +123,10 @@ namespace CachedEfCore.Caching.InMemory.Store
             RemoveDependentEntities(typesToRemove);
         }
 
-        public void RemoveDependentEntities(HashSet<IEntityType> entitiesToRemove)
+        public void RemoveDependentEntities(IEnumerable<IEntityType> entitiesToRemove)
         {
             var l_typeKeys = _typeKeys;
+            var l_typeVersions = _typeVersions;
 
             lock (_typeKeys)
             {
@@ -121,8 +137,27 @@ namespace CachedEfCore.Caching.InMemory.Store
                         cts.Cancel();
                         cts.Dispose();
                     }
+
+                    if (l_typeVersions.TryGetValue(item.ClrType, out var strongBox))
+                    {
+                        unchecked
+                        {
+                            ++strongBox.Value;
+                        }
+                    }
+                    else
+                    {
+                        l_typeVersions.TryAdd(item.ClrType, new StrongBox<uint> { Value = 0 });
+                    }
                 }
             }
+
+        }
+
+        public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
+        {
+            var pendingEntities = _inMemoryPendingEntitiesImplementation.AddPendingEntities(entitiesToAdd);
+            return pendingEntities;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -147,7 +182,9 @@ namespace CachedEfCore.Caching.InMemory.Store
         {
             var inMemoryKey = GetKey(key, transactionId);
 
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache);
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache, currentVersion, typeVersionValue);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -156,11 +193,11 @@ namespace CachedEfCore.Caching.InMemory.Store
             object cacheKey,
             DbContextId? dependentDbContext, 
             Guid? transactionId, 
-            object? dataToCache)
+            object? dataToCache,
+            uint? currentVersion,
+            StrongBox<uint>? typeVersionValue)
         {
-            var dbQueryCacheInMemoryCache = dbContext.GetService<DbQueryCacheStoreInMemoryCacheEntryOptions>();
-
-            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(dbQueryCacheInMemoryCache.EntryOptions);
+            var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_memoryCacheEntryOptions);
             cacheEntry.Value = dataToCache;
 
             lock (_typeKeys)
@@ -177,7 +214,7 @@ namespace CachedEfCore.Caching.InMemory.Store
             {
                 // if dataToCache is null the object is not really dependent to the DbContext instance
 
-                var dbContextId = dbContext.ContextId;
+                var dbContextId = dependentDbContext.Value;
                 lock (_dbContextDependentKeys)
                 {
                     ref var cts = ref CollectionsMarshal.GetValueRefOrAddDefault(_dbContextDependentKeys, dbContextId, out var exists);
@@ -201,11 +238,23 @@ namespace CachedEfCore.Caching.InMemory.Store
                     cacheEntry.AddExpirationToken(new CancellationChangeToken(cts.Token));
                 }
             }
+
+            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
+            {
+                cacheEntry.Dispose();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetOrAdd<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<T> create, IDbQueryCacheMetrics metrics)
         {
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                metrics.ReportCachePending();
+                var value = create();
+                return value;
+            }
+
             var inMemoryKey = GetKey(key, transactionId);
 
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
@@ -214,16 +263,29 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = create();
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
 
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue, currentVersion, typeVersionValue);
+            
             return createdValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<T> GetOrAddAsync<T>(DbContext dbContext, Type rootEntityType, IDbQueryCacheKey key, Guid? transactionId, Func<Task<T>> create, IDbQueryCacheMetrics metrics)
         {
+            if (_inMemoryPendingEntitiesImplementation.IsPending(rootEntityType))
+            {
+                var valueTask = create().ConfigureAwait(false);
+                metrics.ReportCachePending();
+
+                var value = await valueTask;
+                return value;
+            }
+
             var inMemoryKey = GetKey(key, transactionId);
 
             if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
@@ -232,11 +294,22 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue, currentVersion, typeVersionValue);
 
             return createdValue;
+        }
+
+        private bool IsSameVersion(Type key, uint? currentVersion, StrongBox<uint>? typeVersionValue)
+        {
+            return currentVersion.HasValue && typeVersionValue is not null
+                ? currentVersion.Value == typeVersionValue.Value
+                : !_typeVersions.ContainsKey(key);
         }
     }
 }

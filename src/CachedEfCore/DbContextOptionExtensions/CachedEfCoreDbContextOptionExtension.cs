@@ -85,13 +85,13 @@ namespace CachedEfCore.DbContextOptionExtensions
 
             public override string LogFragment => " CachedEfCore ";
 
-            private int? HashCodetServiceProvider;
+            private int? HashCodeServiceProvider;
 
             public override int GetServiceProviderHashCode()
             {
-                if (HashCodetServiceProvider.HasValue)
+                if (HashCodeServiceProvider.HasValue)
                 {
-                    return HashCodetServiceProvider.Value;
+                    return HashCodeServiceProvider.Value;
                 }
 
                 var extension = (CachedEfCoreDbContextOptionExtension)this.Extension;
@@ -108,9 +108,9 @@ namespace CachedEfCore.DbContextOptionExtensions
                     hashCode.Add(item.GetServiceProviderHashCode(item));
                 }
 
-                HashCodetServiceProvider = hashCode.ToHashCode();
+                HashCodeServiceProvider = hashCode.ToHashCode();
 
-                return HashCodetServiceProvider.Value;
+                return HashCodeServiceProvider.Value;
             }
 
             public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)

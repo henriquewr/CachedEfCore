@@ -1,4 +1,7 @@
-﻿using CachedEfCore.Configuration;
+﻿using CachedEfCore.Caching.InMemory.DbContextOptionExtensions;
+using CachedEfCore.Configuration;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using System;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {
@@ -8,13 +11,12 @@ namespace CachedEfCore.Caching.InMemory.Configuration
         {
             public CachedEfCoreOptionsBuilder UseInMemoryCacheStore(Action<CachedEfCoreCachingInMemoryOptionsBuilder>? configure = null)
             {
-                foreach (var item in CachedEfCoreCachingInMemoryCoreServices.GetCoreServices())
-                {
-                    builder.CachedEfCoreExtension.AddService(item);
-                }
+                var extension = new CachedEfCoreInMemoryCacheExtension(builder.DbContextOptionsBuilder);
 
-                var optionsBuilder = new CachedEfCoreCachingInMemoryOptionsBuilder(builder.CachedEfCoreExtension);
+                var optionsBuilder = new CachedEfCoreCachingInMemoryOptionsBuilder(extension);
                 configure?.Invoke(optionsBuilder);
+
+                ((IDbContextOptionsBuilderInfrastructure)builder.DbContextOptionsBuilder).AddOrUpdateExtension(extension);
 
                 return builder;
             }

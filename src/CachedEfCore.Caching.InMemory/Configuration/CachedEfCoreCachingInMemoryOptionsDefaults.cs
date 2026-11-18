@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
+using System;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {

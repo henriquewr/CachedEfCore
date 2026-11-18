@@ -35,6 +35,8 @@ jobs:
           projects=(
             "src/CachedEfCore/CachedEfCore.csproj"
 
+            "src/CachedEfCore.Caching/CachedEfCore.Caching.csproj"
+
             "src/CachedEfCore.Caching.FusionCache/CachedEfCore.Caching.FusionCache.csproj"
             "src/CachedEfCore.Caching.InMemory/CachedEfCore.Caching.InMemory.csproj"
 

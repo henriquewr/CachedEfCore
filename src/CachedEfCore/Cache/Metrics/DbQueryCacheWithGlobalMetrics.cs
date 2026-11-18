@@ -28,6 +28,12 @@
             _innerCacheMetrics.ReportCacheMiss();
         }
 
+        public void ReportCachePending()
+        {
+            _globalMetrics.ReportCachePending();
+            _innerCacheMetrics.ReportCachePending();
+        }
+
         public void Reset()
         {
             _innerCacheMetrics.Reset();

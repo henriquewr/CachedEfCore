@@ -1,7 +1,9 @@
+
 name: Benchmarks
 
 permissions:
   contents: read
+  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -18,8 +20,19 @@ on:
         default: "*"
         type: string
 
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
 jobs:
   benchmark:
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'run-benchmarks')
+
     runs-on: ubuntu-latest
 
     steps:
@@ -33,24 +46,26 @@ jobs:
 
       - name: Run benchmarks
         shell: bash
+        env:
+          PROJECT: ${{ inputs.project || '' }}
+          FILTER: ${{ inputs.filter || '*' }}
         run: |
-          if [ -z "${{ inputs.project }}" ]; then
+          if [ -z "$PROJECT" ]; then
             mapfile -t projects < <(
               find benchmarks -name "*.csproj" \
-              ! -name "CachedEfCore.Benchmarks.Common.csproj"
+                ! -name "CachedEfCore.Benchmarks.Common.csproj"
             )
           else
             mapfile -t projects < <(
-              find benchmarks \
-                -name "${{ inputs.project }}.csproj"
+              find benchmarks -name "$PROJECT.csproj"
             )
           fi
 
           if [ ${#projects[@]} -eq 0 ]; then
             echo "No benchmark projects found."
 
-            if [ -n "${{ inputs.project }}" ]; then
-              echo "Project: ${{ inputs.project }}"
+            if [ -n "$PROJECT" ]; then
+              echo "Project: $PROJECT"
             fi
 
             exit 1
@@ -69,12 +84,98 @@ jobs:
               --project "$project" \
               --configuration Release \
               -- \
-              --filter "${{ inputs.filter }}"
+              --filter "$FILTER"
           done
 
+      - name: Generate benchmark report
+        if: success()
+        shell: bash
+        run: |
+          REPORT="$RUNNER_TEMP/benchmark-comment.md"
+
+          echo "<!-- benchmark-results -->" > "$REPORT"
+          echo "## Benchmark results" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          if [ -d "BenchmarkDotNet.Artifacts/results" ]; then
+            find BenchmarkDotNet.Artifacts/results \
+              -name "*.md" -type f | sort | while read -r file; do
+
+              echo "### $(basename "$file" .md)" >> "$REPORT"
+              echo "" >> "$REPORT"
+              cat "$file" >> "$REPORT"
+              echo "" >> "$REPORT"
+              echo "---" >> "$REPORT"
+              echo "" >> "$REPORT"
+            done
+          fi
+
+          if [ "$(wc -c < "$REPORT")" -lt 100 ]; then
+            echo "No Markdown benchmark reports were generated." >> "$REPORT"
+          fi
+
+          echo "" >> "$REPORT"
+          echo "[View workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" >> "$REPORT"
+
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment benchmark results on PR
+        if: >-
+          success() &&
+          github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          REPORT_PATH: ${{ runner.temp }}/benchmark-comment.md
+        with:
+          script: |
+            const fs = require('fs');
+
+            const marker = '<!-- benchmark-results -->';
+            const body = fs.readFileSync(
+              process.env.REPORT_PATH,
+              'utf8'
+            );
+
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number
+              }
+            );
+
+            const existingComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes(marker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body
+              });
+
+              core.info('Updated existing benchmark comment.');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+
+              core.info('Created benchmark comment.');
+            }
+
       - name: Upload benchmark results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: BenchmarkDotNet.Artifacts/**
-          if-no-files-found: error
+          if-no-files-found: warn

@@ -4,6 +4,7 @@
     {
         void Reset();
 
+        void ReportCachePending();
         void ReportCacheHit();
         void ReportCacheMiss();
 
@@ -12,10 +13,11 @@
 
     public readonly struct CacheMetrics
     {
+        public required readonly uint Pending { get; init; }
         public required readonly uint Hits { get; init; }
         public required readonly uint Misses { get; init; }
 
-        public readonly ulong All => Hits + Misses;
+        public readonly ulong All => (ulong)Hits + (ulong)Misses;
 
         public readonly double Ratio => All == 0 ? 0 : (double)Hits / All;
     }

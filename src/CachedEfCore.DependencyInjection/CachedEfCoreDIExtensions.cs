@@ -2,7 +2,6 @@
 using CachedEfCore.Cache.Metrics;
 using CachedEfCore.Configuration;
 using CachedEfCore.DbContextOptionExtensions;
-using CachedEfCore.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;

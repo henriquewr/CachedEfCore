@@ -1,36 +1,29 @@
-﻿using CachedEfCore.Caching.InMemory.Store;
-using CachedEfCore.Configuration;
-using CachedEfCore.DbContextOptionExtensions;
+﻿using CachedEfCore.Caching.InMemory.DbContextOptionExtensions;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace CachedEfCore.Caching.InMemory.Configuration
 {
     public class CachedEfCoreCachingInMemoryOptionsBuilder
     {
-        private readonly CachedEfCoreDbContextOptionExtension _cachedEfCoreExtension;
+        private readonly CachedEfCoreInMemoryCacheExtension _cachedEfCoreInMemoryCacheExtension;
 
-        public CachedEfCoreCachingInMemoryOptionsBuilder(CachedEfCoreDbContextOptionExtension cachedEfCoreExtension)
+        public CachedEfCoreCachingInMemoryOptionsBuilder(CachedEfCoreInMemoryCacheExtension cachedEfCoreInMemoryCacheExtension)
         {
-            _cachedEfCoreExtension = cachedEfCoreExtension;
+            _cachedEfCoreInMemoryCacheExtension = cachedEfCoreInMemoryCacheExtension;
         }
 
         public CachedEfCoreCachingInMemoryOptionsBuilder WithMemoryCacheEntryOptions(Func<MemoryCacheEntryOptions, MemoryCacheEntryOptions> action)
         {
             var memoryCacheOptions = action(CachedEfCoreCachingInMemoryOptionsDefaults.DefaultMemoryCacheEntryOptions);
 
-            var service = new CachedEfCoreService
-            {
-                ServiceDescriptor = ServiceDescriptor.Scoped<DbQueryCacheStoreInMemoryCacheEntryOptions>(sp =>
-                {
-                    return new DbQueryCacheStoreInMemoryCacheEntryOptions() { EntryOptions = memoryCacheOptions };
-                }),
-                GetServiceProviderHashCode = null,
-                ShouldUseSameServiceProvider = null,
-                Options = null,
-            };
+            _cachedEfCoreInMemoryCacheExtension.WithMemoryCacheEntryOptions(memoryCacheOptions);
+            return this;
+        }
 
-            _cachedEfCoreExtension.ReplaceService(service);
+        public CachedEfCoreCachingInMemoryOptionsBuilder UseInstance(IMemoryCache memoryCacheInstance)
+        {
+            _cachedEfCoreInMemoryCacheExtension.WithMemoryCacheInstance(memoryCacheInstance);
 
             return this;
         }

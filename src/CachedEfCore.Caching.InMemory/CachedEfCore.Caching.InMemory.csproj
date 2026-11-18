@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
+		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Configurations>Debug;Release;TestRelease;TestDebug</Configurations>
 	</PropertyGroup>
@@ -17,7 +17,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\CachedEfCore\CachedEfCore.csproj" />
+		<ProjectReference Include="..\CachedEfCore.Caching\CachedEfCore.Caching.csproj" />
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='TestDebug'">

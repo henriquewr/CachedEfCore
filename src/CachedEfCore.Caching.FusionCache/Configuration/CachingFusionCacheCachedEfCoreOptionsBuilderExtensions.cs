@@ -1,6 +1,7 @@
 ﻿using CachedEfCore.Caching.FusionCache.DbContextOptionExtensions;
 using CachedEfCore.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using System;
 
 namespace CachedEfCore.Caching.FusionCache.Configuration
 {
