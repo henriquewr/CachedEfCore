@@ -182,7 +182,9 @@ namespace CachedEfCore.Caching.InMemory.Store
         {
             var inMemoryKey = GetKey(key, transactionId);
 
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache);
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, dataToCache, currentVersion, typeVersionValue);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -191,9 +193,11 @@ namespace CachedEfCore.Caching.InMemory.Store
             object cacheKey,
             DbContextId? dependentDbContext, 
             Guid? transactionId, 
-            object? dataToCache)
+            object? dataToCache,
+            uint? currentVersion,
+            StrongBox<uint>? typeVersionValue)
         {
-            using var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_memoryCacheEntryOptions);
+            var cacheEntry = _cache.CreateEntry(cacheKey).SetOptions(_memoryCacheEntryOptions);
             cacheEntry.Value = dataToCache;
 
             lock (_typeKeys)
@@ -234,6 +238,11 @@ namespace CachedEfCore.Caching.InMemory.Store
                     cacheEntry.AddExpirationToken(new CancellationChangeToken(cts.Token));
                 }
             }
+
+            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
+            {
+                cacheEntry.Dispose();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -248,22 +257,19 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var inMemoryKey = GetKey(key, transactionId);
 
-            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
-            uint? currentVersion = typeVersionValue?.Value;
-
-            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue) && IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = create();
             metrics.ReportCacheMiss();
 
-            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
-            {
-                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
-            }
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue, currentVersion, typeVersionValue);
             
             return createdValue;
         }
@@ -282,22 +288,19 @@ namespace CachedEfCore.Caching.InMemory.Store
 
             var inMemoryKey = GetKey(key, transactionId);
 
-            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
-            uint? currentVersion = typeVersionValue?.Value;
-
-            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue) && IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
 
-            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
-            {
-                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
-            }
+            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue, currentVersion, typeVersionValue);
 
             return createdValue;
         }
