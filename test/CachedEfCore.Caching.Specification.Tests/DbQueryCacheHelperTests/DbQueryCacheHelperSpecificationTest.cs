@@ -906,6 +906,96 @@ namespace CachedEfCore.Caching.Specification.Tests.DbQueryCacheHelperTests
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
+        public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithreaded_Between_Multiple_Scopes_And_Waits_To_Return(bool async)
+        {
+            var serviceProvider = CreatePooledProvider(false);
+
+            var savedEntity = new NonLazyLoadEntity
+            {
+                StringData = $"Test",
+                Value = 0,
+            };
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                await dbContext.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+                await dbContext.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+                dbContext.NonLazyLoadEntity.AddRange(savedEntity);
+
+                await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+            }
+
+            await Parallel.ForAsync(0, 1000, new ParallelOptions { MaxDegreeOfParallelism = 2, CancellationToken = TestContext.Current.CancellationToken }, async (i, cancellationToken) =>
+            {
+                using var scope = serviceProvider.CreateScope();
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+
+                await dbContext.NonLazyLoadEntity.Where(x => x.Id == savedEntity.Id).ExecuteUpdateAsync(p => p.SetProperty(x => x.Value, x => x.Value + 1), cancellationToken: cancellationToken);
+
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+                await AssertEntity(null, dbQueryCacheHelper, dbContext);
+            });
+
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+                var dbQueryCacheHelper = scope.ServiceProvider.GetRequiredService<IDbQueryCacheHelper>();
+
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+                await AssertEntity(true, dbQueryCacheHelper, dbContext);
+            }
+
+            async Task AssertEntity(bool? cached, IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+            {
+                var entitiesFromContext = await GetEntityFrom(dbQueryCacheHelper, dbContext);
+                Assert.True(entitiesFromContext.FromDb <= entitiesFromContext.FromCache, $"Expected FromDb ({entitiesFromContext.FromDb}) to be less than or equal to FromCache ({entitiesFromContext.FromCache})");
+
+                async Task<(int FromCache, int FromDb)> GetEntityFrom(IDbQueryCacheHelper dbQueryCacheHelper, TestDbContext dbContext)
+                {
+                    var fromDb = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+
+                    var cacheKey = $"{nameof(Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithreaded_Between_Multiple_Scopes_And_Waits_To_Return)}-cacheKeyAddToCache-{savedEntity.Id}";
+
+                    bool created = false;
+
+                    var cachedEntity = async
+                        ? await dbQueryCacheHelper.GetOrAddAsync(typeof(NonLazyLoadEntity), dbContext, async () =>
+                        {
+                            created = true;
+                            var value = await dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).FirstAsync();
+                            await Task.Delay(50);
+                            return value;
+                        }, cacheKey)
+                        : dbQueryCacheHelper.GetOrAdd(typeof(NonLazyLoadEntity), dbContext, () =>
+                        {
+                            created = true;
+                            var value = dbContext.NonLazyLoadEntity.AsNoTracking().Where(x => x.Id == savedEntity.Id).Select(x => x.Value).First();
+                            Thread.Sleep(50);
+                            return value;
+                        }, cacheKey);
+
+                    if (cached.HasValue)
+                    {
+                        Assert.True(cached.Value != created, $"Expected value to {(cached.Value ? "" : "not ")}be cached");
+                    }
+
+                    return (cachedEntity, fromDb);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
         public virtual async Task Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction_On_Commit(bool async)
         {
             await Getting_From_Cache_Should_Not_Return_Old_Values_When_Multithread_Between_Multiple_Scopes_And_Transaction(async,

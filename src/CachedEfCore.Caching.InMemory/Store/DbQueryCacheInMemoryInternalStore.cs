@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -20,6 +21,8 @@ namespace CachedEfCore.Caching.InMemory.Store
     {
         internal readonly Dictionary<DbContextId, CancellationTokenSource> _dbContextDependentKeys = new(0);
         internal readonly Dictionary<Type, CancellationTokenSource> _typeKeys = new();
+        private readonly ConcurrentDictionary<Type, StrongBox<uint>> _typeVersions = new();
+
         private readonly object _transactions = new();
         private readonly InMemoryPendingEntitiesImplementation _inMemoryPendingEntitiesImplementation;
         private readonly IMemoryCache _cache;
@@ -91,6 +94,8 @@ namespace CachedEfCore.Caching.InMemory.Store
                     item.Value.Dispose();
                 }
                 _typeKeys.Clear();
+
+                _typeVersions.Clear();
             }
 
             lock (_dbContextDependentKeys)
@@ -121,6 +126,7 @@ namespace CachedEfCore.Caching.InMemory.Store
         public void RemoveDependentEntities(IEnumerable<IEntityType> entitiesToRemove)
         {
             var l_typeKeys = _typeKeys;
+            var l_typeVersions = _typeVersions;
 
             lock (_typeKeys)
             {
@@ -131,8 +137,21 @@ namespace CachedEfCore.Caching.InMemory.Store
                         cts.Cancel();
                         cts.Dispose();
                     }
+
+                    if (l_typeVersions.TryGetValue(item.ClrType, out var strongBox))
+                    {
+                        unchecked
+                        {
+                            ++strongBox.Value;
+                        }
+                    }
+                    else
+                    {
+                        l_typeVersions.TryAdd(item.ClrType, new StrongBox<uint> { Value = 0 });
+                    }
                 }
             }
+
         }
 
         public IPendingEntities AddPendingEntities(IEnumerable<IEntityType> entitiesToAdd)
@@ -234,9 +253,19 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = create();
             metrics.ReportCacheMiss();
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+
+            if (currentVersion.HasValue && typeVersionValue is not null
+                ? currentVersion.Value == typeVersionValue.Value
+                : !_typeVersions.ContainsKey(rootEntityType))
+            {
+                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+            }
+            
             return createdValue;
         }
 
@@ -259,10 +288,19 @@ namespace CachedEfCore.Caching.InMemory.Store
                 return cachedValue!;
             }
 
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
 
-            InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+            if (currentVersion.HasValue && typeVersionValue is not null 
+                ? currentVersion.Value == typeVersionValue.Value
+                : !_typeVersions.ContainsKey(rootEntityType))
+            {
+                InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
+            }
+
             return createdValue;
         }
     }
