@@ -247,21 +247,20 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
 
             var inMemoryKey = GetKey(key, transactionId);
-            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
+
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue) && IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
-            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
-            uint? currentVersion = typeVersionValue?.Value;
-
             var createdValue = create();
             metrics.ReportCacheMiss();
 
-            if (currentVersion.HasValue && typeVersionValue is not null
-                ? currentVersion.Value == typeVersionValue.Value
-                : !_typeVersions.ContainsKey(rootEntityType))
+            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
             {
                 InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
             }
@@ -282,26 +281,32 @@ namespace CachedEfCore.Caching.InMemory.Store
             }
 
             var inMemoryKey = GetKey(key, transactionId);
-            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue))
+
+            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
+            uint? currentVersion = typeVersionValue?.Value;
+
+            if (_cache.TryGetValue<T>(inMemoryKey, out var cachedValue) && IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
             {
                 metrics.ReportCacheHit();
                 return cachedValue!;
             }
 
-            _typeVersions.TryGetValue(rootEntityType, out var typeVersionValue);
-            uint? currentVersion = typeVersionValue?.Value;
-
             var createdValue = await create().ConfigureAwait(false);
             metrics.ReportCacheMiss();
 
-            if (currentVersion.HasValue && typeVersionValue is not null 
-                ? currentVersion.Value == typeVersionValue.Value
-                : !_typeVersions.ContainsKey(rootEntityType))
+            if (IsSameVersion(rootEntityType, currentVersion, typeVersionValue))
             {
                 InternalAddToCache(dbContext, rootEntityType, inMemoryKey, key.DependentDbContext, transactionId, createdValue);
             }
 
             return createdValue;
+        }
+
+        private bool IsSameVersion(Type key, uint? currentVersion, StrongBox<uint>? typeVersionValue)
+        {
+            return currentVersion.HasValue && typeVersionValue is not null
+                ? currentVersion.Value == typeVersionValue.Value
+                : !_typeVersions.ContainsKey(key);
         }
     }
 }
